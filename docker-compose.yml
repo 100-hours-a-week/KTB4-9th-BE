@@ -64,14 +64,14 @@ services:
     expose:
       - "8000"
     environment:
-      CHROMA_HOST: chromadb
+      CHROMA_HOST: chroma
       CHROMA_PORT: "8000"
-      CHROMA_URL: http://chromadb:8000
+      CHROMA_URL: http://chroma:8000
     networks:
       - proxy-network
       - ai-network
     depends_on:
-      - chromadb
+      - chroma
 
   mysql:
     image: mysql:8.4

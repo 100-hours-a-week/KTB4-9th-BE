@@ -2,6 +2,7 @@
 /build/
 /target/
 /.gradle/
+/out/
 
 # IDE
 /.idea/
