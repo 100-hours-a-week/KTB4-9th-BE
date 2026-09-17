@@ -1,4 +1,54 @@
 name: ci-v1.yml
+
 on:
+  pull_request:
+    branches:
+      - dev
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  test-and-build:
+    name: Test and verify Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Grant Gradle wrapper permission
+        run: chmod +x ./gradlew
+
+      - name: Run tests
+        run: ./gradlew test --no-daemon
+
+      - name: Verify Docker image build
+        env:
+          IMAGE_TAG: ci-${{ github.sha }}
+        run: |
+          docker build \
+            --tag "cosmos-backend:${IMAGE_TAG}" \
+            .

@@ -1,4 +1,127 @@
-name: cd-vi.yml
+name: cd-v1.yml
+
 on:
+  workflow_run:
+    workflows:
+      - ci-v1.yml
+    branches:
+      - main
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-production
+  cancel-in-progress: false
 
 jobs:
+  deploy:
+    name: Build, push and deploy
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+
+    env:
+      IMAGE_REPOSITORY: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}
+      IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+
+    steps:
+      - name: Checkout merged commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Validate deployment settings
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+          DOCKERHUB_REPOSITORY: ${{ vars.DOCKERHUB_REPOSITORY }}
+        run: |
+          set -euo pipefail
+
+          : "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required}"
+          : "${DOCKERHUB_TOKEN:?DOCKERHUB_TOKEN is required}"
+          : "${DOCKERHUB_REPOSITORY:?DOCKERHUB_REPOSITORY is required}"
+          : "${EC2_HOST:?EC2_HOST is required}"
+          : "${EC2_USER:?EC2_USER is required}"
+          : "${EC2_SSH_PRIVATE_KEY:?EC2_SSH_PRIVATE_KEY is required}"
+          : "${EC2_KNOWN_HOSTS:?EC2_KNOWN_HOSTS is required}"
+
+          if [[ ! "${IMAGE_TAG}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "IMAGE_TAG must be a 40-character Git SHA."
+            exit 1
+          fi
+
+      - name: Log in to Docker Hub
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          printf '%s' "${DOCKERHUB_TOKEN}" |
+            docker login \
+              --username "${{ secrets.DOCKERHUB_USERNAME }}" \
+              --password-stdin
+
+      - name: Build backend image
+        run: |
+          set -euo pipefail
+
+          docker build \
+            --pull \
+            --tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}" \
+            .
+
+      - name: Push SHA image
+        run: |
+          set -euo pipefail
+
+          docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+
+      - name: Configure SSH
+        env:
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          install -d -m 700 "${HOME}/.ssh"
+
+          printf '%s\n' "${EC2_SSH_PRIVATE_KEY}" \
+            > "${RUNNER_TEMP}/ec2_key"
+
+          printf '%s\n' "${EC2_KNOWN_HOSTS}" \
+            > "${HOME}/.ssh/known_hosts"
+
+          chmod 600 "${RUNNER_TEMP}/ec2_key"
+          chmod 600 "${HOME}/.ssh/known_hosts"
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          set -euo pipefail
+
+          ssh \
+            -i "${RUNNER_TEMP}/ec2_key" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=3 \
+            "${EC2_USER}@${EC2_HOST}" \
+            "/opt/cosmos/deploy.sh '${IMAGE_REPOSITORY}:${IMAGE_TAG}'"
+
+      - name: Log out from Docker Hub
+        if: always()
+        run: |
+          docker logout >/dev/null 2>&1 || true
