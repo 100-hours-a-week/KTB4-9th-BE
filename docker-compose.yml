@@ -1,0 +1,121 @@
+# version 속성은 더 이상 사용되지 않는다
+# name: 명시적으로 설정하지 않은 경우 사용할 프로젝트 이름
+name: cosmos
+
+# services는 애플리케이션 내에서 확장 또는 교체가 가능한 컴퓨팅 리소스에 대한 추상적인 정의
+# 서비스는 컨테이너로 구성되므로 Docker 이미지와 런타임 인자 집합으로 정의된다.
+# 각 서비스는 컨테이너를 실행하기 위한 런타임 제약 조건과 요구 사항을 정의한다.
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cosmos-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    # bind mount 방식
+    # ro 권한: nginx 컨테이너가 파일을 수정하지 못하게 하는 권한
+    # ssh로 사용자가 호스트 파일을 수정하는 것은 가능
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - proxy-network
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    restart: unless-stopped
+    expose:
+      - "8080"
+    # environment 속성은 컨테이너에 설정된 환경 변수를 정의한다.
+    # 배열 또는 맵을 사용할 수 있다
+    # true, false, yes, no와 같은 모든 부울 값은 YAML 파서에 의해
+    # True, False로 변환되지 않도록 따옴표로 묶어야 한다
+    # env_file과 environment가 둘 다 선언되어 있을 경우 environment가 우선 적용된다
+    # 둘의 차이는 env_file은 별도의 파일에서 가져오는 값이고 environment는 compose.yml에 직접 작성하는 것
+    environment:
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      JWT_SECRET: ${JWT_SECRET}
+      ACCESS_TOKEN_EXP: ${ACCESS_TOKEN_EXP}
+      REFRESH_TOKEN_EXP: ${REFRESH_TOKEN_EXP}
+
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_PUBLIC_BASE_URL: ${AWS_S3_PUBLIC_BASE_URL}
+      CLOUD_AWS_S3_PUBLIC_BASE_URL: ${AWS_S3_PUBLIC_BASE_URL}
+      # 헬스체크 readiness를 걸어놓으면 계속 서버가 운영 중 일 때도 확인하니까
+      # 그냥 ci/cd에서 deploy.sh 같은 걸로 blue/green 배포할 때 새 버전이 준비됐는지 확인하고 nginx를 전환하는 것이 목적이라 compose에서는 헬스체크 제외
+    networks:
+      - proxy-network
+      - db-network
+
+    # depends_on 속성을 사용하면 서비스 시작 및 종료 순서를 제어할 수 있다.
+    # 서비스 시작 순서가 애플리케이션 기능에 영향을 미치는 경우에 유용
+    # 프로세스가 시작됨만 확인할 뿐, 서비스가 실제 요청을 받을 준비가 됐는지는 확인하지 않는다
+    depends_on:
+      - mysql
+
+  ai-server:
+    image:  ${AI_IMAGE}
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+      CHROMA_URL: http://chroma:8000
+    networks:
+      - proxy-network
+      - ai-network
+    depends_on:
+      - chroma
+
+  mysql:
+    image: mysql:8.4
+    container_name: cosmos-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    expose:
+      - "3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - db-network
+
+  chroma:
+    image: chromadb/chroma:1.4.1
+    restart: unless-stopped
+    environment:
+      IS_PERSISTENT: "TRUE"
+    expose:
+      - "8000"
+    volumes:
+      - chroma-data:/data
+    networks:
+      - ai-network
+
+networks:
+  proxy-network:
+  ai-network:
+  db-network:
+
+volumes:
+  mysql-data:
+  chroma-data:
