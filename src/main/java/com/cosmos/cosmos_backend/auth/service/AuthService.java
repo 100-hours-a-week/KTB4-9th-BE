@@ -8,6 +8,8 @@ import com.cosmos.cosmos_backend.auth.domain.entity.UserOauthAccount;
 import com.cosmos.cosmos_backend.auth.dto.KakaoTokenResponseDto;
 import com.cosmos.cosmos_backend.auth.dto.KakaoUserInfoResponseDto;
 import com.cosmos.cosmos_backend.auth.dto.LoginResponseDto;
+import com.cosmos.cosmos_backend.auth.dto.LoginResult;
+import com.cosmos.cosmos_backend.auth.jwt.JwtTokenProvider;
 import com.cosmos.cosmos_backend.auth.repository.UserOauthAccountRepository;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +29,10 @@ public class AuthService {
     @Autowired
     private UserRepository userRepository;
 
-    public LoginResponseDto login(String provider, String code) {
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    public LoginResult login(String provider, String code) {
 
         OAuthProvider oauthProvider = OAuthProvider.valueOf(provider.toUpperCase());
 
@@ -46,11 +51,11 @@ public class AuthService {
         // 4. 없다면 회원 등록, provider account 등록
         // 5. 있다면 기존 회원 사용, user 정보 반환
         // 6. COSMOS Access/Refresh Token 생성
-        if(userOauthAccount.isPresent()){
+        // 7. 컨트롤러로 결과 반환
+        User user;
 
-            User user =  userOauthAccount.get().getUser();
-            LoginResponseDto loginResponseDto = new LoginResponseDto(user.getId(),user.getUsername(),user.getProfileImageUrl());
-            return loginResponseDto;
+        if(userOauthAccount.isPresent()){
+            user =  userOauthAccount.get().getUser();
 
         } else {
             User newUser = new User(kakaoUser.kakaoAccount().profile().nickname(), kakaoUser.kakaoAccount().profile().profileImageUrl());
@@ -59,11 +64,16 @@ public class AuthService {
             UserOauthAccount newUserOauthAccount = new UserOauthAccount(newUser, oauthProvider,kakaoUser.oauthUserId().toString());
             userOauthAccountRepository.save(newUserOauthAccount);
 
-            LoginResponseDto loginResponseDto = new LoginResponseDto(newUser.getId(),newUser.getUsername(),newUser.getProfileImageUrl());
-            return loginResponseDto;
+            user =newUser;
         }
 
-        // 7. Controller로 결과 반환
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getUsername());
 
+        LoginResponseDto responseDto = new LoginResponseDto(user.getId(),
+                user.getUsername(),
+                user.getProfileImageUrl());
+
+        return new LoginResult(responseDto,accessToken);
     }
+
 }
