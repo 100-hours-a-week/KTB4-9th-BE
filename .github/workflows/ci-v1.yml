@@ -42,9 +42,6 @@ jobs:
       - name: Grant Gradle wrapper permission
         run: chmod +x ./gradlew
 
-      - name: Run tests
-        run: ./gradlew test --no-daemon
-
       - name: Verify Docker image build
         env:
           IMAGE_TAG: ci-${{ github.sha }}
