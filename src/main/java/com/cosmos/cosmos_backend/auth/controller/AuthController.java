@@ -3,6 +3,7 @@ package com.cosmos.cosmos_backend.auth.controller;
 import com.cosmos.cosmos_backend.auth.domain.entity.User;
 import com.cosmos.cosmos_backend.auth.dto.LoginResponseDto;
 import com.cosmos.cosmos_backend.auth.dto.LoginResult;
+import com.cosmos.cosmos_backend.auth.dto.TokenRefreshResult;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.auth.service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,9 @@ public class AuthController {
     @Value("${jwt.access-token-expiration}")
     private long accessTokenExpiration;
 
+    @Value("${jwt.refresh-token-expiration}")
+    private long refreshTokenExpiration;
+
     @Autowired
     private UserRepository userRepository;
 
@@ -55,9 +59,21 @@ public class AuthController {
                 .maxAge(accessTokenExpiration)
                 .build();
 
+        // refresh token 쿠키 생성
+        ResponseCookie refreshTokenCookie = ResponseCookie
+                .from("refreshToken", loginResult.refreshToken())
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/auth")
+                .maxAge(refreshTokenExpiration)
+                .build();
+
+
         return ResponseEntity
                 .status(HttpStatus.FOUND)
                 .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
                 .location(URI.create("http://localhost:5173/"))
                 .build();
     }
@@ -78,6 +94,102 @@ public class AuthController {
                 user.getUsername(),
                 user.getProfileImageUrl()
         );
+    }
+
+    @PostMapping("/token/refresh")
+    public ResponseEntity<Void> refreshToken(
+            @CookieValue(
+                    name = "refreshToken",
+                    required = false
+            ) String refreshToken
+    ) {
+
+        // 1. Refresh Token 쿠키가 없는 경우
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new RuntimeException("refresh_token_missing");
+        }
+
+        // 2. Refresh Token 검증 + 새로운 토큰 발급
+        TokenRefreshResult result =
+                authService.refreshToken(refreshToken);
+
+        // 3. 새로운 Access Token 쿠키
+        ResponseCookie accessTokenCookie = ResponseCookie
+                .from("accessToken", result.accessToken())
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(accessTokenExpiration)
+                .build();
+
+        // 4. 새로운 Refresh Token 쿠키
+        ResponseCookie refreshTokenCookie = ResponseCookie
+                .from("refreshToken", result.refreshToken())
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/auth")
+                .maxAge(refreshTokenExpiration)
+                .build();
+
+        // 5. Body 없이 새로운 쿠키 두 개 전달
+        return ResponseEntity
+                .noContent()
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        accessTokenCookie.toString()
+                )
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        refreshTokenCookie.toString()
+                )
+                .build();
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = "refreshToken", required = false)
+            String refreshToken
+    ) {
+
+        // 1. refreshToken이 존재하면 AuthService.logout() 호출
+        if (refreshToken != null && !refreshToken.isBlank()){
+            authService.logout(refreshToken);
+        }
+
+        // 2. accessToken 삭제용 쿠키 생성
+        ResponseCookie accessTokenCookie = ResponseCookie
+                .from("accessToken", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(0)
+                .build();
+
+        // 3. refreshToken 삭제용 쿠키 생성
+        ResponseCookie refreshTokenCookie = ResponseCookie
+                .from("refreshToken", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/auth")
+                .maxAge(0)
+                .build();
+
+        // 4. 두 Set-Cookie를 담아서 204 반환
+        return ResponseEntity
+                .noContent()
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        accessTokenCookie.toString()
+                )
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        refreshTokenCookie.toString()
+                )
+                .build();
     }
 
 }

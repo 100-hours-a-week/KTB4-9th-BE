@@ -1,7 +1,6 @@
 package com.cosmos.cosmos_backend.auth.dto;
 
-public record LoginResult(
-        LoginResponseDto response,
+public record TokenRefreshResult(
         String accessToken,
         String refreshToken
 ) {

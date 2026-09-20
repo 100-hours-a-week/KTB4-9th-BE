@@ -11,6 +11,10 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
     @Override
     public String resolve(HttpServletRequest request) {
 
+        if ("/auth/token/refresh".equals(request.getRequestURI())) {
+            return null;
+        }
+
         // 1. 요청에 포함된 모든 쿠키 가져오기
         Cookie[] cookies = request.getCookies();
 

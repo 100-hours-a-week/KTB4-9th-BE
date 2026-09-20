@@ -22,11 +22,12 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
+                .csrf(csrf -> csrf.disable())
                 // CORS 설정
                 .cors(Customizer.withDefaults())
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/oauth/**").permitAll()
+                        .requestMatchers("/auth/oauth/**", "/auth/token/refresh").permitAll()
                         .anyRequest().authenticated()
                 )
 
