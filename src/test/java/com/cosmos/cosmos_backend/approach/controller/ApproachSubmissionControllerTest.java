@@ -54,13 +54,15 @@ class ApproachSubmissionControllerTest {
                 .thenReturn(new ApproachSubmission(42L, 1L, Category.ARRAY, "풀이", true));
 
         // When & Then
-        mvc().post().uri("/problems/1/solution-submissions")
+        var body = mvc().post().uri("/problems/1/solution-submissions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"selectedCategory\":\"ARRAY\",\"approach\":\"풀이\"}")
                 .assertThat()
                 .hasStatusOk()
-                .bodyJson()
-                .extractingPath("$.data.evaluationStatus").isEqualTo("PENDING");
+                .bodyJson();
+
+        body.extractingPath("$.data.evaluationStatus").isEqualTo("PENDING");
+        body.extractingPath("$.data.result.isCorrect").isEqualTo(true);
 
         verify(approachSubmissionService).submit(42L, 1L, "ARRAY", "풀이");
     }
