@@ -4,6 +4,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.service.ProblemService;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,9 +21,9 @@ public class ProblemController {
     private final ProblemService problemService;
 
     @GetMapping("/{problemId}")
-    public ResponseEntity<ApiResponse<ProblemDetailResponse>> getProblemDetail(@PathVariable String problemId) {
+    public ResponseEntity<ApiResponse<Map<String, ProblemDetailResponse>>> getProblemDetail(@PathVariable String problemId) {
         ProblemDetailResponse response = problemService.getProblemDetail(parseProblemId(problemId));
-        return ResponseEntity.ok(ApiResponse.of("problem_detail_retrieval_success", response));
+        return ResponseEntity.ok(ApiResponse.of("problem_detail_retrieval_success", Map.of("problem", response)));
     }
 
     // problemId 문자열을 숫자로 변환
