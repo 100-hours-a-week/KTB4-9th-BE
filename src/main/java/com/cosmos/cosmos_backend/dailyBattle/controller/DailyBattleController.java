@@ -1,12 +1,15 @@
 package com.cosmos.cosmos_backend.dailyBattle.controller;
 
-import com.cosmos.cosmos_backend.dailyBattle.dto.AiBattleCreateRequestDto;
-import com.cosmos.cosmos_backend.dailyBattle.dto.BattleParticipationResponseDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.parameters.P;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -21,7 +24,7 @@ public class DailyBattleController {
     // 배틀 문제 저장
     @PostMapping("/daily-battles")
     public ResponseEntity<Void> createDailyBattle(
-            @RequestBody AiBattleCreateRequestDto request
+            @Valid @RequestBody AiBattleCreateRequestDto request
     ) {
 
         Long battleId = dailyBattleService.createDailyBattle(request);
@@ -34,10 +37,13 @@ public class DailyBattleController {
     //배틀 참여
     @PostMapping("/{battle_id}/participations")
     public BattleParticipationResponseDto battleParticipation(
-            @PathVariable Long battle_id
+            @PathVariable @Positive Long battle_id,
+            @AuthenticationPrincipal Jwt jwt
     ){
 
-        BattleParticipationResponseDto battleParticipationResponse = dailyBattleService.battleParticipation(battle_id);
+        Long user_id = Long.parseLong(jwt.getSubject());
+
+        BattleParticipationResponseDto battleParticipationResponse = dailyBattleService.battleParticipation(battle_id, user_id);
 
         return battleParticipationResponse;
     }

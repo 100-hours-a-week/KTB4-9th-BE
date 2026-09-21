@@ -1,6 +1,7 @@
-package com.cosmos.cosmos_backend.dailyBattle.dto;
+package com.cosmos.cosmos_backend.dailyBattle.dto.response;
 
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
+
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;

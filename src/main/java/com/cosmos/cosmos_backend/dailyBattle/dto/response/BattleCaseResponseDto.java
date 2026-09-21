@@ -1,7 +1,6 @@
-package com.cosmos.cosmos_backend.dailyBattle.dto;
+package com.cosmos.cosmos_backend.dailyBattle.dto.response;
 
 public record BattleCaseResponseDto(
-        Long battleCaseId,
         String input,
         Integer displayOrder
 ) {

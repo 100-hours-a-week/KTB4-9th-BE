@@ -33,7 +33,7 @@ public class BattleParticipation {
     User user;
 
     @Column(nullable = true)
-    private boolean allCorrect;
+    private Boolean allCorrect;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -47,7 +47,7 @@ public class BattleParticipation {
     private LocalDateTime submittedAt;
 
 
-    public BattleParticipation(DailyBattle dailyBattle, User user, ParticipationStatus participationStatus) {
+    public BattleParticipation(DailyBattle dailyBattle, User user) {
         this.dailyBattle = dailyBattle;
         this.user = user;
         this.participationStatus = ParticipationStatus.IN_PROGRESS;
