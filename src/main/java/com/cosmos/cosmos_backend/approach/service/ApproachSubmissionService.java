@@ -20,12 +20,17 @@ public class ApproachSubmissionService {
 
     @Transactional
     public ApproachSubmission submit(Long userId, Long problemId, String selectedCategory, String approach) {
+        // 1. problemId로 문제를 조회 (없으면 404 예외를 던짐)
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
 
+        // 2. 선택한 카테고리를 enum으로 변환 (없는 값이면 400 예외를 던짐)
         Category category = parseCategory(selectedCategory);
+
+        // 3. 선택한 카테고리와 문제의 정답 카테고리를 비교해 정답 여부를 계산
         boolean categoryResult = category.name().equals(problem.getCategory());
 
+        // 4. 이미 제출한 적이 있으면 갱신(재제출), 없으면 새로 저장
         return approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId)
                 .map(existing -> {
                     existing.resubmit(category, approach, categoryResult);
@@ -36,10 +41,13 @@ public class ApproachSubmissionService {
                 ));
     }
 
+    // 카테고리 문자열을 Category enum으로 변환
     private Category parseCategory(String value) {
         try {
+            // 1. 문자열을 enum으로 변환
             return Category.valueOf(value);
         } catch (IllegalArgumentException e) {
+            // 2. 없는 값이면 400 예외를 던짐
             throw new BusinessException(HttpStatus.BAD_REQUEST, "invalid_selected_category");
         }
     }

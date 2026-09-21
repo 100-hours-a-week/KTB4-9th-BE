@@ -31,18 +31,28 @@ public class ApproachSubmissionController {
             @Valid @RequestBody ApproachSubmitRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
+        // 1. 경로의 problemId를 숫자로 변환
         Long id = parseProblemId(problemId);
+
+        // 2. Spring Security가 검증한 JWT에서 로그인한 사용자 id(sub)를 꺼냄
         Long userId = Long.valueOf(jwt.getSubject());
+
+        // 3. 제출 처리는 Service에게 맡김
         ApproachSubmission submission = approachSubmissionService.submit(
                 userId, id, request.selectedCategory(), request.naturalSolution()
         );
+
+        // 4. 제출 결과를 message + data 형식으로 감싸서 200으로 반환
         return ResponseEntity.ok(ApiResponse.of("solution_submission_success", ApproachSubmitResponse.of(submission)));
     }
 
+    // problemId 문자열을 숫자로 변환
     private Long parseProblemId(String problemId) {
         try {
+            // 1. 문자열을 숫자로 변환
             return Long.parseLong(problemId);
         } catch (NumberFormatException e) {
+            // 2. 숫자가 아니면 400 예외를 던짐 (GlobalExceptionHandler가 응답으로 변환)
             throw new BusinessException(HttpStatus.BAD_REQUEST, "invalid_problem_id");
         }
     }

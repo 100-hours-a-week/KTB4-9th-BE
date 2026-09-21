@@ -25,9 +25,12 @@ public class ProblemService {
     /** 문제 상세 조회. */
     @Transactional(readOnly = true)
     public ProblemDetailResponse getProblemDetail(Long problemId) {
+        // 1. problemId로 문제를 조회 (없으면 404 예외를 던짐)
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
 
+        // 2. 입력 제한(JSON), 예시, 실행 제한을 각각 조회
+        // 3. 조회한 값들을 응답 형태로 조립해서 반환
         return ProblemDetailResponse.of(
                 problem,
                 objectMapper.readValue(problem.getConstraints(), ProblemConstraints.class),
