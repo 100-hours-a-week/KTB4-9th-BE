@@ -38,11 +38,14 @@ class ProblemControllerTest {
         when(problemService.getProblemDetail(1L)).thenReturn(response);
 
         // When & Then
-        mvc().get().uri("/problems/1")
+        var body = mvc().get().uri("/problems/1")
                 .assertThat()
                 .hasStatusOk()
-                .bodyJson()
-                .extractingPath("$.message").isEqualTo("problem_detail_retrieval_success");
+                .bodyJson();
+
+        body.extractingPath("$.message").isEqualTo("problem_detail_retrieval_success");
+        // 명세서: data 안에 problem 한 겹이 더 있음
+        body.extractingPath("$.data.problem.problemId").isEqualTo(1);
     }
 
     @Test
