@@ -8,6 +8,7 @@ on:
       - main
     types:
       - completed
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,20 +20,29 @@ concurrency:
 jobs:
   deploy:
     name: Build, push and deploy
-    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success'
+    # 1. 수동 실행이거나, main에 푸시된 CI 성공 시 실행
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.conclusion == 'success'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
 
     env:
       IMAGE_REPOSITORY: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}
-      IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+      # 2. 수동 실행 시에는 github.sha 사용
+      IMAGE_TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
 
     steps:
       - name: Checkout merged commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          # 3. 수동 실행 시에는 github.sha 사용
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
 
       - name: Validate deployment settings
