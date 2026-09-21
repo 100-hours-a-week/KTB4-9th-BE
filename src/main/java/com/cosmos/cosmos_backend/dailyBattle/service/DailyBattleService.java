@@ -41,6 +41,7 @@ public class DailyBattleService {
 
         DailyBattle saving_problem = new DailyBattle(
                 date,
+                request.category(),
                 request.problemTitle(),
                 request.problemDescription()
         );
@@ -81,6 +82,8 @@ public class DailyBattleService {
                 user
         );
 
+        battleParticipationRepository.save(battle_participation);
+
         // 배틀 정보 불러오기 (제목, 본문)
         String title = dailyBattle.getTitle();
         String content = dailyBattle.getContent();
@@ -117,6 +120,7 @@ public class DailyBattleService {
 
         // 배틀 참여 응답 dto 만들기
         BattleParticipationResponseDto battleParticipationResponseDto = new BattleParticipationResponseDto(
+                dailyBattle.getCategory(),
                 battle_id,
                 user_id,
                 dailyBattle.getBattleDate(),

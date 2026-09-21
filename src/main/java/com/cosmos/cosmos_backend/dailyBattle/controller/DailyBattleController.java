@@ -22,7 +22,7 @@ public class DailyBattleController {
     private final DailyBattleService  dailyBattleService;
 
     // 배틀 문제 저장
-    @PostMapping("/daily-battles")
+    @PostMapping("/problem")
     public ResponseEntity<Void> createDailyBattle(
             @Valid @RequestBody AiBattleCreateRequestDto request
     ) {

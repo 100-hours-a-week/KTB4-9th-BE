@@ -1,5 +1,6 @@
 package com.cosmos.cosmos_backend.dailyBattle.domain.entity;
 
+import com.cosmos.cosmos_backend.common.Category;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -28,6 +29,9 @@ public class DailyBattle {
     private LocalDate battleDate;
 
     @Column(nullable = false)
+    private Category category;
+
+    @Column(nullable = false)
     private String title;
 
     @Column(nullable = false, columnDefinition = "TEXT")
@@ -35,10 +39,12 @@ public class DailyBattle {
 
     public DailyBattle(
             LocalDate battleDate,
+            Category category,
             String title,
             String content
     ){
         this.battleDate = battleDate;
+        this.category = category;
         this.title = title;
         this.content = content;
     }
