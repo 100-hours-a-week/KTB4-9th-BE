@@ -45,14 +45,17 @@ public record ProblemDetailResponse(
             List<RunningLimit> runningLimits
     ) {
         return new ProblemDetailResponse(
+                // 1. 문제 기본 정보
                 problem.getId(),
                 parseLevel(problem.getDifficulty()),
                 problem.getCategory(),
                 problem.getTitle(),
                 problem.getContent(),
+                // 2. 입력/출력 형식과 입력 제한 (constraints JSON에서 꺼냄)
                 constraints.inputFormat(),
                 constraints.outputFormat(),
                 constraints.inputConstraints(),
+                // 3. 언어별 실행 제한
                 runningLimits.stream()
                         .map(limit -> new ExecutionLimit(
                                 limit.getLanguage().name(),
@@ -60,6 +63,7 @@ public record ProblemDetailResponse(
                                 limit.getMemoryLimitMb() * 1024 // MB → KB 변환
                         ))
                         .toList(),
+                // 4. 공개 예시
                 examples.stream()
                         .map(e -> new Example(e.getInput(), e.getOutput(), e.getDescription()))
                         .toList()
