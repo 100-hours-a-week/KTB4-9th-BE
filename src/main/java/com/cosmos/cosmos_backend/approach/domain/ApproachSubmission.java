@@ -47,9 +47,6 @@ public class ApproachSubmission {
     @Column(name = "category_result", nullable = false)
     private Boolean categoryResult;
 
-    @Column(name = "category_select_reason", columnDefinition = "TEXT")
-    private String categorySelectReason;
-
     @Column(name = "total_score")
     private Integer totalScore;
 
@@ -90,7 +87,6 @@ public class ApproachSubmission {
         this.evaluationStatus = EvaluationStatus.PENDING;
         this.totalScore = null;
         this.aiFeedback = null;
-        this.categorySelectReason = null;
         this.evaluatedAt = null;
     }
 }

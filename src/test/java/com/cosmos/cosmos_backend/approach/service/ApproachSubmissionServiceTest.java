@@ -32,7 +32,7 @@ class ApproachSubmissionServiceTest {
     }
 
     private Problem problem(String category) {
-        return new Problem("LV1", category, "제목", "내용", "{}");
+        return new Problem("LV1", category, "제목", "내용", "{}", "선정 배경");
     }
 
     @Test

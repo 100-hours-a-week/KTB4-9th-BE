@@ -35,11 +35,15 @@ public class Problem {
     @Column(nullable = false, columnDefinition = "json")
     private String constraints;
 
-    public Problem(String difficulty, String category, String title, String content, String constraints) {
+    @Column(name = "category_select_reason", nullable = false, length = 30)
+    private String categorySelectReason;
+
+    public Problem(String difficulty, String category, String title, String content, String constraints, String categorySelectReason) {
         this.difficulty = difficulty;
         this.category = category;
         this.title = title;
         this.content = content;
         this.constraints = constraints;
+        this.categorySelectReason = categorySelectReason;
     }
 }
