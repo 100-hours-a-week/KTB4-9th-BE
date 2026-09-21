@@ -23,7 +23,10 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
-    // JWT 생성/검증 및 Resource Server 인증
+	// 헬스체크
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	// JWT 생성/검증 및 Resource Server 인증
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
 	compileOnly 'org.projectlombok:lombok'
