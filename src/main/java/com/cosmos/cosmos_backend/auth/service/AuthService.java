@@ -12,6 +12,7 @@ import com.cosmos.cosmos_backend.auth.jwt.JwtTokenProvider;
 import com.cosmos.cosmos_backend.auth.repository.RefreshTokenRepository;
 import com.cosmos.cosmos_backend.auth.repository.UserOauthAccountRepository;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -21,25 +22,20 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
-    @Autowired
-    private KakaoOAuthClient kakaoOAuthClient;
+    private final KakaoOAuthClient kakaoOAuthClient;
 
-    @Autowired
-    private UserOauthAccountRepository userOauthAccountRepository;
+    private final UserOauthAccountRepository userOauthAccountRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
+    private final JwtTokenProvider jwtTokenProvider;
 
-    @Autowired
-    private RefreshTokenProvider refreshTokenProvider;
+    private final RefreshTokenProvider refreshTokenProvider;
 
-    @Autowired
-    private RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Transactional
     public LoginResult login(String provider, String code) {

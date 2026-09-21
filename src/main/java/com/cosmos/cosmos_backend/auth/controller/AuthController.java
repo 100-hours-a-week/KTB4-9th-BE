@@ -6,6 +6,7 @@ import com.cosmos.cosmos_backend.auth.dto.LoginResult;
 import com.cosmos.cosmos_backend.auth.dto.TokenRefreshResult;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.auth.service.AuthService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -21,10 +22,12 @@ import java.net.URI;
 
 @RestController
 @RequestMapping("/auth")
+@RequiredArgsConstructor
 public class AuthController {
 
-    @Autowired
-    private AuthService authService;
+    private final AuthService authService;
+
+    private final UserRepository userRepository;
 
     @Value("${cookie.secure}")
     private boolean cookieSecure;
@@ -34,9 +37,6 @@ public class AuthController {
 
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpiration;
-
-    @Autowired
-    private UserRepository userRepository;
 
     // oauth 로그인 결과에 대한 콜백
     @GetMapping("/oauth/{provider}/callback")
