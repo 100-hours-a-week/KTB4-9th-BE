@@ -34,7 +34,7 @@ public class ApproachSubmissionController {
         Long id = parseProblemId(problemId);
         Long userId = Long.valueOf(jwt.getSubject());
         ApproachSubmission submission = approachSubmissionService.submit(
-                userId, id, request.selectedCategory(), request.approach()
+                userId, id, request.selectedCategory(), request.naturalSolution()
         );
         return ResponseEntity.ok(ApiResponse.of("solution_submission_success", ApproachSubmitResponse.of(submission)));
     }

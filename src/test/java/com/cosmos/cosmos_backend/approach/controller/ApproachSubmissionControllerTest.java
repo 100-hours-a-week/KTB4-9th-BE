@@ -56,7 +56,7 @@ class ApproachSubmissionControllerTest {
         // When & Then
         var body = mvc().post().uri("/problems/1/solution-submissions")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"selectedCategory\":\"ARRAY\",\"approach\":\"풀이\"}")
+                .content("{\"selectedCategory\":\"ARRAY\",\"natural_solution\":\"풀이\"}")
                 .assertThat()
                 .hasStatusOk()
                 .bodyJson();
@@ -73,7 +73,7 @@ class ApproachSubmissionControllerTest {
 
         mvc().post().uri("/problems/abc/solution-submissions")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"selectedCategory\":\"ARRAY\",\"approach\":\"풀이\"}")
+                .content("{\"selectedCategory\":\"ARRAY\",\"natural_solution\":\"풀이\"}")
                 .assertThat()
                 .hasStatus(HttpStatus.BAD_REQUEST)
                 .bodyJson()
@@ -86,7 +86,20 @@ class ApproachSubmissionControllerTest {
 
         mvc().post().uri("/problems/1/solution-submissions")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"selectedCategory\":\"ARRAY\",\"approach\":\"\"}")
+                .content("{\"selectedCategory\":\"ARRAY\",\"natural_solution\":\"\"}")
+                .assertThat()
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson()
+                .extractingPath("$.message").isEqualTo("approach_is_required");
+    }
+
+    @Test
+    void submit_returns400_whenOldFieldNameApproachUsed() {
+        loginAs("42");
+
+        mvc().post().uri("/problems/1/solution-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"selectedCategory\":\"ARRAY\",\"approach\":\"풀이\"}")
                 .assertThat()
                 .hasStatus(HttpStatus.BAD_REQUEST)
                 .bodyJson()

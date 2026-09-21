@@ -45,7 +45,8 @@ class ProblemServiceTest {
                 "LV1", "ARRAY", "두 수의 합", "합이 목표값이 되는 두 원소의 인덱스를 반환하세요.",
                 """
                 {"inputFormat":"정수 배열 nums와 목표값 target이 주어집니다.","outputFormat":"합이 target이 되는 두 원소의 인덱스를 출력합니다.","inputConstraints":[{"target":"nums.length","scope":"INPUT","dataType":"INT","minValue":2,"maxValue":100000,"specialConditions":[]}]}
-                """
+                """,
+                "배열을 순회하며 값을 저장하는 구조"
         );
         setId(problem, 1L);
         when(problemRepository.findById(1L)).thenReturn(Optional.of(problem));
