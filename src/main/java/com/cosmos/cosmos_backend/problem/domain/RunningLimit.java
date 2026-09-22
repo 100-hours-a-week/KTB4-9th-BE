@@ -41,12 +41,12 @@ public class RunningLimit {
     private Language language;
 
     @Column(name = "time_limit_ms", nullable = false)
-    private Integer timeLimitMs;
+    private Float timeLimitMs;
 
     @Column(name = "memory_limit_mb", nullable = false)
     private Integer memoryLimitMb;
 
-    public RunningLimit(Long problemId, Language language, Integer timeLimitMs, Integer memoryLimitMb) {
+    public RunningLimit(Long problemId, Language language, Float timeLimitMs, Integer memoryLimitMb) {
         this.problemId = problemId;
         this.language = language;
         this.timeLimitMs = timeLimitMs;
