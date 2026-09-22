@@ -2,10 +2,8 @@ package com.cosmos.cosmos_backend.problem.dto.response;
 
 import java.util.List;
 
-/** problems.constraints 컬럼(JSON)을 파싱한 결과. */
+/** problems.constraints 컬럼(JSON)의 내용. input_format/output_format은 별도 컬럼으로 분리됨. */
 public record ProblemConstraints(
-        String inputFormat,
-        String outputFormat,
         List<ProblemDetailResponse.InputConstraint> inputConstraints
 ) {
 }

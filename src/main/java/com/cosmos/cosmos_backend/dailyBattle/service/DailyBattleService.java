@@ -5,7 +5,6 @@ import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
-import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCaseCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleCaseResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
@@ -14,9 +13,7 @@ import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepos
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.*;
 import java.util.ArrayList;
@@ -49,7 +46,7 @@ public class DailyBattleService {
         dailyBattleRepository.save(saving_problem);
 
         for (int i = 0 ; i < request.cases().size() ; i++){
-            AiBattleCaseCreateRequestDto caseRequest = request.cases().get(i);
+            AiBattleCreateRequestDto.AiBattleCaseCreateRequestDto caseRequest = request.cases().get(i);
 
             BattleCase battleCase = new BattleCase(
                     saving_problem,

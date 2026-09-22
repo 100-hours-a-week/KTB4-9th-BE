@@ -25,4 +25,13 @@ public record AiBattleCreateRequestDto(
         @Size(min = 3, max = 3)
         List<@Valid AiBattleCaseCreateRequestDto> cases
 ) {
+        public record AiBattleCaseCreateRequestDto(
+
+                @NotBlank
+                String input,
+
+                @NotBlank
+                String output
+        ) {
+        }
 }
