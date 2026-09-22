@@ -4,12 +4,7 @@ import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemConstraints;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,9 +24,11 @@ public class Problem {
     private Long id;
 
     @Column(nullable = false, length = 16)
+    @Enumerated(EnumType.STRING)
     private Difficulty difficulty;
 
     @Column(nullable = false, length = 125)
+    @Enumerated(EnumType.STRING)
     private Category category;
 
     @Column(nullable = false, length = 30)
