@@ -9,6 +9,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.Problem;
 import com.cosmos.cosmos_backend.problem.domain.ProblemExample;
 import com.cosmos.cosmos_backend.problem.domain.RunningLimit;
+import com.cosmos.cosmos_backend.problem.dto.response.ProblemConstraints;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.ProblemExampleRepository;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
@@ -20,7 +21,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class ProblemServiceTest {
@@ -35,17 +35,19 @@ class ProblemServiceTest {
     private RunningLimitRepository runningLimitRepository;
 
     private ProblemService service() {
-        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, new ObjectMapper());
+        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository);
     }
 
     @Test
     void getProblemDetail_returnsAssembledResponse_whenProblemExists() {
         // Given
+        ProblemConstraints constraints = new ProblemConstraints(
+                List.of(new ProblemDetailResponse.InputConstraint("nums.length", "INPUT", "INT", 2L, 100000L, List.of()))
+        );
         Problem problem = new Problem(
                 "LV1", "ARRAY", "두 수의 합", "합이 목표값이 되는 두 원소의 인덱스를 반환하세요.",
-                """
-                {"inputFormat":"정수 배열 nums와 목표값 target이 주어집니다.","outputFormat":"합이 target이 되는 두 원소의 인덱스를 출력합니다.","inputConstraints":[{"target":"nums.length","scope":"INPUT","dataType":"INT","minValue":2,"maxValue":100000,"specialConditions":[]}]}
-                """,
+                "정수 배열 nums와 목표값 target이 주어집니다.", "합이 target이 되는 두 원소의 인덱스를 출력합니다.",
+                constraints,
                 "배열을 순회하며 값을 저장하는 구조"
         );
         setId(problem, 1L);

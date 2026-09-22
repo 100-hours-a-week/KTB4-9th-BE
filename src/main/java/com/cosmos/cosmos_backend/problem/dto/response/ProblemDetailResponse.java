@@ -40,7 +40,6 @@ public record ProblemDetailResponse(
     /** 엔티티들을 응답 형태로 조립. */
     public static ProblemDetailResponse of(
             Problem problem,
-            ProblemConstraints constraints,
             List<ProblemExample> examples,
             List<RunningLimit> runningLimits
     ) {
@@ -51,10 +50,10 @@ public record ProblemDetailResponse(
                 problem.getCategory(),
                 problem.getTitle(),
                 problem.getContent(),
-                // 2. 입력/출력 형식과 입력 제한 (constraints JSON에서 꺼냄)
-                constraints.inputFormat(),
-                constraints.outputFormat(),
-                constraints.inputConstraints(),
+                // 2. 입력/출력 형식(별도 컬럼)과 입력 제한(constraints JSON)
+                problem.getInputFormat(),
+                problem.getOutputFormat(),
+                problem.getConstraints().inputConstraints(),
                 // 3. 언어별 실행 제한
                 runningLimits.stream()
                         .map(limit -> new ExecutionLimit(
