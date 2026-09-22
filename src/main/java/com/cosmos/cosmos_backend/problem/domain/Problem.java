@@ -1,5 +1,8 @@
 package com.cosmos.cosmos_backend.problem.domain;
 
+import com.cosmos.cosmos_backend.common.Category;
+import com.cosmos.cosmos_backend.common.Difficulty;
+import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemConstraints;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,6 +16,8 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.util.List;
+
 @Entity
 @Table(name = "problems")
 @Getter
@@ -24,10 +29,10 @@ public class Problem {
     private Long id;
 
     @Column(nullable = false, length = 16)
-    private String difficulty;
+    private Difficulty difficulty;
 
     @Column(nullable = false, length = 125)
-    private String category;
+    private Category category;
 
     @Column(nullable = false, length = 30)
     private String title;
@@ -43,12 +48,12 @@ public class Problem {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "json")
-    private ProblemConstraints constraints;
+    private List<AiProblemsCreateRequestDto.InputConstraints> constraints;
 
     @Column(name = "category_select_reason", nullable = false, length = 100)
     private String categorySelectReason;
 
-    public Problem(String difficulty, String category, String title, String content, String inputFormat, String outputFormat, ProblemConstraints constraints, String categorySelectReason) {
+    public Problem(Difficulty difficulty, Category category, String title, String content, String inputFormat, String outputFormat, List<AiProblemsCreateRequestDto.InputConstraints> constraints, String categorySelectReason) {
         this.difficulty = difficulty;
         this.category = category;
         this.title = title;
