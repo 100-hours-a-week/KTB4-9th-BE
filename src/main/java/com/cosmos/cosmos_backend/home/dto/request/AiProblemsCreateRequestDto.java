@@ -16,7 +16,7 @@ public record AiProblemsCreateRequestDto(
         @JsonProperty("problems")
         @NotNull
         @Valid
-        @Size(min = 5, max = 5)
+        @Size(min = 1, max = 255)
         List<ProblemsInfo> aiProblems
 
 ) {
