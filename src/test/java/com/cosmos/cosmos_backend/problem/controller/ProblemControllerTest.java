@@ -2,6 +2,8 @@ package com.cosmos.cosmos_backend.problem.controller;
 
 import static org.mockito.Mockito.when;
 
+import com.cosmos.cosmos_backend.common.Category;
+import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.exception.GlobalExceptionHandler;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
@@ -32,7 +34,7 @@ class ProblemControllerTest {
     void getProblemDetail_returns200WithBody_whenProblemExists() {
         // Given
         ProblemDetailResponse response = new ProblemDetailResponse(
-                1L, 1, "ARRAY", "두 수의 합", "내용",
+                1L, Difficulty.LV1, Category.ARRAY, "두 수의 합", "내용",
                 "입력 형식", "출력 형식", List.of(), List.of(), List.of()
         );
         when(problemService.getProblemDetail(1L)).thenReturn(response);
