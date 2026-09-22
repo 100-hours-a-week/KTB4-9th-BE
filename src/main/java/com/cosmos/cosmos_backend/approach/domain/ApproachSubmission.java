@@ -66,7 +66,8 @@ public class ApproachSubmission {
     @Column(name = "evaluated_at")
     private LocalDateTime evaluatedAt;
 
-    public ApproachSubmission(Long userId, Long problemId, Category selectedCategory, String naturalSolution, boolean categoryResult) {
+    /** AI 평가가 성공했을 때만 호출됨. 생성과 동시에 COMPLETED로 채움. */
+    public ApproachSubmission(Long userId, Long problemId, Category selectedCategory, String naturalSolution, boolean categoryResult, int score, String feedback) {
         this.userId = userId;
         this.problemId = problemId;
         this.selectedCategory = selectedCategory;
@@ -74,19 +75,22 @@ public class ApproachSubmission {
         this.categoryResult = categoryResult;
         this.submittedCount = 1;
         this.submittedAt = LocalDateTime.now();
-        this.evaluationStatus = EvaluationStatus.PENDING;
+        this.totalScore = score;
+        this.aiFeedback = feedback;
+        this.evaluationStatus = EvaluationStatus.COMPLETED;
+        this.evaluatedAt = LocalDateTime.now();
     }
 
-    /** 재제출 처리. 이전 평가 결과는 초기화하고 다시 평가 대기 상태로 되돌림. */
-    public void resubmit(Category selectedCategory, String naturalSolution, boolean categoryResult) {
+    /** 재제출 처리. AI 평가가 성공했을 때만 호출됨. 이전 결과를 새 결과로 덮어씀. */
+    public void resubmit(Category selectedCategory, String naturalSolution, boolean categoryResult, int score, String feedback) {
         this.selectedCategory = selectedCategory;
         this.naturalSolution = naturalSolution;
         this.categoryResult = categoryResult;
         this.submittedCount += 1;
         this.submittedAt = LocalDateTime.now();
-        this.evaluationStatus = EvaluationStatus.PENDING;
-        this.totalScore = null;
-        this.aiFeedback = null;
-        this.evaluatedAt = null;
+        this.totalScore = score;
+        this.aiFeedback = feedback;
+        this.evaluationStatus = EvaluationStatus.COMPLETED;
+        this.evaluatedAt = LocalDateTime.now();
     }
 }

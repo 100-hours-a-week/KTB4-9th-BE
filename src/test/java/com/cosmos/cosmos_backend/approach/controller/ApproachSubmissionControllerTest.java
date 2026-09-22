@@ -3,10 +3,13 @@ package com.cosmos.cosmos_backend.approach.controller;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
+import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.service.ApproachSubmissionService;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.exception.GlobalExceptionHandler;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,8 +53,9 @@ class ApproachSubmissionControllerTest {
     void submit_returns200AndPassesTokenUserIdToService() {
         // Given
         loginAs("42");
-        when(approachSubmissionService.submit(42L, 1L, "ARRAY", "풀이"))
-                .thenReturn(new ApproachSubmission(42L, 1L, Category.ARRAY, "풀이", true));
+        ApproachSubmission submission = new ApproachSubmission(42L, 1L, Category.ARRAY, "풀이", true, 85, "좋은 접근이에요");
+        ApproachSubmitResult result = new ApproachSubmitResult(submission, List.of(new AiEvaluationResult.KeywordJudgement("정렬", true)));
+        when(approachSubmissionService.submit(42L, 1L, "ARRAY", "풀이")).thenReturn(result);
 
         // When & Then
         var body = mvc().post().uri("/problems/1/solution-submissions")
@@ -61,8 +65,12 @@ class ApproachSubmissionControllerTest {
                 .hasStatusOk()
                 .bodyJson();
 
-        body.extractingPath("$.data.evaluationStatus").isEqualTo("PENDING");
+        body.extractingPath("$.data.evaluationStatus").isEqualTo("COMPLETED");
         body.extractingPath("$.data.result.isCorrect").isEqualTo(true);
+        body.extractingPath("$.data.result.approachScore").isEqualTo(85);
+        body.extractingPath("$.data.result.aiFeedback").isEqualTo("좋은 접근이에요");
+        body.extractingPath("$.data.result.keywords[0].keyword").isEqualTo("정렬");
+        body.extractingPath("$.data.result.keywords[0].isIncluded").isEqualTo(true);
 
         verify(approachSubmissionService).submit(42L, 1L, "ARRAY", "풀이");
     }

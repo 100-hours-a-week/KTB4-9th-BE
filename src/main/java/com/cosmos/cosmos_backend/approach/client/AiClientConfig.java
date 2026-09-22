@@ -15,7 +15,9 @@ public class AiClientConfig {
     @Bean
     public RestClient aiRestClient(AiClientProperties properties) {
         // 1. 연결 타임아웃을 설정한 HTTP 클라이언트를 생성
+        // HTTP/1.1로 고정 (기본값인 h2c 업그레이드 시도가 일부 서버·프록시에서 문제될 수 있음)
         HttpClient httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(properties.connectTimeout())
                 .build();
 

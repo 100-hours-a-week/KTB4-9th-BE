@@ -1,6 +1,6 @@
 package com.cosmos.cosmos_backend.approach.controller;
 
-import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
+import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.request.ApproachSubmitRequest;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.service.ApproachSubmissionService;
@@ -37,13 +37,13 @@ public class ApproachSubmissionController {
         // 2. Spring Security가 검증한 JWT에서 로그인한 사용자 id(sub)를 꺼냄
         Long userId = Long.valueOf(jwt.getSubject());
 
-        // 3. 제출 처리는 Service에게 맡김
-        ApproachSubmission submission = approachSubmissionService.submit(
+        // 3. 제출 처리는 Service에게 맡김 (AI 평가까지 끝난 뒤에 반환됨)
+        ApproachSubmitResult result = approachSubmissionService.submit(
                 userId, id, request.selectedCategory(), request.naturalSolution()
         );
 
         // 4. 제출 결과를 message + data 형식으로 감싸서 200으로 반환
-        return ResponseEntity.ok(ApiResponse.of("solution_submission_success", ApproachSubmitResponse.of(submission)));
+        return ResponseEntity.ok(ApiResponse.of("solution_submission_success", ApproachSubmitResponse.of(result)));
     }
 
     // problemId 문자열을 숫자로 변환
