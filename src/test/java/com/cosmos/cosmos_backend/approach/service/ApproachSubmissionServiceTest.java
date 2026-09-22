@@ -10,7 +10,9 @@ import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepositor
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.Problem;
+import com.cosmos.cosmos_backend.problem.dto.response.ProblemConstraints;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +34,7 @@ class ApproachSubmissionServiceTest {
     }
 
     private Problem problem(String category) {
-        return new Problem("LV1", category, "제목", "내용", "{}", "선정 배경");
+        return new Problem("LV1", category, "제목", "내용", "입력 형식", "출력 형식", new ProblemConstraints(List.of()), "선정 배경");
     }
 
     @Test
