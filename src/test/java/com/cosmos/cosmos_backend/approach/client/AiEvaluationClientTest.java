@@ -10,8 +10,11 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.cosmos.cosmos_backend.common.Datatype;
+import com.cosmos.cosmos_backend.common.Language;
+import com.cosmos.cosmos_backend.common.Scope;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
-import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
+import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
@@ -45,8 +48,8 @@ class AiEvaluationClientTest {
         return new AiEvaluationRequest(
                 "계단 오르기", "본문", "DP", "점화식 구조",
                 List.of("점화식", "모듈러 연산"),
-                List.of(new ProblemDetailResponse.InputConstraint("N", "INPUT", "INT", 1L, 100000L, List.of())),
-                List.of(new ProblemDetailResponse.ExecutionLimit("PYTHON", 3000, 262144)),
+                List.of(new AiProblemsCreateRequestDto.InputConstraints("N", Scope.INPUT, Datatype.INT, 1F, 100000F, List.of())),
+                List.of(new AiProblemsCreateRequestDto.ExecutionLimits(Language.PYTHON, 3000F, 262144)),
                 "점화식으로 푼다"
         );
     }

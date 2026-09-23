@@ -15,11 +15,12 @@ import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
+import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.domain.Keyword;
 import com.cosmos.cosmos_backend.problem.domain.Problem;
 import com.cosmos.cosmos_backend.problem.domain.RunningLimit;
-import com.cosmos.cosmos_backend.problem.dto.response.ProblemConstraints;
 import com.cosmos.cosmos_backend.problem.repository.KeywordRepository;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
@@ -70,7 +71,7 @@ class ApproachSubmissionServiceTest {
     }
 
     private Problem problem(String category) {
-        return new Problem("LV1", category, "제목", "내용", "입력 형식", "출력 형식", new ProblemConstraints(List.of()), "선정 배경");
+        return new Problem(Difficulty.LV1, Category.valueOf(category), "제목", "내용", "입력 형식", "출력 형식", List.<AiProblemsCreateRequestDto.InputConstraints>of(), "선정 배경");
     }
 
     private AiEvaluationResult aiSuccess(String... includedKeywords) {

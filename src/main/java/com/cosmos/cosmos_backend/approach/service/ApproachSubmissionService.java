@@ -10,8 +10,8 @@ import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.Keyword;
 import com.cosmos.cosmos_backend.problem.domain.Problem;
+import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.domain.RunningLimit;
-import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.KeywordRepository;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
@@ -43,7 +43,7 @@ public class ApproachSubmissionService {
         Category category = parseCategory(selectedCategory);
 
         // 3. 선택한 카테고리와 문제의 정답 카테고리를 비교해 정답 여부를 계산 (오답이어도 계속 진행)
-        boolean categoryResult = category.name().equals(problem.getCategory());
+        boolean categoryResult = category.equals(problem.getCategory());
 
         // 4. AI 평가에 필요한 키워드·실행 제한을 조회하고 요청을 조립
         List<Keyword> keywords = keywordRepository.findByProblemIdOrderById(problemId);
@@ -84,19 +84,19 @@ public class ApproachSubmissionService {
     // 문제·키워드·실행 제한을 AI 요청 형태로 조립
     private AiEvaluationRequest buildAiRequest(Problem problem, String naturalSolution, List<Keyword> keywords, List<RunningLimit> runningLimits) {
         // 1. 실행 제한을 AI 요청 형태로 변환 (MB → KB)
-        List<ProblemDetailResponse.ExecutionLimit> executionLimits = runningLimits.stream()
-                .map(limit -> new ProblemDetailResponse.ExecutionLimit(
-                        limit.getLanguage().name(), limit.getTimeLimitMs(), limit.getMemoryLimitMb() * 1024))
+        List<AiProblemsCreateRequestDto.ExecutionLimits> executionLimits = runningLimits.stream()
+                .map(limit -> new AiProblemsCreateRequestDto.ExecutionLimits(
+                        limit.getLanguage(), limit.getTimeLimitMs(), limit.getMemoryLimitMb() * 1024))
                 .toList();
 
         // 2. 요청 조립 (constraints는 Hibernate가 JSON에서 자동 변환해 둔 값을 그대로 씀)
         return new AiEvaluationRequest(
                 problem.getTitle(),
                 problem.getContent(),
-                problem.getCategory(),
+                problem.getCategory().name(),
                 problem.getCategorySelectReason(),
                 keywords.stream().map(Keyword::getKeyword).toList(),
-                problem.getConstraints().inputConstraints(),
+                problem.getConstraints(),
                 executionLimits,
                 naturalSolution
         );

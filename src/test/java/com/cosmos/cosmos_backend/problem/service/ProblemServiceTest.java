@@ -10,7 +10,6 @@ import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.domain.Problem;
 import com.cosmos.cosmos_backend.problem.domain.ProblemExample;
 import com.cosmos.cosmos_backend.problem.domain.RunningLimit;
-import com.cosmos.cosmos_backend.problem.dto.response.ProblemConstraints;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.ProblemExampleRepository;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
@@ -42,8 +41,8 @@ class ProblemServiceTest {
     @Test
     void getProblemDetail_returnsAssembledResponse_whenProblemExists() {
         // Given
-        ProblemConstraints constraints = new ProblemConstraints(
-                List.of(new AiProblemsCreateRequestDto.InputConstraints("nums.length", Scope.INPUT, Datatype.INT, 2F, 100000F, List.of()))
+        List<AiProblemsCreateRequestDto.InputConstraints> constraints = List.of(
+                new AiProblemsCreateRequestDto.InputConstraints("nums.length", Scope.INPUT, Datatype.INT, 2F, 100000F, List.of())
         );
         Problem problem = new Problem(
                 Difficulty.LV1, Category.ARRAY, "두 수의 합", "합이 목표값이 되는 두 원소의 인덱스를 반환하세요.",
@@ -63,8 +62,8 @@ class ProblemServiceTest {
 
         // Then
         assertThat(response.problemId()).isEqualTo(1L);
-        assertThat(response.level()).isEqualTo(1);
-        assertThat(response.category()).isEqualTo("ARRAY");
+        assertThat(response.difficulty()).isEqualTo(Difficulty.LV1);
+        assertThat(response.category()).isEqualTo(Category.ARRAY);
         assertThat(response.inputFormat()).isEqualTo("정수 배열 nums와 목표값 target이 주어집니다.");
         assertThat(response.executionLimits()).hasSize(1);
         assertThat(response.executionLimits().get(0).memoryLimitKb()).isEqualTo(500 * 1024);
