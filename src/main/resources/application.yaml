@@ -1,3 +1,9 @@
 spring:
   application:
     name: cosmos-backend
+
+ai:
+  server:
+    base-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
+    connect-timeout: ${AI_SERVER_CONNECT_TIMEOUT:3s}
+    read-timeout: ${AI_SERVER_READ_TIMEOUT:30s}
