@@ -63,44 +63,44 @@ public class DailyBattleService {
     }
 
     @Transactional
-    public BattleParticipationResponseDto battleParticipation(Long battle_id, Long user_id){
+    public BattleParticipationResponseDto battleParticipation(Long battleId, Long userId){
 
         // user 정보 있는지 확인
         //TODO: 유저 없을때 예외처리
-        User user = userRepository.findById(user_id).get();
+        User user = userRepository.findById(userId).get();
 
         // 배틀 정보 있는지 확인
         //TODO: 배틀문제 없을때 예외처리
-        DailyBattle dailyBattle = dailyBattleRepository.findById(battle_id).get();
+        DailyBattle dailyBattle = dailyBattleRepository.findById(battleId).get();
 
         // 배틀 참여 상태 엔티티 생성
-        BattleParticipation battle_participation = new BattleParticipation(
+        BattleParticipation battleParticipation = new BattleParticipation(
                 dailyBattle,
                 user
         );
 
-        battleParticipationRepository.save(battle_participation);
+        battleParticipationRepository.save(battleParticipation);
 
         // 배틀 정보 불러오기 (제목, 본문)
         String title = dailyBattle.getTitle();
         String content = dailyBattle.getContent();
 
         // 배틀 케이스 정보 불러오기 (인풋, 순서)
-        List<BattleCase> battle_cases_list = battleCaseRepository.findByDailyBattle_BattleId(battle_id);
+        List<BattleCase> battleCaseList = battleCaseRepository.findByDailyBattle_BattleId(battleId);
 
         // 배틀 케이스 응답 dto 만들기
-        List<BattleCaseResponseDto>  battle_case_response_list = new ArrayList<>();
+        List<BattleCaseResponseDto>  battleCaseResponseList = new ArrayList<>();
 
-        for (BattleCase battle_case : battle_cases_list){
-            String input = battle_case.getInput();
-            Integer display_order = battle_case.getDisplayOrder();
+        for (BattleCase battleCase : battleCaseList){
+            String input = battleCase.getInput();
+            Integer displayOrder = battleCase.getDisplayOrder();
 
-            BattleCaseResponseDto battle_cases = new BattleCaseResponseDto(input, display_order);
-            battle_case_response_list.add(battle_cases);
+            BattleCaseResponseDto battleCases = new BattleCaseResponseDto(input, displayOrder);
+            battleCaseResponseList.add(battleCases);
         }
 
         //시작시간
-        OffsetDateTime startedAt = battle_participation
+        OffsetDateTime startedAt = battleParticipation
                 .getStartedAt()
                 .atOffset(ZoneOffset.ofHours(9));
 
@@ -110,7 +110,7 @@ public class DailyBattleService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        Long remained_time_second = Math.max(
+        Long remainedTimeSecond = Math.max(
                 0L,
                 Duration.between(now, battleEndTime).getSeconds()
         );
@@ -118,15 +118,15 @@ public class DailyBattleService {
         // 배틀 참여 응답 dto 만들기
         BattleParticipationResponseDto battleParticipationResponseDto = new BattleParticipationResponseDto(
                 dailyBattle.getCategory(),
-                battle_id,
-                user_id,
+                battleId,
+                userId,
                 dailyBattle.getBattleDate(),
                 title,
                 content,
-                battle_participation.getParticipationStatus(),
+                battleParticipation.getParticipationStatus(),
                 startedAt,
-                remained_time_second,
-                battle_case_response_list
+                remainedTimeSecond,
+                battleCaseResponseList
         );
 
         //반환

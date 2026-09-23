@@ -21,3 +21,6 @@ jwt:
 
 cookie:
   secure: false
+
+ai:
+  root-url : http://localhost:8000
