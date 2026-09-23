@@ -1,4 +1,4 @@
-package com.cosmos.cosmos_backend.problem.domain;
+package com.cosmos.cosmos_backend.problem.domain.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

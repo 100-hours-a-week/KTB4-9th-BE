@@ -1,6 +1,6 @@
 package com.cosmos.cosmos_backend.approach.client;
 
-import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
+import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import java.util.List;
 
 /** AI 서버 POST /api/llm/evaluation 요청 본문. */

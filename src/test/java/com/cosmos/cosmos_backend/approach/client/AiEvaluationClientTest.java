@@ -14,7 +14,7 @@ import com.cosmos.cosmos_backend.common.Datatype;
 import com.cosmos.cosmos_backend.common.Language;
 import com.cosmos.cosmos_backend.common.Scope;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
-import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
+import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;

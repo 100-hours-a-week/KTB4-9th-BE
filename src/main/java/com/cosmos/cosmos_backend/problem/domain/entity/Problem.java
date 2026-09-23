@@ -1,9 +1,8 @@
-package com.cosmos.cosmos_backend.problem.domain;
+package com.cosmos.cosmos_backend.problem.domain.entity;
 
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
-import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
-import com.cosmos.cosmos_backend.problem.dto.response.ProblemConstraints;
+import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

@@ -1,8 +1,8 @@
-package com.cosmos.cosmos_backend.home.controller;
+package com.cosmos.cosmos_backend.problem.controller;
 
 
-import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
-import com.cosmos.cosmos_backend.home.service.DailyProblemService;
+import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
+import com.cosmos.cosmos_backend.problem.service.DailyProblemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
