@@ -1,11 +1,10 @@
-package com.cosmos.cosmos_backend.home.service;
+package com.cosmos.cosmos_backend.problem.service;
 
-import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
+import com.cosmos.cosmos_backend.problem.domain.entity.*;
+import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.domain.*;
-import com.cosmos.cosmos_backend.problem.domain.entity.Hint;
 import com.cosmos.cosmos_backend.problem.repository.*;
 import jakarta.transaction.Transactional;
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

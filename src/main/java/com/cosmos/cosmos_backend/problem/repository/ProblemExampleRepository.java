@@ -1,6 +1,6 @@
 package com.cosmos.cosmos_backend.problem.repository;
 
-import com.cosmos.cosmos_backend.problem.domain.ProblemExample;
+import com.cosmos.cosmos_backend.problem.domain.entity.ProblemExample;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 

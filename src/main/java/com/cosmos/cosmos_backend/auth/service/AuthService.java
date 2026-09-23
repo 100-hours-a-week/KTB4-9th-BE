@@ -70,7 +70,7 @@ public class AuthService {
             UserOauthAccount newUserOauthAccount = new UserOauthAccount(newUser, oauthProvider,kakaoUser.oauthUserId().toString());
             userOauthAccountRepository.save(newUserOauthAccount);
 
-            user =newUser;
+            user = newUser;
         }
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getUsername());

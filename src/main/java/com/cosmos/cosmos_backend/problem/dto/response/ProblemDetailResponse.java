@@ -2,10 +2,10 @@ package com.cosmos.cosmos_backend.problem.dto.response;
 
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
-import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
-import com.cosmos.cosmos_backend.problem.domain.Problem;
-import com.cosmos.cosmos_backend.problem.domain.ProblemExample;
-import com.cosmos.cosmos_backend.problem.domain.RunningLimit;
+import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
+import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
+import com.cosmos.cosmos_backend.problem.domain.entity.ProblemExample;
+import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import java.util.List;
 
 /** 문제 상세 조회 응답. */

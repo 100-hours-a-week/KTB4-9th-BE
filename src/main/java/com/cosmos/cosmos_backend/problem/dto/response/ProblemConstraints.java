@@ -1,6 +1,6 @@
 package com.cosmos.cosmos_backend.problem.dto.response;
 
-import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
+import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 
 import java.util.List;
 

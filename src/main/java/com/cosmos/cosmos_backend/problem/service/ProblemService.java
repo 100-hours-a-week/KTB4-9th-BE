@@ -1,7 +1,7 @@
 package com.cosmos.cosmos_backend.problem.service;
 
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
-import com.cosmos.cosmos_backend.problem.domain.Problem;
+import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.ProblemExampleRepository;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
