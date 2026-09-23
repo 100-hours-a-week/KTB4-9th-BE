@@ -1,4 +1,4 @@
-package com.cosmos.cosmos_backend.home.dto.request;
+package com.cosmos.cosmos_backend.problem.dto.request;
 
 import com.cosmos.cosmos_backend.common.*;
 import com.fasterxml.jackson.annotation.JsonProperty;

@@ -1,4 +1,4 @@
-package com.cosmos.cosmos_backend.problem.domain;
+package com.cosmos.cosmos_backend.problem.domain.entity;
 
 import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;

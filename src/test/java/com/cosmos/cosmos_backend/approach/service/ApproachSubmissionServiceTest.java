@@ -9,7 +9,7 @@ import com.cosmos.cosmos_backend.approach.domain.EvaluationStatus;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
-import com.cosmos.cosmos_backend.problem.domain.Problem;
+import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemConstraints;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import java.util.List;

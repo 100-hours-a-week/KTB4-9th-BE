@@ -6,10 +6,10 @@ import static org.mockito.Mockito.when;
 
 import com.cosmos.cosmos_backend.common.*;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
-import com.cosmos.cosmos_backend.home.dto.request.AiProblemsCreateRequestDto;
-import com.cosmos.cosmos_backend.problem.domain.Problem;
-import com.cosmos.cosmos_backend.problem.domain.ProblemExample;
-import com.cosmos.cosmos_backend.problem.domain.RunningLimit;
+import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
+import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
+import com.cosmos.cosmos_backend.problem.domain.entity.ProblemExample;
+import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemConstraints;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.ProblemExampleRepository;

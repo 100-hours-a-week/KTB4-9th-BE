@@ -1,6 +1,6 @@
 package com.cosmos.cosmos_backend.problem.repository;
 
-import com.cosmos.cosmos_backend.problem.domain.RunningLimit;
+import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
