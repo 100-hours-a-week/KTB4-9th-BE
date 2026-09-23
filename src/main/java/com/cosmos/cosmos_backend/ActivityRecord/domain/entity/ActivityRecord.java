@@ -41,4 +41,15 @@ public class ActivityRecord {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    public  ActivityRecord(Long userId, LocalDate activityDate, Long correctProblemCount) {
+        this.userId = userId;
+        this.activityDate = activityDate;
+        this.correctProblemCount = correctProblemCount;
+    }
+
+    // 정답 수 증가
+    public void increaseCorrectProblemCount() {
+        this.correctProblemCount++;
+    }
+
 }
