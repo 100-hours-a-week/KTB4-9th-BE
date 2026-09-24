@@ -3,11 +3,14 @@ package com.cosmos.cosmos_backend.problem.service;
 import com.cosmos.cosmos_backend.problem.domain.entity.*;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.domain.*;
+import com.cosmos.cosmos_backend.problem.dto.response.DailyProblemResponseDto;
 import com.cosmos.cosmos_backend.problem.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -26,12 +29,19 @@ public class DailyProblemService {
 
     private final HintRepository hintRepository;
 
+    private final DailyProblemRepository dailyProblemRepository;
+
     @Transactional
     public void createDailyProblems(AiProblemsCreateRequestDto problemsCreateRequest) {
 
         List<AiProblemsCreateRequestDto.ProblemsInfo> aiProblems = problemsCreateRequest.aiProblems();
 
+        // 오늘 날짜
+        LocalDate dailyProblemDate = LocalDate.now();
+
         // 필요한 엔티티 선언
+        DailyProblem dailyProblem;
+
         Problem problem;
 
         ProblemExample problemExample;
@@ -45,6 +55,9 @@ public class DailyProblemService {
         Hint hintComment;
 
         Hint hintSolution;
+
+        // 개수
+        Integer displayOrder = 1;
 
         for (AiProblemsCreateRequestDto.ProblemsInfo problemsInfo : aiProblems) {
 
@@ -60,6 +73,13 @@ public class DailyProblemService {
             );
 
             problemRepository.save(problem);
+
+            //데일리 문제 엔티티에도 저장
+            dailyProblem = new DailyProblem(problem, dailyProblemDate, displayOrder);
+
+            displayOrder ++;
+
+            dailyProblemRepository.save(dailyProblem);
 
             Long dailyProblemId = problem.getId();
 
@@ -129,5 +149,51 @@ public class DailyProblemService {
                 keywordRepository.save(keyword);
             }
         }
+    }
+
+    public DailyProblemResponseDto getDailyProblems() {
+
+        LocalDate date = LocalDate.now();
+
+        List<DailyProblem> dailyProblemList = dailyProblemRepository.findByRecommendDateOrderByDisplayOrderDesc(date);
+
+        List<DailyProblemResponseDto.DailyProblems> dailyProblems = new ArrayList<>();
+
+        for (int i = 0; i < dailyProblemList.size(); i++) {
+
+            Problem problem = dailyProblemList.get(i).getProblem();
+
+            List<AiProblemsCreateRequestDto.ProblemExamples> examples = new ArrayList<>();
+
+            List<ProblemExample> problemExamples = problemExampleRepository.findByProblemIdOrderByDisplayOrder(problem.getId());
+
+            for (int j = 0 ; j < problemExamples.size(); j++) {
+                AiProblemsCreateRequestDto.ProblemExamples example = new AiProblemsCreateRequestDto.ProblemExamples(
+                        problemExamples.get(j).getInput(),
+                        problemExamples.get(j).getOutput(),
+                        problemExamples.get(j).getDescription()
+                );
+
+                examples.add(example);
+            }
+
+            DailyProblemResponseDto.DailyProblems dailyProblem = new DailyProblemResponseDto.DailyProblems(
+                    problem.getId(),
+                    problem.getDifficulty(),
+                    problem.getCategory(),
+                    problem.getTitle(),
+                    problem.getContent(),
+                    examples
+            );
+
+            dailyProblems.add(dailyProblem);
+        }
+
+        DailyProblemResponseDto dailyProblemResponse = new DailyProblemResponseDto(
+                date,
+                dailyProblems
+        );
+
+        return dailyProblemResponse;
     }
 }
