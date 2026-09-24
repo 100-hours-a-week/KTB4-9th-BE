@@ -1,5 +1,7 @@
 package com.cosmos.cosmos_backend.approach.service;
 
+import com.cosmos.cosmos_backend.ActivityRecord.domain.entity.ActivityRecord;
+import com.cosmos.cosmos_backend.ActivityRecord.repository.ActivityRecordRepository;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationClient;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
@@ -15,8 +17,12 @@ import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.repository.KeywordRepository;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -33,6 +39,8 @@ public class ApproachSubmissionService {
     private final ApproachSubmissionRepository approachSubmissionRepository;
     private final AiEvaluationClient aiEvaluationClient;
     private final TransactionTemplate transactionTemplate;
+
+    private final ActivityRecordRepository activityRecordRepository;
 
     public ApproachSubmitResult submit(Long userId, Long problemId, String selectedCategory, String naturalSolution) {
         // 1. problemId로 문제를 조회 (없으면 404 예외를 던짐)
@@ -66,6 +74,24 @@ public class ApproachSubmissionService {
                                 new ApproachSubmission(userId, problemId, category, naturalSolution, categoryResult, result.score(), result.feedback())
                         ))
         );
+
+        // 학습 기록
+        // 1. 정답 + 자연어 풀이 100점이면 잔디 +1
+        // 2. 기존에 해당 날짜에 대한 기록 있으면 그냥 + 1
+        // 3. 기존에 해당 날짜에 대한 기록 없으면 행 새로 만들기
+        if (submission.getCategoryResult() && submission.getTotalScore() == 100){
+
+            LocalDate activityDate = LocalDate.now();
+            Optional<ActivityRecord> activityRecord = activityRecordRepository.findByUserIdAndActivityDate(userId, activityDate);
+
+            if (activityRecord.isPresent()) {
+                ActivityRecord activity = activityRecord.get();
+                activity.increaseCorrectProblemCount();
+            } else {
+                ActivityRecord activity = new ActivityRecord(userId, activityDate, 1L);
+                activityRecordRepository.save(activity);
+            }
+        }
 
         return new ApproachSubmitResult(submission, mergedKeywords);
     }
