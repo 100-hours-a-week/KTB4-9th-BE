@@ -27,7 +27,7 @@ public class ActivityRecordController {
 
         ActivityRecordResponseDto activityRecordResponseDto = activityRecordService.getLearningRecord(userId);
 
-        return null;
+        return activityRecordResponseDto;
     }
 
 
