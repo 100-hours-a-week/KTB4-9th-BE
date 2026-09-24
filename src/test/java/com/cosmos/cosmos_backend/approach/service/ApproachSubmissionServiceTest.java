@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.cosmos.cosmos_backend.activityRecord.repository.ActivityRecordRepository;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationClient;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
@@ -53,6 +54,9 @@ class ApproachSubmissionServiceTest {
     @Mock
     private AiEvaluationClient aiEvaluationClient;
 
+    @Mock
+    private ActivityRecordRepository activityRecordRepository;
+
     private ApproachSubmissionService service;
 
     @BeforeEach
@@ -66,7 +70,7 @@ class ApproachSubmissionServiceTest {
         };
         service = new ApproachSubmissionService(
                 problemRepository, keywordRepository, runningLimitRepository, approachSubmissionRepository,
-                aiEvaluationClient, fakeTransactionTemplate
+                aiEvaluationClient, fakeTransactionTemplate, activityRecordRepository
         );
     }
 
