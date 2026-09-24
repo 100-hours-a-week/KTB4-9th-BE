@@ -2,16 +2,16 @@ package com.cosmos.cosmos_backend.problem.controller;
 
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
+import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.service.ProblemService;
 import java.util.Map;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/problems")
@@ -38,5 +38,15 @@ public class ProblemController {
             // 2. 숫자가 아니면 400 예외를 던짐 (GlobalExceptionHandler가 응답으로 변환)
             throw new BusinessException(HttpStatus.BAD_REQUEST, "invalid_problem_id");
         }
+    }
+
+    @PostMapping("")
+    public ResponseEntity<Void> createProblems(
+            @Valid
+            @RequestBody AiProblemsCreateRequestDto problemCreateRequest) {
+
+        problemService.createProblems(problemCreateRequest);
+
+        return ResponseEntity.noContent().build();
     }
 }
