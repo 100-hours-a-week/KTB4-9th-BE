@@ -1,4 +1,4 @@
-package com.cosmos.cosmos_backend.ActivityRecord.dto;
+package com.cosmos.cosmos_backend.activityRecord.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

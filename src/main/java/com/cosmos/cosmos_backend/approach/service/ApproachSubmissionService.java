@@ -1,7 +1,7 @@
 package com.cosmos.cosmos_backend.approach.service;
 
-import com.cosmos.cosmos_backend.ActivityRecord.domain.entity.ActivityRecord;
-import com.cosmos.cosmos_backend.ActivityRecord.repository.ActivityRecordRepository;
+import com.cosmos.cosmos_backend.activityRecord.domain.entity.ActivityRecord;
+import com.cosmos.cosmos_backend.activityRecord.repository.ActivityRecordRepository;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationClient;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
@@ -19,7 +19,6 @@ import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
