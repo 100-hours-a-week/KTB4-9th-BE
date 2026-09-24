@@ -37,13 +37,13 @@ public class DailyBattleController {
     //배틀 참여
     @PostMapping("/{battle_id}/participations")
     public BattleParticipationResponseDto battleParticipation(
-            @PathVariable @Positive Long battle_id,
+            @PathVariable @Positive Long battleId,
             @AuthenticationPrincipal Jwt jwt
     ){
 
-        Long user_id = Long.parseLong(jwt.getSubject());
+        Long userId = Long.parseLong(jwt.getSubject());
 
-        BattleParticipationResponseDto battleParticipationResponse = dailyBattleService.battleParticipation(battle_id, user_id);
+        BattleParticipationResponseDto battleParticipationResponse = dailyBattleService.battleParticipation(battleId, userId);
 
         return battleParticipationResponse;
     }
