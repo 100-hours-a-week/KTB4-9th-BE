@@ -1,6 +1,6 @@
-package com.cosmos.cosmos_backend.ActivityRecord.repository;
+package com.cosmos.cosmos_backend.activityRecord.repository;
 
-import com.cosmos.cosmos_backend.ActivityRecord.domain.entity.ActivityRecord;
+import com.cosmos.cosmos_backend.activityRecord.domain.entity.ActivityRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;

@@ -1,9 +1,9 @@
-package com.cosmos.cosmos_backend.ActivityRecord.service;
+package com.cosmos.cosmos_backend.activityRecord.service;
 
 
-import com.cosmos.cosmos_backend.ActivityRecord.domain.entity.ActivityRecord;
-import com.cosmos.cosmos_backend.ActivityRecord.dto.ActivityRecordResponseDto;
-import com.cosmos.cosmos_backend.ActivityRecord.repository.ActivityRecordRepository;
+import com.cosmos.cosmos_backend.activityRecord.domain.entity.ActivityRecord;
+import com.cosmos.cosmos_backend.activityRecord.dto.ActivityRecordResponseDto;
+import com.cosmos.cosmos_backend.activityRecord.repository.ActivityRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

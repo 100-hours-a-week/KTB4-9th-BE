@@ -1,7 +1,7 @@
-package com.cosmos.cosmos_backend.ActivityRecord.controller;
+package com.cosmos.cosmos_backend.activityRecord.controller;
 
-import com.cosmos.cosmos_backend.ActivityRecord.dto.ActivityRecordResponseDto;
-import com.cosmos.cosmos_backend.ActivityRecord.service.ActivityRecordService;
+import com.cosmos.cosmos_backend.activityRecord.dto.ActivityRecordResponseDto;
+import com.cosmos.cosmos_backend.activityRecord.service.ActivityRecordService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;

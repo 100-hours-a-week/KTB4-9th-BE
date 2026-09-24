@@ -1,4 +1,4 @@
-package com.cosmos.cosmos_backend.ActivityRecord.domain.entity;
+package com.cosmos.cosmos_backend.activityRecord.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
