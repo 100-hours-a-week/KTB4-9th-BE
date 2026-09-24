@@ -11,9 +11,8 @@ import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
 import com.cosmos.cosmos_backend.problem.domain.entity.ProblemExample;
 import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
-import com.cosmos.cosmos_backend.problem.repository.ProblemExampleRepository;
-import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
-import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
+import com.cosmos.cosmos_backend.problem.repository.*;
+
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -34,8 +33,17 @@ class ProblemServiceTest {
     @Mock
     private RunningLimitRepository runningLimitRepository;
 
+    @Mock
+    private HintRepository hintRepository;
+
+    @Mock
+    private TestCaseRepository testCaseRepository;
+
+    @Mock
+    private KeywordRepository keywordRepository;
+
     private ProblemService service() {
-        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository);
+        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository);
     }
 
     @Test
