@@ -49,12 +49,16 @@ public class DailyProblemService {
         }
     }
 
+    // 데일리 문제 조회 -> FE에서 처음 화면에서 조회
     public DailyProblemResponseDto getDailyProblems() {
 
+        // 오늘 날짜
         LocalDate date = LocalDate.now();
 
+        // 1. 데일리 문제 리스트 디비에서 받아오기
         List<DailyProblem> dailyProblemList = dailyProblemRepository.findByRecommendDateOrderByDisplayOrderDesc(date);
 
+        // 2. 데일리 문제 리스트로 응답 구성
         List<DailyProblemResponseDto.DailyProblems> dailyProblems = new ArrayList<>();
 
         for (int i = 0; i < dailyProblemList.size(); i++) {
