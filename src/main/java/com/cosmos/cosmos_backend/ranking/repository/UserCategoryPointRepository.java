@@ -1,5 +1,6 @@
 package com.cosmos.cosmos_backend.ranking.repository;
 
+import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserCategoryPoint;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserPoint;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,9 +9,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserCategoryPointRepository extends JpaRepository<UserCategoryPoint, Integer> {
-    Optional<UserPoint> findByUser_UserId(Long userId);
+    Optional<UserCategoryPoint> findByUser_IdAndCategory(Long userId, Category category);
 
-    List<UserPoint> findTop100ByOrderByPointDesc();
+    List<UserCategoryPoint> findTop100ByCategoryOrderByPointDesc(Category category);
 
-    long countByPointGreaterThan(Long point);
+    long countByCategoryAndPointGreaterThan(Category category, Long point);
 }

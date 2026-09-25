@@ -1,5 +1,6 @@
 package com.cosmos.cosmos_backend.ranking.repository;
 
+import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserDifficultyPoint;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserPoint;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,9 +10,9 @@ import java.util.Optional;
 
 public interface UserDifficultyPointRepository extends JpaRepository<UserDifficultyPoint, Integer> {
 
-    Optional<UserPoint> findByUser_UserId(Long userId);
+    Optional<UserDifficultyPoint> findByUser_IdAndDifficulty(Long userId, Difficulty difficulty);
 
-    List<UserPoint> findTop100ByOrderByPointDesc();
+    List<UserDifficultyPoint> findTop100ByDifficultyOrderByPointDesc(Difficulty difficulty);
 
-    long countByPointGreaterThan(Long point);
+    long countByDifficultyAndPointGreaterThan(Difficulty  difficulty, Long point);
 }
