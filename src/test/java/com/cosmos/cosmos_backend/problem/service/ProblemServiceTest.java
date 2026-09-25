@@ -10,6 +10,7 @@ import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
 import com.cosmos.cosmos_backend.problem.domain.entity.ProblemExample;
 import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
+import com.cosmos.cosmos_backend.problem.domain.entity.UsedHint;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.*;
 
@@ -42,8 +43,11 @@ class ProblemServiceTest {
     @Mock
     private KeywordRepository keywordRepository;
 
+    @Mock
+    private UsedHintRepository usedHintRepository;
+
     private ProblemService service() {
-        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository);
+        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository);
     }
 
     @Test
@@ -65,8 +69,10 @@ class ProblemServiceTest {
         when(runningLimitRepository.findByProblemId(1L))
                 .thenReturn(List.of(new RunningLimit(1L, Language.PYTHON, 4000F, 500)));
 
+        when(usedHintRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.empty());
+
         // When
-        ProblemDetailResponse response = service().getProblemDetail(1L);
+        ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
 
         // Then
         assertThat(response.problemId()).isEqualTo(1L);
@@ -77,6 +83,27 @@ class ProblemServiceTest {
         assertThat(response.executionLimits().get(0).memoryLimitKb()).isEqualTo(500 * 1024);
         assertThat(response.examples()).hasSize(1);
         assertThat(response.examples().get(0).input()).isEqualTo("nums=[2,7]");
+        // 힌트 사용 기록이 없으면 0
+        assertThat(response.usedHintStage()).isEqualTo(0);
+    }
+
+    @Test
+    void getProblemDetail_returnsSavedHintStage_whenUsedHintExists() {
+        // Given
+        Problem problem = new Problem(
+                Difficulty.LV1, Category.ARRAY, "두 수의 합", "내용", "입력 형식", "출력 형식", List.of(), "배열"
+        );
+        setId(problem, 1L);
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(1L)).thenReturn(List.of());
+        when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
+        when(usedHintRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.of(new UsedHint(7L, 1L, 2)));
+
+        // When
+        ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
+
+        // Then
+        assertThat(response.usedHintStage()).isEqualTo(2);
     }
 
     @Test
@@ -85,7 +112,7 @@ class ProblemServiceTest {
         when(problemRepository.findById(999L)).thenReturn(Optional.empty());
 
         // When & Then
-        assertThatThrownBy(() -> service().getProblemDetail(999L))
+        assertThatThrownBy(() -> service().getProblemDetail(7L, 999L))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND))
                 .hasMessage("problem_not_found");

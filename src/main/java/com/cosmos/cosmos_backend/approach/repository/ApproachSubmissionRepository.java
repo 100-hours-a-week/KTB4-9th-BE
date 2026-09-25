@@ -17,4 +17,7 @@ public interface ApproachSubmissionRepository extends JpaRepository<ApproachSubm
     // 사용자·문제별 기존 제출을 잠그고 조회 (트랜잭션 안에서만 호출 가능)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ApproachSubmission> findForUpdateByUserIdAndProblemId(Long userId, Long problemId);
+
+    // 사용자·문제별 기존 제출 조회 (재제출 여부 판단용)
+    Optional<ApproachSubmission> findByUserIdAndProblemId(Long userId, Long problemId);
 }

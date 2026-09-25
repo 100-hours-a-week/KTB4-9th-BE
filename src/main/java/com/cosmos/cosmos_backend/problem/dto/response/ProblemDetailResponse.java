@@ -19,7 +19,9 @@ public record ProblemDetailResponse(
         String outputFormat,
         List<AiProblemsCreateRequestDto.InputConstraints> inputConstraints,
         List<AiProblemsCreateRequestDto.ExecutionLimits> executionLimits,
-        List<AiProblemsCreateRequestDto.ProblemExamples> examples
+        List<AiProblemsCreateRequestDto.ProblemExamples> examples,
+        // 힌트 사용 단계 (0: 안 씀, 1: 주석 힌트까지, 2: 정답 힌트까지)
+        Integer usedHintStage
 ) {
 
 
@@ -27,7 +29,8 @@ public record ProblemDetailResponse(
     public static ProblemDetailResponse of(
             Problem problem,
             List<ProblemExample> examples,
-            List<RunningLimit> runningLimits
+            List<RunningLimit> runningLimits,
+            int usedHintStage
     ) {
         return new ProblemDetailResponse(
                 // 1. 문제 기본 정보
@@ -51,7 +54,9 @@ public record ProblemDetailResponse(
                 // 4. 공개 예시
                 examples.stream()
                         .map(e -> new AiProblemsCreateRequestDto.ProblemExamples(e.getInput(), e.getOutput(), e.getDescription()))
-                        .toList()
+                        .toList(),
+                // 5. 힌트 사용 단계
+                usedHintStage
         );
     }
 }

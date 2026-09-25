@@ -8,6 +8,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -37,9 +38,12 @@ public class UserPoint {
     @Column(name = "current_correct_streak", nullable = false)
     private Long currentStreakDay;
 
+    @Column(name = "last_correct_Date", nullable = false)
+    private LocalDate lastCorrectDate;
+
     @LastModifiedDate
     @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    private LocalDate updatedAt;
 
     public UserPoint(User user, Long totalPoint, Long totalCorrectProblemCount, Long currentCorrectStreak) {
         this.user = user;
@@ -53,9 +57,24 @@ public class UserPoint {
         this.currentStreakDay++;
     }
 
+    // 연속 일수 리셋
+    public void resetCorrectStreak() {
+        this.currentStreakDay = 1L;
+    }
+
+    // 마지막 정답 날짜 업데이트
+    public void updateLastCorrectDate(LocalDate date) {
+        this.lastCorrectDate = date;
+    }
+
     // 누적 정답 수 + 1
-    public void increaseCorrectProblemCount() {
+    public void increaseTotalCorrectProblemCount() {
         this.totalCorrectProblemCount++;
+    }
+
+    //포인트 증가
+    public void increaseTotalPoint(Long point) {
+        this.totalPoint += point;
     }
 
 }

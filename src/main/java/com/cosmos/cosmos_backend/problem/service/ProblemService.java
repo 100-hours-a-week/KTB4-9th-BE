@@ -25,20 +25,27 @@ public class ProblemService {
     private final HintRepository hintRepository;
     private final KeywordRepository keywordRepository;
     private final TestCaseRepository testCaseRepository;
+    private final UsedHintRepository usedHintRepository;
 
     /** 문제 상세 조회. */
     @Transactional(readOnly = true)
-    public ProblemDetailResponse getProblemDetail(Long problemId) {
+    public ProblemDetailResponse getProblemDetail(Long userId, Long problemId) {
         // 1. problemId로 문제를 조회 (없으면 404 예외를 던짐, constraints는 Hibernate가 JSON에서 자동 변환)
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
 
-        // 2. 예시, 실행 제한을 각각 조회
-        // 3. 조회한 값들을 응답 형태로 조립해서 반환
+        // 2. 사용자의 힌트 사용 단계를 조회 (기록이 없으면 0)
+        int usedHintStage = usedHintRepository.findByUserIdAndProblemId(userId, problemId)
+                .map(UsedHint::getHintStage)
+                .orElse(0);
+
+        // 3. 예시, 실행 제한을 각각 조회
+        // 4. 조회한 값들을 응답 형태로 조립해서 반환
         return ProblemDetailResponse.of(
                 problem,
                 problemExampleRepository.findByProblemIdOrderByDisplayOrder(problemId),
-                runningLimitRepository.findByProblemId(problemId)
+                runningLimitRepository.findByProblemId(problemId),
+                usedHintStage
         );
     }
 

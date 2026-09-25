@@ -38,4 +38,12 @@ public class UserDifficultyPoint {
         this.point = point;
         this.correctProblemCount = correctProblemCount;
     }
+
+    public void increasePoint(Long point) {
+        this.point += point;
+    }
+
+    public void increaseCorrectProblemCount() {
+        this.correctProblemCount++;
+    }
 }
