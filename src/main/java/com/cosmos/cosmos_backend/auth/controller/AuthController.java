@@ -74,7 +74,7 @@ public class AuthController {
                 .status(HttpStatus.FOUND)
                 .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-                .location(URI.create("http://localhost:5173/"))
+                .location(URI.create("https://cosmoscode.site/"))
                 .build();
     }
 
