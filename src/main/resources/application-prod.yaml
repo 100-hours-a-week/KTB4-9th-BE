@@ -28,3 +28,7 @@ ai:
     base-url: ${AI_SERVER_BASE_URL:http://ai-server:8000}
     connect-timeout: ${AI_SERVER_CONNECT_TIMEOUT:3s}
     read-timeout: ${AI_SERVER_READ_TIMEOUT:30s}
+
+server:
+  servlet:
+    context-path: /api
