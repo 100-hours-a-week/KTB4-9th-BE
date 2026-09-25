@@ -2,6 +2,8 @@ package com.cosmos.cosmos_backend.ranking.service;
 
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
+import com.cosmos.cosmos_backend.ranking.domain.entity.UserCategoryPoint;
+import com.cosmos.cosmos_backend.ranking.domain.entity.UserDifficultyPoint;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserPoint;
 import com.cosmos.cosmos_backend.ranking.repository.UserCategoryPointRepository;
 import com.cosmos.cosmos_backend.ranking.repository.UserDifficultyPointRepository;
@@ -68,22 +70,32 @@ public class UserPointService {
             default: earnedPoint = 0L; break;
         }
 
+
+        Long streakBonus = 0L;
+
         // 4-1. 오늘 최초 정답인 경우에만 streak 보너스 지급
         if (firstCorrectToday) {
-            Long streakBonus = userPoint.getCurrentStreakDay() * 2;
-            earnedPoint += streakBonus;
+            streakBonus = userPoint.getCurrentStreakDay() * 2;
         }
+
+        // 전체 랭킹에는 streak 보너스 추가
+        Long totalEarnedPoint = earnedPoint + streakBonus;
 
         // 4-2. 마지막 정답 날짜 갱신
         userPoint.updateLastCorrectDate(today);
 
         // 5. 전체 포인트 업데이트
-        userPoint.increaseTotalPoint(earnedPoint);
+        userPoint.increaseTotalPoint(totalEarnedPoint);
 
         // 6. 해당 난이도 UserDifficultyPoint 업데이트
+        UserDifficultyPoint userDifficultyPoint = userDifficultyPointRepository.findByUser_IdAndDifficulty(userId, difficulty).get();
+
+        userDifficultyPoint.increasePoint(earnedPoint);
 
         // 7. 해당 카테고리 UserCategoryPoint 업데이트
+        UserCategoryPoint userCategoryPoint = userCategoryPointRepository.findByUser_IdAndCategory(userId, category).get();
 
+        userCategoryPoint.increasePoint(earnedPoint);
 
     }
 }
