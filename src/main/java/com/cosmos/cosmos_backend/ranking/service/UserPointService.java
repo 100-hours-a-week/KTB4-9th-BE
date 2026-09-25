@@ -1,5 +1,7 @@
 package com.cosmos.cosmos_backend.ranking.service;
 
+import com.cosmos.cosmos_backend.auth.domain.entity.User;
+import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserCategoryPoint;
@@ -13,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +24,7 @@ public class UserPointService {
     private final UserPointRepository userPointRepository;
     private final UserDifficultyPointRepository userDifficultyPointRepository;
     private final UserCategoryPointRepository userCategoryPointRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public void updatePoint(
@@ -29,9 +33,12 @@ public class UserPointService {
             Category category
     ) {
 
+        // 0. User 조회
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
         // 정답 →
         // 1. UserPoint 조회
-        UserPoint userPoint = userPointRepository.findByUser_Id(userId).get();
+        UserPoint userPoint = userPointRepository.findByUser_Id(userId).orElseThrow(() -> new IllegalArgumentException("사용자 포인트 정보를 찾을 수 없습니다."));
 
         // 2. 전체 정답 문제 수 증가
         userPoint.increaseTotalCorrectProblemCount();
@@ -62,12 +69,24 @@ public class UserPointService {
         Long earnedPoint;
 
         switch (difficulty) {
-            case LV1 : earnedPoint = 5L; break;
-            case LV2 : earnedPoint = 10L; break;
-            case LV3 : earnedPoint = 15L; break;
-            case LV4 : earnedPoint = 20L; break;
-            case LV5 : earnedPoint = 25L; break;
-            default: earnedPoint = 0L; break;
+            case LV1:
+                earnedPoint = 5L;
+                break;
+            case LV2:
+                earnedPoint = 10L;
+                break;
+            case LV3:
+                earnedPoint = 15L;
+                break;
+            case LV4:
+                earnedPoint = 20L;
+                break;
+            case LV5:
+                earnedPoint = 25L;
+                break;
+            default:
+                earnedPoint = 0L;
+                break;
         }
 
 
@@ -75,7 +94,7 @@ public class UserPointService {
 
         // 4-1. 오늘 최초 정답인 경우에만 streak 보너스 지급
         if (firstCorrectToday) {
-            streakBonus = userPoint.getCurrentStreakDay() * 2;
+            streakBonus = Math.min(userPoint.getCurrentStreakDay(), 7L) * 2;
         }
 
         // 전체 랭킹에는 streak 보너스 추가
@@ -88,14 +107,45 @@ public class UserPointService {
         userPoint.increaseTotalPoint(totalEarnedPoint);
 
         // 6. 해당 난이도 UserDifficultyPoint 업데이트
-        UserDifficultyPoint userDifficultyPoint = userDifficultyPointRepository.findByUser_IdAndDifficulty(userId, difficulty).get();
+        Optional<UserDifficultyPoint> userDifficultyPoint = userDifficultyPointRepository.findByUser_IdAndDifficulty(userId, difficulty);
 
-        userDifficultyPoint.increasePoint(earnedPoint);
+        if (userDifficultyPoint.isPresent()) {
+            UserDifficultyPoint difficultyPoint = userDifficultyPoint.get();
+            difficultyPoint.increasePoint(earnedPoint);
+            difficultyPoint.increaseCorrectProblemCount();
+        } else {
+            UserDifficultyPoint difficultyPoint = new UserDifficultyPoint(
+                    user,
+                    difficulty,
+                    earnedPoint,
+                    1L
+            );
+
+            userDifficultyPointRepository.save(difficultyPoint);
+
+            difficultyPoint.increaseCorrectProblemCount();
+        }
+
 
         // 7. 해당 카테고리 UserCategoryPoint 업데이트
-        UserCategoryPoint userCategoryPoint = userCategoryPointRepository.findByUser_IdAndCategory(userId, category).get();
+        Optional<UserCategoryPoint> userCategoryPoint = userCategoryPointRepository.findByUser_IdAndCategory(userId, category);
 
-        userCategoryPoint.increasePoint(earnedPoint);
+        if (userCategoryPoint.isPresent()) {
+            UserCategoryPoint categoryPoint = userCategoryPoint.get();
+            categoryPoint.increasePoint(earnedPoint);
+            categoryPoint.increaseCorrectProblemCount();
+        } else {
+            UserCategoryPoint categoryPoint = new UserCategoryPoint(
+                    user,
+                    category,
+                    earnedPoint,
+                    1L
+            );
+
+            userCategoryPointRepository.save(categoryPoint);
+
+            categoryPoint.increaseCorrectProblemCount();
+        }
 
     }
 }

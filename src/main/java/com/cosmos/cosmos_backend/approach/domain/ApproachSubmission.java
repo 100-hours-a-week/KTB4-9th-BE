@@ -60,6 +60,9 @@ public class ApproachSubmission {
     @Column(name = "submitted_count", nullable = false)
     private Integer submittedCount;
 
+    @Column(name = "is_solved", nullable = false)
+    private Boolean isSolved = false;
+
     @Column(name = "submitted_at", nullable = false)
     private LocalDateTime submittedAt;
 
@@ -92,5 +95,9 @@ public class ApproachSubmission {
         this.aiFeedback = feedback;
         this.evaluationStatus = EvaluationStatus.COMPLETED;
         this.evaluatedAt = LocalDateTime.now();
+    }
+
+    public void markAsSolved() {
+        this.isSolved = true;
     }
 }
