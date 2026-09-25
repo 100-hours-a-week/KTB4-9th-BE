@@ -5,6 +5,7 @@ import com.cosmos.cosmos_backend.auth.domain.entity.User;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
+import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserCategoryPoint;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserDifficultyPoint;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserPoint;
@@ -16,6 +17,7 @@ import com.cosmos.cosmos_backend.ranking.repository.UserCategoryPointRepository;
 import com.cosmos.cosmos_backend.ranking.repository.UserDifficultyPointRepository;
 import com.cosmos.cosmos_backend.ranking.repository.UserPointRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -40,7 +42,9 @@ public class RankingService {
         Optional<UserPoint> userPoint = userPointRepository.findByUser_Id(userId);
 
         // 0. 유저 정보 조회
-        User user = userRepository.findById(userId).get();
+        User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
+                HttpStatus.NOT_FOUND, "User not found"
+        ));
 
         // 1. 유저 개인 포인트 계산
         Long myPoint = userPoint.get().getTotalPoint();
