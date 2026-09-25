@@ -75,16 +75,16 @@ public class AuthService {
             userOauthAccountRepository.save(newUserOauthAccount);
 
             user = newUser;
+
+            UserPoint userPoint = new UserPoint(
+                    user,
+                    0L,
+                    0L,
+                    0L
+            );
+
+            userPointRepository.save(userPoint);
         }
-
-        UserPoint userPoint = new UserPoint(
-                user,
-                0L,
-                0L,
-                0L
-        );
-
-        userPointRepository.save(userPoint);
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getUsername());
 

@@ -20,7 +20,7 @@ jwt:
   refresh-token-expiration: 1209600
 
 cookie:
-  secure: false
+  secure: true
 
 ai:
   root-url : ${AI_BASE_URL}
