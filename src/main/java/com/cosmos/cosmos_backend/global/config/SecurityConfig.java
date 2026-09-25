@@ -27,7 +27,9 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/oauth/**", "/auth/token/refresh").permitAll()
+                        .requestMatchers("/auth/oauth/**", "/auth/token/refresh",
+                                "/auth/logout"
+                        ).permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/daily-problems").permitAll()
                         .anyRequest().authenticated()
