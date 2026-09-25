@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -21,11 +23,17 @@ public class ProblemController {
     private final ProblemService problemService;
 
     @GetMapping("/{problemId}")
-    public ResponseEntity<ApiResponse<Map<String, ProblemDetailResponse>>> getProblemDetail(@PathVariable String problemId) {
-        // 1. 경로의 problemId를 숫자로 변환하고, 조회는 Service에게 맡김
-        ProblemDetailResponse response = problemService.getProblemDetail(parseProblemId(problemId));
+    public ResponseEntity<ApiResponse<Map<String, ProblemDetailResponse>>> getProblemDetail(
+            @PathVariable String problemId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        // 1. Spring Security가 검증한 JWT에서 로그인한 사용자 id(sub)를 꺼냄
+        Long userId = Long.valueOf(jwt.getSubject());
 
-        // 2. 응답을 message + data 형식으로 감싸서 200으로 반환
+        // 2. 경로의 problemId를 숫자로 변환하고, 조회는 Service에게 맡김
+        ProblemDetailResponse response = problemService.getProblemDetail(userId, parseProblemId(problemId));
+
+        // 3. 응답을 message + data 형식으로 감싸서 200으로 반환
         return ResponseEntity.ok(ApiResponse.of("problem_detail_retrieval_success", Map.of("problem", response)));
     }
 
