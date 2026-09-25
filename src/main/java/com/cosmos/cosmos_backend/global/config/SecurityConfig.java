@@ -48,7 +48,7 @@ public class SecurityConfig {
 
         // 프론트 서버
         configuration.setAllowedOrigins(
-                List.of("http://localhost:5173")
+                List.of("https://cosmoscode.site")
         );
 
         configuration.setAllowedMethods(
