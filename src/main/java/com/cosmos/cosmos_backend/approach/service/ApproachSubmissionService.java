@@ -7,6 +7,7 @@ import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
+import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
@@ -44,6 +45,7 @@ public class ApproachSubmissionService {
 
     private final ActivityRecordRepository activityRecordRepository;
 
+
     private final UserPointService userPointService;
 
     public ApproachSubmitResult submit(Long userId, Long problemId, String selectedCategory, String naturalSolution) {
@@ -51,24 +53,29 @@ public class ApproachSubmissionService {
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
 
-
         // 2. 선택한 카테고리를 enum으로 변환 (없는 값이면 400 예외를 던짐)
         Category category = parseCategory(selectedCategory);
 
         // 난이도 반환
         Difficulty difficulty = problem.getDifficulty();
 
-        // 3. 선택한 카테고리와 문제의 정답 카테고리를 비교해 정답 여부를 계산 (오답이어도 계속 진행)
+        // 3. 이 문제의 제출 횟수가 한도를 채웠으면 AI를 부르기 전에 429 (잠금 없는 빠른 차단)
+        int usedBefore = approachSubmissionRepository.findSubmittedCount(userId, problemId).orElse(0);
+        if (usedBefore >= ApproachSubmission.MAX_SUBMISSION_COUNT) {
+            throw limitExceeded(problemId, usedBefore);
+        }
+
+        // 4. 선택한 카테고리와 문제의 정답 카테고리를 비교해 정답 여부를 계산 (오답이어도 계속 진행)
         boolean categoryResult = category.equals(problem.getCategory());
 
-        // 4. AI 평가에 필요한 키워드·실행 제한을 조회하고 요청을 조립
+        // 5. AI 평가에 필요한 키워드·실행 제한을 조회하고 요청을 조립
         List<Keyword> keywords = keywordRepository.findByProblemIdOrderById(problemId);
         AiEvaluationRequest request = buildAiRequest(problem, naturalSolution, keywords, runningLimitRepository.findByProblemId(problemId));
 
-        // 5. AI 서버에 평가 요청 (실패하면 예외가 던져져 여기서 끝나고 DB는 그대로 유지됨)
+        // 6. AI 서버에 평가 요청 (실패하면 예외가 던져져 여기서 끝나고 DB는 그대로 유지됨)
         AiEvaluationResult result = aiEvaluationClient.evaluate(request);
 
-        // 6. AI 판정을 우리 키워드 목록 기준으로 병합
+        // 7. AI 판정을 우리 키워드 목록 기준으로 병합
         List<AiEvaluationResult.KeywordJudgement> mergedKeywords = mergeKeywordJudgements(keywords, result.keywords());
 
         // 이미 정답을 맞춘적이 있는지 확인
@@ -76,11 +83,15 @@ public class ApproachSubmissionService {
 
         Boolean alreadySolved = beforeSubmission.isPresent() && beforeSubmission.get().getIsSolved();
 
-
-        // 7. 성공했을 때만 이 트랜잭션 안에서 기존 제출을 갱신하거나 새로 저장
+        // 8. 성공했을 때만 이 트랜잭션 안에서 잠근 채로 기존 제출을 갱신하거나 새로 저장
         ApproachSubmission submission = transactionTemplate.execute(status ->
-                approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId)
+                approachSubmissionRepository.findForUpdateByUserIdAndProblemId(userId, problemId)
                         .map(existing -> {
+                            // 1. 잠근 뒤 다시 확인 (앞의 빠른 확인 이후 다른 요청이 올렸을 수 있음)
+                            if (existing.getSubmittedCount() >= ApproachSubmission.MAX_SUBMISSION_COUNT) {
+                                throw limitExceeded(problemId, existing.getSubmittedCount());
+                            }
+                            // 2. 재제출 처리 (커밋 때 UPDATE가 나감)
                             existing.resubmit(category, naturalSolution, categoryResult, result.score(), result.feedback());
                             return existing;
                         })
@@ -142,6 +153,13 @@ public class ApproachSubmissionService {
         }
 
         return new ApproachSubmitResult(submission, mergedKeywords);
+    }
+
+    // 제출 한도 초과 429 예외 생성 (data에 문제 번호와 사용 횟수를 담음)
+    private BusinessException limitExceeded(Long problemId, int usedCount) {
+        int limit = ApproachSubmission.MAX_SUBMISSION_COUNT;
+        return new BusinessException(HttpStatus.TOO_MANY_REQUESTS, "solution_submission_limit_exceeded",
+                new ApproachSubmitResponse.SubmissionLimitExceededData(problemId, limit, usedCount, limit - usedCount));
     }
 
     // 카테고리 문자열을 Category enum으로 변환

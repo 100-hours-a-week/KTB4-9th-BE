@@ -6,6 +6,8 @@ import static org.mockito.Mockito.when;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
+import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
+import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.approach.service.ApproachSubmissionService;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.exception.GlobalExceptionHandler;
@@ -71,6 +73,9 @@ class ApproachSubmissionControllerTest {
         body.extractingPath("$.data.result.aiFeedback").isEqualTo("좋은 접근이에요");
         body.extractingPath("$.data.result.keywords[0].keyword").isEqualTo("정렬");
         body.extractingPath("$.data.result.keywords[0].isIncluded").isEqualTo(true);
+        body.extractingPath("$.data.submissionUsage.limit").isEqualTo(5);
+        body.extractingPath("$.data.submissionUsage.usedCount").isEqualTo(1);
+        body.extractingPath("$.data.submissionUsage.remainingCount").isEqualTo(4);
 
         verify(approachSubmissionService).submit(42L, 1L, "ARRAY", "풀이");
     }
@@ -112,5 +117,28 @@ class ApproachSubmissionControllerTest {
                 .hasStatus(HttpStatus.BAD_REQUEST)
                 .bodyJson()
                 .extractingPath("$.message").isEqualTo("approach_is_required");
+    }
+
+    @Test
+    void submit_returns429WithUsageData_whenSubmissionLimitExceeded() {
+        // Given
+        loginAs("42");
+        when(approachSubmissionService.submit(42L, 1L, "ARRAY", "풀이"))
+                .thenThrow(new BusinessException(HttpStatus.TOO_MANY_REQUESTS, "solution_submission_limit_exceeded",
+                        new ApproachSubmitResponse.SubmissionLimitExceededData(1L, 5, 5, 0)));
+
+        // When & Then
+        var body = mvc().post().uri("/problems/1/solution-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"selectedCategory\":\"ARRAY\",\"natural_solution\":\"풀이\"}")
+                .assertThat()
+                .hasStatus(HttpStatus.TOO_MANY_REQUESTS)
+                .bodyJson();
+
+        body.extractingPath("$.message").isEqualTo("solution_submission_limit_exceeded");
+        body.extractingPath("$.data.problemId").isEqualTo(1);
+        body.extractingPath("$.data.limit").isEqualTo(5);
+        body.extractingPath("$.data.usedCount").isEqualTo(5);
+        body.extractingPath("$.data.remainingCount").isEqualTo(0);
     }
 }
