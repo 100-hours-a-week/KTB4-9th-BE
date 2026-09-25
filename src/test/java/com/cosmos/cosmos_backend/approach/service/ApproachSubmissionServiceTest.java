@@ -28,6 +28,8 @@ import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
 import java.util.List;
 import java.util.Optional;
+
+import com.cosmos.cosmos_backend.ranking.service.UserPointService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,6 +62,8 @@ class ApproachSubmissionServiceTest {
 
     private ApproachSubmissionService service;
 
+    private UserPointService userPointService;
+
     @BeforeEach
     void setUp() {
         // TransactionTemplate 없이도 콜백이 바로 실행되도록 최소한으로 흉내냄 (진짜 트랜잭션은 안 씀)
@@ -71,7 +75,7 @@ class ApproachSubmissionServiceTest {
         };
         service = new ApproachSubmissionService(
                 problemRepository, keywordRepository, runningLimitRepository, approachSubmissionRepository,
-                aiEvaluationClient, fakeTransactionTemplate, activityRecordRepository
+                aiEvaluationClient, fakeTransactionTemplate, activityRecordRepository, userPointService
         );
     }
 

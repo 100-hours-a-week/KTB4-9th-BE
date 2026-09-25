@@ -10,6 +10,7 @@ import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
+import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.entity.Keyword;
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
@@ -24,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import com.cosmos.cosmos_backend.ranking.service.UserPointService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -42,6 +45,9 @@ public class ApproachSubmissionService {
 
     private final ActivityRecordRepository activityRecordRepository;
 
+
+    private final UserPointService userPointService;
+
     public ApproachSubmitResult submit(Long userId, Long problemId, String selectedCategory, String naturalSolution) {
         // 1. problemId로 문제를 조회 (없으면 404 예외를 던짐)
         Problem problem = problemRepository.findById(problemId)
@@ -49,6 +55,9 @@ public class ApproachSubmissionService {
 
         // 2. 선택한 카테고리를 enum으로 변환 (없는 값이면 400 예외를 던짐)
         Category category = parseCategory(selectedCategory);
+
+        // 난이도 반환
+        Difficulty difficulty = problem.getDifficulty();
 
         // 3. 이 문제의 제출 횟수가 한도를 채웠으면 AI를 부르기 전에 429 (잠금 없는 빠른 차단)
         int usedBefore = approachSubmissionRepository.findSubmittedCount(userId, problemId).orElse(0);
@@ -69,6 +78,11 @@ public class ApproachSubmissionService {
         // 7. AI 판정을 우리 키워드 목록 기준으로 병합
         List<AiEvaluationResult.KeywordJudgement> mergedKeywords = mergeKeywordJudgements(keywords, result.keywords());
 
+        // 이미 정답을 맞춘적이 있는지 확인
+        Optional<ApproachSubmission> beforeSubmission = approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId);
+
+        Boolean alreadySolved = beforeSubmission.isPresent() && beforeSubmission.get().getIsSolved();
+
         // 8. 성공했을 때만 이 트랜잭션 안에서 잠근 채로 기존 제출을 갱신하거나 새로 저장
         ApproachSubmission submission = transactionTemplate.execute(status ->
                 approachSubmissionRepository.findForUpdateByUserIdAndProblemId(userId, problemId)
@@ -86,22 +100,56 @@ public class ApproachSubmissionService {
                         ))
         );
 
+
+        // 이번 제출이 정답인지 확인
+        Boolean correct = submission.getCategoryResult() && submission.getTotalScore() == 100;
+
+
+        // 해당 문제에 대해 최초 정답일 경우에만 잔디, 포인트 갱신
         // 학습 기록
+        // 0. 해당 문제에 대해 첫 정답인지 확인, 첫 정답일 경우에만 잔디, 포인트 업데이트
         // 1. 정답 + 자연어 풀이 100점이면 잔디 +1
         // 2. 기존에 해당 날짜에 대한 기록 있으면 그냥 + 1
         // 3. 기존에 해당 날짜에 대한 기록 없으면 행 새로 만들기
-        if (submission.getCategoryResult() && submission.getTotalScore() == 100){
+        // 포인트 갱신
+        // 0. 전체, 난이도, 카테고리별로 각각 업데이트
+        if (!alreadySolved && correct) {
 
+            // solved = true
+            submission.markAsSolved();
+
+            // 오늘의 학습 기록 갱신
             LocalDate activityDate = LocalDate.now();
-            Optional<ActivityRecord> activityRecord = activityRecordRepository.findByUserIdAndActivityDate(userId, activityDate);
+
+            Optional<ActivityRecord> activityRecord =
+                    activityRecordRepository.findByUserIdAndActivityDate(
+                            userId,
+                            activityDate
+                    );
 
             if (activityRecord.isPresent()) {
+
                 ActivityRecord activity = activityRecord.get();
                 activity.increaseCorrectProblemCount();
+
             } else {
-                ActivityRecord activity = new ActivityRecord(userId, activityDate, 1L);
+
+                ActivityRecord activity =
+                        new ActivityRecord(
+                                userId,
+                                activityDate,
+                                1L
+                        );
+
                 activityRecordRepository.save(activity);
             }
+
+            // 포인트 / 랭킹 갱신
+            userPointService.updatePoint(
+                    userId,
+                    difficulty,
+                    category
+            );
         }
 
         return new ApproachSubmitResult(submission, mergedKeywords);

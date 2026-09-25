@@ -8,10 +8,10 @@ import java.util.Optional;
 
 
 public interface UserPointRepository extends JpaRepository<UserPoint, Long> {
-    Optional<UserPoint> findByUser_UserId(Long userId);
+    Optional<UserPoint> findByUser_Id(Long userId);
 
     List<UserPoint> findTop100ByOrderByTotalPointDesc();
 
-    long countByPointGreaterThan(Long point);
+    long countByTotalPointGreaterThan(Long point);
 
 }
