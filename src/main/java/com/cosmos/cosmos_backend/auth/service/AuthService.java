@@ -171,9 +171,15 @@ public class AuthService {
         // 2. 해당 hash를 가진 RefreshToken을 DB에서 조회
         Optional<RefreshToken> savedRefreshToken = refreshTokenRepository.findByRefreshTokenHash(refreshTokenHash);
 
+        System.out.println("[LOGOUT] DB token found = " + savedRefreshToken.isPresent());
 
         // 3. 존재한다면 해당 RefreshToken 행 삭제
         if (savedRefreshToken.isPresent()) {
+            System.out.println(
+                    "[LOGOUT] DELETE refreshTokenId = "
+                            + savedRefreshToken.get().getRefreshTokenId()
+            );
+
             refreshTokenRepository.delete(savedRefreshToken.get());
         }
     }
