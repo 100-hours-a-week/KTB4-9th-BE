@@ -14,6 +14,7 @@ import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
+import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
@@ -92,7 +93,7 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
+        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -115,7 +116,7 @@ class ApproachSubmissionServiceTest {
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
         ApproachSubmission existing = new ApproachSubmission(10L, 1L, Category.ARRAY, "이전 풀이", false, 20, "이전 피드백");
-        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
+        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
 
         // When
         ApproachSubmitResult result = service.submit(10L, 1L, "GRAPH", "새 풀이");
@@ -135,7 +136,7 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
+        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -161,7 +162,7 @@ class ApproachSubmissionServiceTest {
                 .satisfies(e -> assertThat(((BusinessException) e).getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
 
         verify(approachSubmissionRepository, never()).save(any());
-        verify(approachSubmissionRepository, never()).findByUserIdAndProblemId(any(), any());
+        verify(approachSubmissionRepository, never()).findForUpdateByUserIdAndProblemId(any(), any());
     }
 
     @Test
@@ -179,7 +180,7 @@ class ApproachSubmissionServiceTest {
                         new AiEvaluationResult.KeywordJudgement("AI가 준 모르는 키워드", true)
                 )
         ));
-        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
+        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -200,7 +201,7 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
+        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -238,5 +239,87 @@ class ApproachSubmissionServiceTest {
                 .hasMessage("invalid_selected_category");
 
         verifyNoInteractions(aiEvaluationClient);
+    }
+
+    // 제출 횟수가 count인 기존 제출을 만든다.
+    private ApproachSubmission submissionWithCount(int count) {
+        ApproachSubmission submission = new ApproachSubmission(10L, 1L, Category.ARRAY, "이전 풀이", false, 20, "이전 피드백");
+        for (int i = 1; i < count; i++) {
+            submission.resubmit(Category.ARRAY, "이전 풀이", false, 20, "이전 피드백");
+        }
+        return submission;
+    }
+
+    @Test
+    void submit_throws429WithUsageData_andNeverCallsAi_whenLimitAlreadyReached() {
+        // Given
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(approachSubmissionRepository.findSubmittedCount(10L, 1L)).thenReturn(Optional.of(5));
+
+        // When & Then
+        assertThatThrownBy(() -> service.submit(10L, 1L, "ARRAY", "풀이"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> {
+                    BusinessException be = (BusinessException) e;
+                    assertThat(be.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                    assertThat(be.getData()).isEqualTo(new ApproachSubmitResponse.SubmissionLimitExceededData(1L, 5, 5, 0));
+                })
+                .hasMessage("solution_submission_limit_exceeded");
+
+        verifyNoInteractions(aiEvaluationClient);
+        verify(approachSubmissionRepository, never()).findForUpdateByUserIdAndProblemId(any(), any());
+        verify(approachSubmissionRepository, never()).save(any());
+    }
+
+    @Test
+    void submit_allowsFifthSubmission_andReachesLimit() {
+        // Given
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(approachSubmissionRepository.findSubmittedCount(10L, 1L)).thenReturn(Optional.of(4));
+        when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
+        when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
+        when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
+        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(submissionWithCount(4)));
+
+        // When
+        ApproachSubmitResult result = service.submit(10L, 1L, "ARRAY", "다섯 번째 풀이");
+
+        // Then
+        assertThat(result.submission().getSubmittedCount()).isEqualTo(5);
+        assertThat(result.submission().getNaturalSolution()).isEqualTo("다섯 번째 풀이");
+    }
+
+    @Test
+    void submit_throws429_andKeepsPreviousResult_whenLimitReachedByAnotherRequestAfterLock() {
+        // Given (빠른 확인 시점엔 4회였는데, 잠근 뒤엔 다른 요청이 올려서 5회가 된 상황)
+        ApproachSubmission existing = submissionWithCount(5);
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(approachSubmissionRepository.findSubmittedCount(10L, 1L)).thenReturn(Optional.of(4));
+        when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
+        when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
+        when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
+        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
+
+        // When & Then
+        assertThatThrownBy(() -> service.submit(10L, 1L, "ARRAY", "새 풀이"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS))
+                .hasMessage("solution_submission_limit_exceeded");
+
+        assertThat(existing.getSubmittedCount()).isEqualTo(5);
+        assertThat(existing.getNaturalSolution()).isEqualTo("이전 풀이");
+        verify(approachSubmissionRepository, never()).save(any());
+    }
+
+    @Test
+    void submit_validatesProblemAndCategory_beforeCheckingLimit() {
+        // Given
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+
+        // When & Then
+        assertThatThrownBy(() -> service.submit(10L, 1L, "NOT_A_CATEGORY", "풀이"))
+                .hasMessage("invalid_selected_category");
+
+        verify(approachSubmissionRepository, never()).findSubmittedCount(any(), any());
     }
 }
