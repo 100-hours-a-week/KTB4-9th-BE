@@ -38,7 +38,7 @@ public class UserPoint {
     @Column(name = "current_correct_streak", nullable = false)
     private Long currentStreakDay;
 
-    @Column(name = "last_correct_Date", nullable = false)
+    @Column(name = "last_correct_Date")
     private LocalDate lastCorrectDate;
 
     @LastModifiedDate

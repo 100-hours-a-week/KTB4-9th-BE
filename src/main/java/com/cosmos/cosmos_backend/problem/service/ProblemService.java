@@ -1,9 +1,13 @@
 package com.cosmos.cosmos_backend.problem.service;
 
+import com.cosmos.cosmos_backend.common.Category;
+import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.problem.client.AiProblemClient;
 import com.cosmos.cosmos_backend.problem.domain.HintType;
 import com.cosmos.cosmos_backend.problem.domain.entity.*;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
+import com.cosmos.cosmos_backend.problem.dto.response.AiProblemCreateOndemandResponseDto;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +31,8 @@ public class ProblemService {
     private final TestCaseRepository testCaseRepository;
     private final UsedHintRepository usedHintRepository;
 
+    private final AiProblemClient aiProblemClient;
+
     /** 문제 상세 조회. */
     @Transactional(readOnly = true)
     public ProblemDetailResponse getProblemDetail(Long userId, Long problemId) {
@@ -49,120 +55,247 @@ public class ProblemService {
         );
     }
 
+    // 온디맨드 문제 생성
+    @Transactional
+    public Problem createOnDemandProblem(
+            Difficulty difficulty,
+            Category category
+    ) {
+
+        // 1. AI 서버에 문제 생성 요청
+        AiProblemCreateOndemandResponseDto response =
+                aiProblemClient.createProblem(difficulty, category);
+
+        // 2. AI 응답 검증
+        if (response == null || !response.success() || response.problem() == null) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "ai_problem_creation_failed");
+        }
+
+        // 3. AI 응답 → 기존 저장 DTO 변환
+        AiProblemsCreateRequestDto.ProblemsInfo problemsInfo = convertToProblemsInfo(response.problem());
+
+        // 4. DB 저장
+        return saveProblem(problemsInfo);
+    }
+
 
     // ai -> BE 생성 문제 저장 요청
     @Transactional
-    public List<Problem> createProblems(AiProblemsCreateRequestDto problemsCreateRequest) {
+    public List<Problem> createProblems(
+            AiProblemsCreateRequestDto problemsCreateRequest
+    ) {
 
-        List<AiProblemsCreateRequestDto.ProblemsInfo> aiProblems = problemsCreateRequest.aiProblems();
-
-        // 필요한 엔티티 선언
-
-        Problem problem;
-
-        ProblemExample problemExample;
-
-        RunningLimit runningLimit;
-
-        TestCase testCase;
-
-        Keyword keyword;
-
-        Hint hintComment;
-
-        Hint hintSolution;
-
-        // 반환용 문제 리스트
         List<Problem> savedProblems = new ArrayList<>();
 
-        for (AiProblemsCreateRequestDto.ProblemsInfo problemsInfo : aiProblems) {
-
-            problem = new Problem(
-                    problemsInfo.difficulty(),
-                    problemsInfo.category(),
-                    problemsInfo.problemTitle(),
-                    problemsInfo.problemDescription(),
-                    problemsInfo.inputFormat(),
-                    problemsInfo.outputFormat(),
-                    problemsInfo.inputConstraints(),
-                    problemsInfo.categorySelectReason()
-            );
-
-            problemRepository.save(problem);
-
-            //문제 id 추출
-            Long problemId = problem.getId();
-
-            // 반환용 문제 저장
-            savedProblems.add(problem);
-
-            // 입출력 예시
-            for (int j = 0; j < problemsInfo.problemExamples().size(); j++) {
-                problemExample = new ProblemExample(
-                        problemId,
-                        problemsInfo.problemExamples().get(j).input(),
-                        problemsInfo.problemExamples().get(j).output(),
-                        problemsInfo.problemExamples().get(j).description(),
-                        j + 1
-                );
-
-                problemExampleRepository.save(problemExample);
-
-            }
-
-            // 언어별 정보 저장, 실행 조건, 힌트
-            for(int k = 0 ; k < problemsInfo.executionLimit().size() ; k ++){
-                runningLimit = new RunningLimit(
-                        problemId,
-                        problemsInfo.executionLimit().get(k).language(),
-                        problemsInfo.executionLimit().get(k).timeLimitMs(),
-                        problemsInfo.executionLimit().get(k).memoryLimitKb()
-                );
-
-                runningLimitRepository.save(runningLimit);
-
-                hintComment = new Hint(
-                        problemId,
-                        problemsInfo.hintComments().get(k).language(),
-                        HintType.COMMENT,
-                        problemsInfo.hintComments().get(k).content()
-                );
-
-                hintRepository.save(hintComment);
-
-                hintSolution = new Hint(
-                        problemId,
-                        problemsInfo.hintSolutionCodes().get(k).language(),
-                        HintType.SOLUTION,
-                        problemsInfo.hintSolutionCodes().get(k).content()
-                );
-
-                hintRepository.save(hintSolution);
-            }
-
-            // 코드 채점용 테스트 케이스
-            for (int l = 0 ; l < problemsInfo.hiddenTests().size() ; l ++){
-                testCase = new TestCase(
-                        problemId,
-                        problemsInfo.hiddenTests().get(l).input(),
-                        problemsInfo.hiddenTests().get(l).output(),
-                        l + 1
-                );
-
-                testCaseRepository.save(testCase);
-            }
-
-            // 자연어 문제 풀이용 키퉈드
-            for (int m = 0 ; m < problemsInfo.solutionKeywords().size() ; m++){
-                keyword = new Keyword(
-                        problemId,
-                        problemsInfo.solutionKeywords().get(m)
-                );
-
-                keywordRepository.save(keyword);
-            }
+        for (AiProblemsCreateRequestDto.ProblemsInfo problemsInfo : problemsCreateRequest.aiProblems()) {
+            savedProblems.add(saveProblem(problemsInfo));
         }
 
         return savedProblems;
+    }
+
+
+    // 문제 저장 로직 분리
+    private Problem saveProblem(
+            AiProblemsCreateRequestDto.ProblemsInfo problemsInfo
+    ) {
+
+        // 1. 문제 저장
+        Problem problem = new Problem(
+                problemsInfo.difficulty(),
+                problemsInfo.category(),
+                problemsInfo.problemTitle(),
+                problemsInfo.problemDescription(),
+                problemsInfo.inputFormat(),
+                problemsInfo.outputFormat(),
+                problemsInfo.inputConstraints(),
+                problemsInfo.categorySelectReason()
+        );
+
+        problemRepository.save(problem);
+
+        Long problemId = problem.getId();
+
+
+        // 2. 입출력 예시 저장
+        for (int i = 0; i < problemsInfo.problemExamples().size(); i++) {
+
+            AiProblemsCreateRequestDto.ProblemExamples example =
+                    problemsInfo.problemExamples().get(i);
+
+            ProblemExample problemExample = new ProblemExample(
+                    problemId,
+                    example.input(),
+                    example.output(),
+                    example.description(),
+                    i + 1
+            );
+
+            problemExampleRepository.save(problemExample);
+        }
+
+
+        // 3. 언어별 실행 제한 + 힌트 저장
+        for (int i = 0; i < problemsInfo.executionLimit().size(); i++) {
+
+            AiProblemsCreateRequestDto.ExecutionLimits limit =
+                    problemsInfo.executionLimit().get(i);
+
+            RunningLimit runningLimit = new RunningLimit(
+                    problemId,
+                    limit.language(),
+                    limit.timeLimitMs(),
+                    limit.memoryLimitKb()
+            );
+
+            runningLimitRepository.save(runningLimit);
+
+
+            AiProblemsCreateRequestDto.HintComments comment =
+                    problemsInfo.hintComments().get(i);
+
+            Hint hintComment = new Hint(
+                    problemId,
+                    comment.language(),
+                    HintType.COMMENT,
+                    comment.content()
+            );
+
+            hintRepository.save(hintComment);
+
+
+            AiProblemsCreateRequestDto.HintSolutionCodes solution =
+                    problemsInfo.hintSolutionCodes().get(i);
+
+            Hint hintSolution = new Hint(
+                    problemId,
+                    solution.language(),
+                    HintType.SOLUTION,
+                    solution.content()
+            );
+
+            hintRepository.save(hintSolution);
+        }
+
+
+        // 4. 테스트 케이스 저장
+        for (int i = 0; i < problemsInfo.hiddenTests().size(); i++) {
+
+            AiProblemsCreateRequestDto.HiddenTestCases hiddenTest =
+                    problemsInfo.hiddenTests().get(i);
+
+            TestCase testCase = new TestCase(
+                    problemId,
+                    hiddenTest.input(),
+                    hiddenTest.output(),
+                    i + 1
+            );
+
+            testCaseRepository.save(testCase);
+        }
+
+
+        // 5. 자연어 풀이 키워드 저장
+        for (String solutionKeyword : problemsInfo.solutionKeywords()) {
+
+            Keyword keyword = new Keyword(
+                    problemId,
+                    solutionKeyword
+            );
+
+            keywordRepository.save(keyword);
+        }
+
+
+        // 6. 저장한 문제 반환
+        return problem;
+    }
+
+
+    // 온디멘드 문제 생성 dto 변환
+    private AiProblemsCreateRequestDto.ProblemsInfo convertToProblemsInfo(
+            AiProblemCreateOndemandResponseDto.ProblemInfo problem
+    ) {
+
+        return new AiProblemsCreateRequestDto.ProblemsInfo(
+
+                problem.problemTitle(),
+
+                // problemContent → problemDescription
+                problem.problemContent(),
+
+                problem.inputFormat(),
+                problem.outputFormat(),
+                problem.difficulty(),
+                problem.category(),
+                problem.categorySelectReason(),
+                problem.solutionKeywords(),
+
+                // examples
+                problem.problemExamples().stream()
+                        .map(example ->
+                                new AiProblemsCreateRequestDto.ProblemExamples(
+                                        example.input(),
+                                        example.output(),
+                                        example.description()
+                                )
+                        )
+                        .toList(),
+
+                // constraints
+                problem.inputConstraints().stream()
+                        .map(constraint ->
+                                new AiProblemsCreateRequestDto.InputConstraints(
+                                        constraint.target(),
+                                        constraint.scope(),
+                                        constraint.dataType(),
+                                        constraint.minValue(),
+                                        constraint.maxValue(),
+                                        constraint.specialConditions()
+                                )
+                        )
+                        .toList(),
+
+                // execution limits
+                problem.executionLimits().stream()
+                        .map(limit ->
+                                new AiProblemsCreateRequestDto.ExecutionLimits(
+                                        limit.language(),
+                                        limit.timeLimitMs(),
+                                        limit.memoryLimitKb()
+                                )
+                        )
+                        .toList(),
+
+                // hidden test cases
+                problem.hiddenTestCases().stream()
+                        .map(test ->
+                                new AiProblemsCreateRequestDto.HiddenTestCases(
+                                        test.input(),
+                                        test.output()
+                                )
+                        )
+                        .toList(),
+
+                // comment → content
+                problem.hintComments().stream()
+                        .map(comment ->
+                                new AiProblemsCreateRequestDto.HintComments(
+                                        comment.language(),
+                                        comment.comment()
+                                )
+                        )
+                        .toList(),
+
+                // code → content
+                problem.solutionCodes().stream()
+                        .map(solution ->
+                                new AiProblemsCreateRequestDto.HintSolutionCodes(
+                                        solution.language(),
+                                        solution.code()
+                                )
+                        )
+                        .toList()
+        );
     }
 }
