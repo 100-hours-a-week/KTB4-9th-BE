@@ -27,6 +27,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ApproachSubmission {
 
+    // 한 문제에 제출할 수 있는 최대 횟수 (첫 제출, 재제출, 복습 제출 모두 포함)
+    public static final int MAX_SUBMISSION_COUNT = 5;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
