@@ -12,6 +12,8 @@ import com.cosmos.cosmos_backend.auth.jwt.JwtTokenProvider;
 import com.cosmos.cosmos_backend.auth.repository.RefreshTokenRepository;
 import com.cosmos.cosmos_backend.auth.repository.UserOauthAccountRepository;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
+import com.cosmos.cosmos_backend.ranking.domain.entity.UserPoint;
+import com.cosmos.cosmos_backend.ranking.repository.UserPointRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +38,8 @@ public class AuthService {
     private final RefreshTokenProvider refreshTokenProvider;
 
     private final RefreshTokenRepository refreshTokenRepository;
+
+    private final UserPointRepository userPointRepository;
 
     @Transactional
     public LoginResult login(String provider, String code) {
@@ -72,6 +76,15 @@ public class AuthService {
 
             user = newUser;
         }
+
+        UserPoint userPoint = new UserPoint(
+                user,
+                0L,
+                0L,
+                0L
+        );
+
+        userPointRepository.save(userPoint);
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getUsername());
 

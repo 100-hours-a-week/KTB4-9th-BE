@@ -11,7 +11,8 @@ import java.util.Optional;
 public interface UserCategoryPointRepository extends JpaRepository<UserCategoryPoint, Integer> {
     Optional<UserCategoryPoint> findByUser_IdAndCategory(Long userId, Category category);
 
-    List<UserCategoryPoint> findTop100ByCategoryOrderByPointDesc(Category category);
+    List<UserCategoryPoint> findTop100ByCategoryAndPointGreaterThanOrderByPointDesc(Category category, Long p
+    );
 
-    long countByCategoryAndPointGreaterThan(Category category, Long point);
+    Long countByCategoryAndPointGreaterThan(Category category, Long point);
 }

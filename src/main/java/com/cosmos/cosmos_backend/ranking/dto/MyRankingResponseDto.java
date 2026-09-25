@@ -9,6 +9,7 @@ public record MyRankingResponseDto(
         @JsonProperty("name")
         String username,
 
+        @JsonProperty("profileImageUrl")
         String userProfileUrl,
 
         Long rank,

@@ -49,7 +49,7 @@ public class RankingService {
         Long myRank = userPointRepository.countByTotalPointGreaterThan(myPoint) + 1;
 
         // 3. TOP 100 계
-        List<UserPoint> top100User =  userPointRepository.findTop100ByOrderByTotalPointDesc();
+        List<UserPoint> top100User =  userPointRepository.findTop100ByTotalPointGreaterThanOrderByTotalPointDesc(0L);
 
         // 4. 응답 조립
         // 4-1. 필터 응답 조립
@@ -120,7 +120,7 @@ public class RankingService {
         Long myRank = userDifficultyPointRepository.countByDifficultyAndPointGreaterThan(difficulty, myPoint) + 1;
 
         // 3. 해당 난이도의 TOP 100 조회
-        List<UserDifficultyPoint> top100User = userDifficultyPointRepository.findTop100ByDifficultyOrderByPointDesc(difficulty);
+        List<UserDifficultyPoint> top100User = userDifficultyPointRepository.findTop100ByDifficultyAndPointGreaterThanOrderByPointDesc(difficulty, 0L);
 
         // 4. 응답 조립
         // 4-1. 필터 응답 조립
@@ -191,8 +191,7 @@ public class RankingService {
         Long myRank = userCategoryPointRepository.countByCategoryAndPointGreaterThan(category, myPoint) + 1;
 
         // 3. 해당 카테고리의 TOP 100 조회
-        List<UserCategoryPoint> top100User = userCategoryPointRepository.findTop100ByCategoryOrderByPointDesc(category);
-
+        List<UserCategoryPoint> top100User = userCategoryPointRepository.findTop100ByCategoryAndPointGreaterThanOrderByPointDesc(category,0L);
         // 4. 응답 조립
         // 4-1. 필터 응답 조립
         RankingFilterResponseDto rankingFilter = new RankingFilterResponseDto(
