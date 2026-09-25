@@ -11,7 +11,7 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
     @Override
     public String resolve(HttpServletRequest request) {
 
-        if ("/auth/token/refresh".equals(request.getRequestURI())) {
+        if ("/auth/token/refresh".equals(request.getRequestURI())|| "/auth/logout".equals(request.getRequestURI())) {
             return null;
         }
 
