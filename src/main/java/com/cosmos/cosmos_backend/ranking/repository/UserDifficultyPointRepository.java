@@ -12,7 +12,7 @@ public interface UserDifficultyPointRepository extends JpaRepository<UserDifficu
 
     Optional<UserDifficultyPoint> findByUser_IdAndDifficulty(Long userId, Difficulty difficulty);
 
-    List<UserDifficultyPoint> findTop100ByDifficultyOrderByPointDesc(Difficulty difficulty);
+    List<UserDifficultyPoint> findTop100ByDifficultyAndPointGreaterThanOrderByPointDesc(Difficulty difficulty, Long point);
 
     long countByDifficultyAndPointGreaterThan(Difficulty  difficulty, Long point);
 }

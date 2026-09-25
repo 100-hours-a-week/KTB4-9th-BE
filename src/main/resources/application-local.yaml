@@ -23,4 +23,4 @@ cookie:
   secure: false
 
 ai:
-  root-url : http://localhost:8000
+  root-url : ${AI_BASE_URL}

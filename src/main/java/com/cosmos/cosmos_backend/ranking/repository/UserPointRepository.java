@@ -10,7 +10,7 @@ import java.util.Optional;
 public interface UserPointRepository extends JpaRepository<UserPoint, Long> {
     Optional<UserPoint> findByUser_Id(Long userId);
 
-    List<UserPoint> findTop100ByOrderByTotalPointDesc();
+    List<UserPoint> findTop100ByTotalPointGreaterThanOrderByTotalPointDesc(Long point);;
 
     long countByTotalPointGreaterThan(Long point);
 
