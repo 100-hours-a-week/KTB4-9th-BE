@@ -9,6 +9,7 @@ import com.cosmos.cosmos_backend.problem.dto.response.HintResponse;
 import com.cosmos.cosmos_backend.problem.repository.HintRepository;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.repository.UsedHintRepository;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,19 +34,24 @@ public class HintService {
         // 2. language 문자열을 enum으로 변환 (없는 값이면 400 예외를 던짐)
         Language lang = parseLanguage(language);
 
-        // 3. 문제·언어·유형에 맞는 힌트를 조회 (없으면 404 예외를 던짐)
+        // 3. 사용 기록을 조회. 정답 힌트는 주석 힌트를 먼저 본 사용자만 조회할 수 있음 (아니면 409 예외를 던짐)
+        Optional<UsedHint> usedHint = usedHintRepository.findByUserIdAndProblemId(userId, problemId);
+        if (hintType == HintType.SOLUTION && usedHint.map(UsedHint::getHintStage).orElse(0) < 1) {
+            throw new BusinessException(HttpStatus.CONFLICT, "comment_hint_required");
+        }
+
+        // 4. 문제·언어·유형에 맞는 힌트를 조회 (없으면 404 예외를 던짐)
         Hint hint = hintRepository.findByProblemIdAndLanguageAndHintType(problemId, lang, hintType)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, notFoundMessage(hintType)));
 
-        // 4. 사용 단계 기록 (주석=1, 정답=2). 기록이 있으면 올리기만 하고, 없으면 새로 저장
+        // 5. 사용 단계 기록 (주석=1, 정답=2). 기록이 있으면 올리기만 하고, 없으면 새로 저장
         int stage = hintType == HintType.COMMENT ? 1 : 2;
-        usedHintRepository.findByUserIdAndProblemId(userId, problemId)
-                .ifPresentOrElse(
-                        used -> used.raiseStageTo(stage),
-                        () -> usedHintRepository.save(new UsedHint(userId, problemId, stage))
-                );
+        usedHint.ifPresentOrElse(
+                used -> used.raiseStageTo(stage),
+                () -> usedHintRepository.save(new UsedHint(userId, problemId, stage))
+        );
 
-        // 5. 응답 형태로 조립해서 반환
+        // 6. 응답 형태로 조립해서 반환
         return HintResponse.of(problemId, hintType, stage, hint.getContent());
     }
 
