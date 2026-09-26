@@ -115,6 +115,23 @@ class HintControllerTest {
     }
 
     @Test
+    void answerHint_returns409_whenCommentHintNotUsed() {
+        // Given
+        loginAs("7");
+        when(hintService.getHint(7L, 1L, "PYTHON", HintType.SOLUTION))
+                .thenThrow(new BusinessException(HttpStatus.CONFLICT, "comment_hint_required"));
+
+        // When & Then
+        mvc().post().uri("/problems/1/hints/answer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"language\":\"PYTHON\"}")
+                .assertThat()
+                .hasStatus(HttpStatus.CONFLICT)
+                .bodyJson()
+                .extractingPath("$.message").isEqualTo("comment_hint_required");
+    }
+
+    @Test
     void hint_returns404_whenServiceThrowsNotFound() {
         // Given
         loginAs("7");
