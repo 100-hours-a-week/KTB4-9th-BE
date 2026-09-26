@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.cosmos.cosmos_backend.common.*;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.problem.client.AiProblemClient;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
 import com.cosmos.cosmos_backend.problem.domain.entity.ProblemExample;
@@ -46,8 +47,11 @@ class ProblemServiceTest {
     @Mock
     private UsedHintRepository usedHintRepository;
 
+    @Mock
+    private AiProblemClient aiProblemClient;
+
     private ProblemService service() {
-        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository);
+        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, aiProblemClient);
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.cosmos.cosmos_backend.problem.repository;
 
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -21,4 +22,21 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
     Optional<Problem> findRandomUnsolved(@Param("difficulty") String difficulty,
                                          @Param("category") String category,
                                          @Param("userId") Long userId);
+
+    // 아무도 풀이를 제출한 적 없는 문제를 난이도·카테고리별로 센다
+    @Query(value = """
+            SELECT p.difficulty AS difficulty, p.category AS category, COUNT(*) AS problemCount
+            FROM problems p
+            WHERE NOT EXISTS (SELECT 1 FROM problem_solution_submissions s WHERE s.problem_id = p.id)
+            GROUP BY p.difficulty, p.category
+            """, nativeQuery = true)
+    List<ProblemCountRow> countUnsolvedGroupByDifficultyAndCategory();
+
+    interface ProblemCountRow {
+        String getDifficulty();
+
+        String getCategory();
+
+        Long getProblemCount();
+    }
 }

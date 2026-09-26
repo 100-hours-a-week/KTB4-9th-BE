@@ -3,6 +3,7 @@ package com.cosmos.cosmos_backend.problem.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -36,6 +37,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.client.ResourceAccessException;
 
 @ExtendWith(MockitoExtension.class)
 class ProblemSelectionServiceTest {
@@ -45,6 +47,9 @@ class ProblemSelectionServiceTest {
 
     @Mock
     private ProblemRepository problemRepository;
+
+    @Mock
+    private ProblemService problemService;
 
     @Mock
     private ProblemExampleRepository problemExampleRepository;
@@ -68,7 +73,7 @@ class ProblemSelectionServiceTest {
             }
         };
         return new ProblemSelectionService(
-                problemRepository, problemExampleRepository, dailyGeneratedCountRepository,
+                problemRepository, problemService, problemExampleRepository, dailyGeneratedCountRepository,
                 fakeTransactionTemplate, Clock.fixed(now, KST)
         );
     }
@@ -230,22 +235,93 @@ class ProblemSelectionServiceTest {
                 })
                 .hasMessage("daily_problem_limit_exceeded");
 
-        verifyNoInteractions(problemRepository);
+        verifyNoInteractions(problemRepository, problemService);
     }
 
     @Test
-    void select_throwsNotFound_andDoesNotIncreaseCount_whenNoUnsolvedProblem() {
+    void select_generatesProblemWithAi_andIncreasesCount_whenNoUnsolvedProblem() {
         // Given
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.of(1));
+        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L)).thenReturn(Optional.empty());
+        when(problemService.createOnDemandProblem(Difficulty.LV3, Category.DP)).thenReturn(problem());
+        when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.of(countRow(TODAY, 1)));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
+
+        // When
+        ProblemSelectionResponse response = service.select(10L, "3", "DP");
+
+        // Then
+        assertThat(response.problem().problemId()).isEqualTo(7L);
+        assertThat(response.dailyUsage().usedCount()).isEqualTo(2);
+    }
+
+    @Test
+    void select_doesNotCallAi_whenUnsolvedProblemExists() {
+        // Given
+        when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
+        when(problemRepository.findRandomUnsolved("LV3", null, 10L)).thenReturn(Optional.of(problem()));
+        when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.empty());
+        when(dailyGeneratedCountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
+
+        // When
+        service.select(10L, "3", null);
+
+        // Then
+        verifyNoInteractions(problemService);
+    }
+
+    @Test
+    void select_asksAiWithConcreteCategory_whenCategoryIsRandom() {
+        // Given
+        when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
         when(problemRepository.findRandomUnsolved("LV3", null, 10L)).thenReturn(Optional.empty());
+        when(problemService.createOnDemandProblem(eq(Difficulty.LV3), any(Category.class))).thenReturn(problem());
+        when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.empty());
+        when(dailyGeneratedCountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
+
+        // When
+        service.select(10L, "3", "RANDOM");
+
+        // Then
+        var captor = org.mockito.ArgumentCaptor.forClass(Category.class);
+        verify(problemService).createOnDemandProblem(eq(Difficulty.LV3), captor.capture());
+        assertThat(captor.getValue()).isNotNull();
+    }
+
+    @Test
+    void select_throws503_andDoesNotIncreaseCount_whenAiServerUnreachable() {
+        // Given
+        when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.of(1));
+        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L)).thenReturn(Optional.empty());
+        when(problemService.createOnDemandProblem(Difficulty.LV3, Category.DP))
+                .thenThrow(new ResourceAccessException("connection refused"));
 
         // When & Then
-        assertThatThrownBy(() -> service.select(10L, "3", null))
+        assertThatThrownBy(() -> service.select(10L, "3", "DP"))
                 .isInstanceOf(BusinessException.class)
-                .satisfies(e -> assertThat(((BusinessException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND))
-                .hasMessage("matching_problem_not_found");
+                .satisfies(e -> assertThat(((BusinessException) e).getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE))
+                .hasMessage("problem_generation_unavailable");
 
         verify(dailyGeneratedCountRepository, never()).findForUpdateByUserIdAndUsageDate(any(), any());
+        verify(dailyGeneratedCountRepository, never()).save(any());
+    }
+
+    @Test
+    void select_passesThroughBusinessException_andDoesNotIncreaseCount_whenAiResponseInvalid() {
+        // Given
+        when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
+        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L)).thenReturn(Optional.empty());
+        when(problemService.createOnDemandProblem(Difficulty.LV3, Category.DP))
+                .thenThrow(new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "ai_problem_creation_failed"));
+
+        // When & Then
+        assertThatThrownBy(() -> service.select(10L, "3", "DP"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR))
+                .hasMessage("ai_problem_creation_failed");
+
         verify(dailyGeneratedCountRepository, never()).save(any());
     }
 
