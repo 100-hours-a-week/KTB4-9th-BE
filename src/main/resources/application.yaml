@@ -7,3 +7,17 @@ ai:
     base-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
     connect-timeout: ${AI_SERVER_CONNECT_TIMEOUT:3s}
     read-timeout: ${AI_SERVER_READ_TIMEOUT:30s}
+
+judge0:
+  base-url: ${JUDGE0_BASE_URL:http://localhost:2358}
+  connect-timeout: ${JUDGE0_CONNECT_TIMEOUT:3s}
+  read-timeout: ${JUDGE0_READ_TIMEOUT:10s}
+  poll-interval: ${JUDGE0_POLL_INTERVAL:1s}
+  max-wait: ${JUDGE0_MAX_WAIT:30s}
+  batch-size: 20
+  max-memory-kb: 512000
+  language-ids:
+    PYTHON: 71
+    JAVASCRIPT: 63
+    JAVA: 62
+    CPP: 54

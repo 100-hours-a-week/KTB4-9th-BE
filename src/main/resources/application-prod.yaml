@@ -29,6 +29,9 @@ ai:
     connect-timeout: ${AI_SERVER_CONNECT_TIMEOUT:3s}
     read-timeout: ${AI_SERVER_READ_TIMEOUT:30s}
 
+judge0:
+  base-url: ${JUDGE0_BASE_URL:https://dev-judge.cosmoscode.site}
+
 server:
   servlet:
     context-path: /api

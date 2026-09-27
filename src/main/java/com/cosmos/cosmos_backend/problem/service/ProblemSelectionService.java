@@ -12,10 +12,12 @@ import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.client.RestClientException;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +26,7 @@ public class ProblemSelectionService {
     private static final int DAILY_LIMIT = 3;
 
     private final ProblemRepository problemRepository;
+    private final ProblemService problemService;
     private final ProblemExampleRepository problemExampleRepository;
     private final DailyGeneratedCountRepository dailyGeneratedCountRepository;
     private final TransactionTemplate transactionTemplate;
@@ -42,15 +45,12 @@ public class ProblemSelectionService {
             throw limitExceeded(today, usedBefore);
         }
 
-        // 3. 안 푼 문제를 랜덤으로 조회
+        // 3. 안 푼 문제를 랜덤으로 조회, 없으면 AI에게 문제 생성을 요청해 저장한 문제를 사용
         Problem problem = problemRepository
                 .findRandomUnsolved(difficulty.name(), category == null ? null : category.name(), userId)
                 .orElse(null);
         if (problem == null) {
-            // TODO: 안 푼 문제가 없으면 AI에게 문제 생성을 요청해 저장한 뒤, 그 문제를 problem에 담아 계속 진행한다.
-            //       (AI 호출은 트랜잭션 밖에서, 실패하면 예외를 던져 4번의 횟수 +1까지 가지 않게 한다.)
-            //       AI 생성이 붙기 전까지는 404.
-            throw new BusinessException(HttpStatus.NOT_FOUND, "matching_problem_not_found");
+            problem = generateProblem(difficulty, category);
         }
 
         // 4. 문제를 확보했으니 이제 횟수를 +1 (여기만 트랜잭션)
@@ -64,6 +64,21 @@ public class ProblemSelectionService {
                 usedCount,
                 DAILY_LIMIT
         );
+    }
+
+    // 안 푼 문제가 없을 때 AI에게 문제 생성을 요청해 저장한 문제를 받는다
+    private Problem generateProblem(Difficulty difficulty, Category category) {
+        // 1. 카테고리가 랜덤이면 16개 중 하나를 무작위로 골라 요청 (AI 요청의 category는 필수라서)
+        Category target = category != null
+                ? category
+                : Category.values()[ThreadLocalRandom.current().nextInt(Category.values().length)];
+        try {
+            // 2. 문제 생성 요청 + 저장 (ProblemService의 온디맨드 로직 사용)
+            return problemService.createOnDemandProblem(difficulty, target);
+        } catch (RestClientException e) {
+            // 3. AI 서버에 연결하지 못했거나 오류 응답이면 503 (횟수는 올라가지 않음)
+            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "problem_generation_unavailable");
+        }
     }
 
     // 오늘 횟수를 잠근 채로 확인하고 +1 (트랜잭션 안에서 호출됨)

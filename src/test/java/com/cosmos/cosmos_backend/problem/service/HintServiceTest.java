@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.cosmos.cosmos_backend.common.Language;
@@ -102,18 +103,55 @@ class HintServiceTest {
     }
 
     @Test
-    void answerHint_savesStage2_whenNoCommentHintUsedBefore() {
-        // Given
-        givenHint(Language.PYTHON, HintType.SOLUTION, "print(1)");
+    void answerHint_throwsConflictAndDoesNotSave_whenNoCommentHintUsedBefore() {
+        // Given (409는 힌트 조회 전에 나므로 hintRepository는 stub하지 않음)
+        when(problemRepository.existsById(PROBLEM_ID)).thenReturn(true);
         when(usedHintRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.empty());
 
+        // When & Then
+        assertThatThrownBy(() -> service().getHint(USER_ID, PROBLEM_ID, "PYTHON", HintType.SOLUTION))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT))
+                .hasMessage("comment_hint_required");
+        verify(hintRepository, never()).findByProblemIdAndLanguageAndHintType(any(), any(), any());
+        verify(usedHintRepository, never()).save(any());
+    }
+
+    @Test
+    void answerHint_succeeds_whenCommentHintWasUsedInAnotherLanguage() {
+        // Given (사용 단계는 언어와 무관하게 문제 단위로 관리됨)
+        givenHint(Language.JAVA, HintType.SOLUTION, "class A {}");
+        UsedHint used = new UsedHint(USER_ID, PROBLEM_ID, 1);
+        when(usedHintRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.of(used));
+
         // When
-        service().getHint(USER_ID, PROBLEM_ID, "PYTHON", HintType.SOLUTION);
+        HintResponse response = service().getHint(USER_ID, PROBLEM_ID, "JAVA", HintType.SOLUTION);
 
         // Then
-        ArgumentCaptor<UsedHint> saved = ArgumentCaptor.forClass(UsedHint.class);
-        verify(usedHintRepository).save(saved.capture());
-        assertThat(saved.getValue().getHintStage()).isEqualTo(2);
+        assertThat(response.hintStage()).isEqualTo(2);
+        assertThat(used.getHintStage()).isEqualTo(2);
+    }
+
+    @Test
+    void answerHint_throwsNotFound_beforeConflict_whenProblemMissing() {
+        // Given
+        when(problemRepository.existsById(PROBLEM_ID)).thenReturn(false);
+
+        // When & Then
+        assertThatThrownBy(() -> service().getHint(USER_ID, PROBLEM_ID, "PYTHON", HintType.SOLUTION))
+                .hasMessage("problem_not_found");
+        verifyNoInteractions(usedHintRepository);
+    }
+
+    @Test
+    void answerHint_throwsBadRequest_beforeConflict_whenLanguageInvalid() {
+        // Given
+        when(problemRepository.existsById(PROBLEM_ID)).thenReturn(true);
+
+        // When & Then
+        assertThatThrownBy(() -> service().getHint(USER_ID, PROBLEM_ID, "RUBY", HintType.SOLUTION))
+                .hasMessage("invalid_language");
+        verifyNoInteractions(usedHintRepository);
     }
 
     @Test
@@ -206,8 +244,10 @@ class HintServiceTest {
 
     @Test
     void answerHint_throwsAnswerHintNotFound_whenHintMissing() {
-        // Given
+        // Given (주석 힌트를 본 상태여야 409가 아니라 힌트 조회까지 진행됨)
         when(problemRepository.existsById(PROBLEM_ID)).thenReturn(true);
+        when(usedHintRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID))
+                .thenReturn(Optional.of(new UsedHint(USER_ID, PROBLEM_ID, 1)));
         when(hintRepository.findByProblemIdAndLanguageAndHintType(PROBLEM_ID, Language.PYTHON, HintType.SOLUTION))
                 .thenReturn(Optional.empty());
 
