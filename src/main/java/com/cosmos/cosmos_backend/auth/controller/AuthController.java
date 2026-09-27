@@ -6,6 +6,7 @@ import com.cosmos.cosmos_backend.auth.dto.LoginResult;
 import com.cosmos.cosmos_backend.auth.dto.TokenRefreshResult;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.auth.service.AuthService;
+import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -106,7 +107,7 @@ public class AuthController {
 
         // 1. Refresh Token 쿠키가 없는 경우
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new RuntimeException("refresh_token_missing");
+            throw new BusinessException(HttpStatus.UNAUTHORIZED, "refresh_token_missing");
         }
 
         // 2. Refresh Token 검증 + 새로운 토큰 발급
