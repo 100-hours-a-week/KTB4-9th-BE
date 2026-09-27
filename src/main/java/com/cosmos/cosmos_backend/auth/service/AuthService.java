@@ -12,11 +12,13 @@ import com.cosmos.cosmos_backend.auth.jwt.JwtTokenProvider;
 import com.cosmos.cosmos_backend.auth.repository.RefreshTokenRepository;
 import com.cosmos.cosmos_backend.auth.repository.UserOauthAccountRepository;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
+import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserPoint;
 import com.cosmos.cosmos_backend.ranking.repository.UserPointRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -116,12 +118,12 @@ public class AuthService {
                 refreshTokenRepository
                         .findByRefreshTokenHash(refreshTokenHash)
                         .orElseThrow(() ->
-                                new RuntimeException("refresh_token_invalid"));
+                                new BusinessException(HttpStatus.UNAUTHORIZED,"refresh_token_invalid"));
 
         // 3. 만료 여부 확인
         if (savedRefreshToken.getExpiresAt().isBefore(LocalDateTime.now())) {
             refreshTokenRepository.delete(savedRefreshToken);
-            throw new RuntimeException("refresh_token_invalid");
+            throw new BusinessException(HttpStatus.UNAUTHORIZED, "refresh_token_invalid");
         }
 
         // 4. 해당 Refresh Token의 사용자 조회
@@ -171,15 +173,8 @@ public class AuthService {
         // 2. 해당 hash를 가진 RefreshToken을 DB에서 조회
         Optional<RefreshToken> savedRefreshToken = refreshTokenRepository.findByRefreshTokenHash(refreshTokenHash);
 
-        System.out.println("[LOGOUT] DB token found = " + savedRefreshToken.isPresent());
-
         // 3. 존재한다면 해당 RefreshToken 행 삭제
         if (savedRefreshToken.isPresent()) {
-            System.out.println(
-                    "[LOGOUT] DELETE refreshTokenId = "
-                            + savedRefreshToken.get().getRefreshTokenId()
-            );
-
             refreshTokenRepository.delete(savedRefreshToken.get());
         }
     }
