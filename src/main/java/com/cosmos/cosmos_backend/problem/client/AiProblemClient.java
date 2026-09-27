@@ -36,7 +36,7 @@ public class AiProblemClient {
         // 2. AI 서버에 문제 생성 요청
         AiProblemCreateOndemandResponseDto response =
                 restClient.post()
-                        .uri("/problem")
+                        .uri("api/llm/problem")
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(request)
                         .retrieve()
