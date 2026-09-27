@@ -3,11 +3,8 @@ package com.cosmos.cosmos_backend.approach.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.cosmos.cosmos_backend.common.Datatype;
 import com.cosmos.cosmos_backend.common.Language;
-import com.cosmos.cosmos_backend.common.Scope;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
-import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -41,8 +38,8 @@ class AiEvaluationClientRealHttpTest {
         return new AiEvaluationRequest(
                 "계단 오르기", "본문", "DP", "점화식 구조",
                 List.of("점화식"),
-                List.of(new AiProblemsCreateRequestDto.InputConstraints("N", Scope.INPUT, Datatype.INT, 1F, 100000F, List.of())),
-                List.of(new AiProblemsCreateRequestDto.ExecutionLimits(Language.PYTHON, 3000F, 262144)),
+                List.of(new AiEvaluationRequest.InputConstraint("N", "input", "int", 1F, 100000F, List.of())),
+                List.of(new AiEvaluationRequest.ExecutionLimit("python", 3000F, 262144)),
                 "점화식으로 푼다"
         );
     }
