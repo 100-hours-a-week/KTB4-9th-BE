@@ -116,9 +116,9 @@ public class RankingService {
         User user = userRepository.findById(userId).get();
 
         // 1. 해당 난이도의 유저 개인 포인트 조회
-        UserDifficultyPoint userDifficultyPoint = userDifficultyPointRepository.findByUser_IdAndDifficulty(userId, difficulty).get();
+        Optional<UserDifficultyPoint> userDifficultyPoint = userDifficultyPointRepository.findByUser_IdAndDifficulty(userId, difficulty);
 
-        Long myPoint = userDifficultyPoint.getPoint();
+        Long myPoint = userDifficultyPoint.get().getPoint();
 
         // 2. 해당 난이도의 유저 랭킹 계산
         Long myRank = userDifficultyPointRepository.countByDifficultyAndPointGreaterThan(difficulty, myPoint) + 1;
@@ -187,9 +187,9 @@ public class RankingService {
         User user = userRepository.findById(userId).get();
 
         // 1. 해당 카테고리의 유저 개인 포인트 조회
-        UserCategoryPoint userCategoryPoint = userCategoryPointRepository.findByUser_IdAndCategory(userId, category).get();
+        Optional<UserCategoryPoint> userCategoryPoint = userCategoryPointRepository.findByUser_IdAndCategory(userId, category);
 
-        Long myPoint = userCategoryPoint.getPoint();
+        Long myPoint = userCategoryPoint.get().getPoint();
 
         // 2. 해당 카테고리의 유저 랭킹 계산
         Long myRank = userCategoryPointRepository.countByCategoryAndPointGreaterThan(category, myPoint) + 1;
