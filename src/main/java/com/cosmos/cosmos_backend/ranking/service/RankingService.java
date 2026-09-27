@@ -113,15 +113,17 @@ public class RankingService {
     public GlobalRankingResponseDto getDifficultyRanking(Long userId, Difficulty difficulty) {
 
         // 0. 유저 정보 조회
-        User user = userRepository.findById(userId).get();
+        User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
+                HttpStatus.NOT_FOUND, "User not found"
+        ));
 
         // 1. 해당 난이도의 유저 개인 포인트 조회
         Optional<UserDifficultyPoint> userDifficultyPoint = userDifficultyPointRepository.findByUser_IdAndDifficulty(userId, difficulty);
 
-        Long myPoint = userDifficultyPoint.get().getPoint();
+        Long myPoint = null;
 
         // 2. 해당 난이도의 유저 랭킹 계산
-        Long myRank = userDifficultyPointRepository.countByDifficultyAndPointGreaterThan(difficulty, myPoint) + 1;
+        Long myRank;
 
         // 3. 해당 난이도의 TOP 100 조회
         List<UserDifficultyPoint> top100User = userDifficultyPointRepository.findTop100ByDifficultyAndPointGreaterThanOrderByPointDesc(difficulty, 0L);
@@ -130,14 +132,23 @@ public class RankingService {
         // 4-1. 필터 응답 조립
         RankingFilterResponseDto rankingFilter = new RankingFilterResponseDto(difficulty, null);
 
+        MyRankingResponseDto myRanking;
+
         // 4-2. 내 랭킹 응답 조립
-        MyRankingResponseDto myRanking = new MyRankingResponseDto(
-                userId,
-                user.getUsername(),
-                user.getProfileImageUrl(),
-                myRank,
-                myPoint
-        );
+        if(userDifficultyPoint.isPresent() && userDifficultyPoint.get().getPoint() > 0){
+            myPoint = userDifficultyPoint.get().getPoint();
+            myRank = userDifficultyPointRepository.countByDifficultyAndPointGreaterThan(difficulty, myPoint) + 1;
+            myRanking = new MyRankingResponseDto(
+                    userId,
+                    user.getUsername(),
+                    user.getProfileImageUrl(),
+                    myRank,
+                    myPoint
+            );
+        } else {
+            myRanking = null;
+        }
+
 
         // 4-3. TOP 100 응답 조립
         List<RankingCommonResponseDto> top100rankings = new ArrayList<>();
@@ -184,15 +195,17 @@ public class RankingService {
     public GlobalRankingResponseDto getCategoryRanking(Long userId, Category category) {
 
         // 0. 유저 정보 조회
-        User user = userRepository.findById(userId).get();
+        User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
+                HttpStatus.NOT_FOUND, "User not found"
+        ));
 
         // 1. 해당 카테고리의 유저 개인 포인트 조회
         Optional<UserCategoryPoint> userCategoryPoint = userCategoryPointRepository.findByUser_IdAndCategory(userId, category);
 
-        Long myPoint = userCategoryPoint.get().getPoint();
+        Long myPoint;
 
         // 2. 해당 카테고리의 유저 랭킹 계산
-        Long myRank = userCategoryPointRepository.countByCategoryAndPointGreaterThan(category, myPoint) + 1;
+        Long myRank = null;
 
         // 3. 해당 카테고리의 TOP 100 조회
         List<UserCategoryPoint> top100User = userCategoryPointRepository.findTop100ByCategoryAndPointGreaterThanOrderByPointDesc(category,0L);
@@ -203,14 +216,24 @@ public class RankingService {
                 category
         );
 
+        MyRankingResponseDto myRanking;
+
         // 4-2. 내 랭킹 응답 조립
-        MyRankingResponseDto myRanking = new MyRankingResponseDto(
-                userId,
-                user.getUsername(),
-                user.getProfileImageUrl(),
-                myRank,
-                myPoint
-        );
+        if(userCategoryPoint.isPresent() && userCategoryPoint.get().getPoint() > 0){
+            myPoint = userCategoryPoint.get().getPoint();
+            myRank = userCategoryPointRepository.countByCategoryAndPointGreaterThan(category, myPoint) + 1;
+
+            myRanking = new MyRankingResponseDto(
+                    userId,
+                    user.getUsername(),
+                    user.getProfileImageUrl(),
+                    myRank,
+                    myPoint
+            );
+        } else {
+            myRanking = null;
+        }
+
 
         // 4-3. TOP 100 응답 조립
         List<RankingCommonResponseDto> top100rankings = new ArrayList<>();
