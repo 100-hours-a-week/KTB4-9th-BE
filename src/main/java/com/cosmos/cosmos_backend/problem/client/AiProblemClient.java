@@ -4,6 +4,7 @@ import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemCreateOndemandRequestDto;
 import com.cosmos.cosmos_backend.problem.dto.response.AiProblemCreateOndemandResponseDto;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -15,13 +16,8 @@ public class AiProblemClient {
     private final RestClient restClient;
 
     public AiProblemClient(
-            RestClient.Builder restClientBuilder,
-            @Value("${ai.root-url}")
-            String aiRootUrl
-    ) {
-        this.restClient = restClientBuilder
-                .baseUrl(aiRootUrl + "/api/llm/")
-                .build();
+            @Qualifier("aiRestClient") RestClient aiRestClient) {
+        this.restClient = aiRestClient;
     }
 
     // 온디맨드 문제 생성 요청
