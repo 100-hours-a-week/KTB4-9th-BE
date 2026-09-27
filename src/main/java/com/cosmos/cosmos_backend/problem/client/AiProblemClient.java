@@ -16,10 +16,11 @@ public class AiProblemClient {
 
     public AiProblemClient(
             RestClient.Builder restClientBuilder,
-            @Value("${ai.root-url}") String aiRootUrl
+            @Value("${ai.root-url}")
+            String aiRootUrl
     ) {
         this.restClient = restClientBuilder
-                .baseUrl(aiRootUrl)
+                .baseUrl(aiRootUrl + "/api/llm/")
                 .build();
     }
 
