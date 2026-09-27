@@ -14,7 +14,13 @@ public record MyRankingResponseDto(
 
         Long rank,
 
-        Long point
+        Long point,
+
+        @JsonProperty("total_correct_problem_count")
+        Long totalCorrectProblemCount,
+
+        @JsonProperty("current_streak_day")
+        Long currentStreakDay
 
 ){
 }

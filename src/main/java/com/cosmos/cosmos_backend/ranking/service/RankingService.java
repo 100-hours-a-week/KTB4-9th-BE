@@ -68,7 +68,9 @@ public class RankingService {
                 user.getUsername(),
                 user.getProfileImageUrl(),
                 myRank,
-                myPoint
+                myPoint,
+                userPoint.get().getTotalCorrectProblemCount(),
+                userPoint.get().getCurrentStreakDay()
         );
 
         // 4-3. Top 100 응답 조립
@@ -94,7 +96,9 @@ public class RankingService {
                     top100User.get(i).getUser().getUsername(),
                     top100User.get(i).getUser().getProfileImageUrl(),
                     rankings,
-                    top100User.get(i).getTotalPoint()
+                    top100User.get(i).getTotalPoint(),
+                    top100User.get(i).getTotalCorrectProblemCount(),
+                    top100User.get(i).getCurrentStreakDay()
             );
 
             top100rankings.add(rankingCommonResponse);
@@ -116,6 +120,8 @@ public class RankingService {
         User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
                 HttpStatus.NOT_FOUND, "User not found"
         ));
+
+        UserPoint myRankingInfo = userPointRepository.findByUser_Id(userId).orElse(null);
 
         // 1. 해당 난이도의 유저 개인 포인트 조회
         Optional<UserDifficultyPoint> userDifficultyPoint = userDifficultyPointRepository.findByUser_IdAndDifficulty(userId, difficulty);
@@ -143,7 +149,10 @@ public class RankingService {
                     user.getUsername(),
                     user.getProfileImageUrl(),
                     myRank,
-                    myPoint
+                    myPoint,
+                    userDifficultyPoint.get().getCorrectProblemCount(),
+                    myRankingInfo.getCurrentStreakDay()
+
             );
         } else {
             myRanking = null;
@@ -169,12 +178,16 @@ public class RankingService {
 
             previousRanking = rankings;
 
+            UserPoint eachUserInfo = userPointRepository.findByUser_Id(top100User.get(i).getUser().getId()).orElse(null);
+
             RankingCommonResponseDto rankingCommonResponse =
                     new RankingCommonResponseDto(
                             top100User.get(i).getUser().getUsername(),
                             top100User.get(i).getUser().getProfileImageUrl(),
                             rankings,
-                            top100User.get(i).getPoint()
+                            top100User.get(i).getPoint(),
+                            top100User.get(i).getCorrectProblemCount(),
+                            eachUserInfo.getCurrentStreakDay()
                     );
 
             top100rankings.add(rankingCommonResponse);
@@ -198,6 +211,8 @@ public class RankingService {
         User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
                 HttpStatus.NOT_FOUND, "User not found"
         ));
+
+        UserPoint myRankingInfo = userPointRepository.findByUser_Id(userId).orElse(null);
 
         // 1. 해당 카테고리의 유저 개인 포인트 조회
         Optional<UserCategoryPoint> userCategoryPoint = userCategoryPointRepository.findByUser_IdAndCategory(userId, category);
@@ -228,7 +243,9 @@ public class RankingService {
                     user.getUsername(),
                     user.getProfileImageUrl(),
                     myRank,
-                    myPoint
+                    myPoint,
+                    userCategoryPoint.get().getCorrectProblemCount(),
+                    myRankingInfo.getCurrentStreakDay()
             );
         } else {
             myRanking = null;
@@ -254,12 +271,16 @@ public class RankingService {
 
             previousRanking = rankings;
 
+            UserPoint eachUserInfo = userPointRepository.findByUser_Id(top100User.get(i).getUser().getId()).orElse(null);
+
             RankingCommonResponseDto rankingCommonResponse =
                     new RankingCommonResponseDto(
                             top100User.get(i).getUser().getUsername(),
                             top100User.get(i).getUser().getProfileImageUrl(),
                             rankings,
-                            top100User.get(i).getPoint()
+                            top100User.get(i).getPoint(),
+                            top100User.get(i).getCorrectProblemCount(),
+                            eachUserInfo.getCurrentStreakDay()
                     );
 
             top100rankings.add(rankingCommonResponse);
