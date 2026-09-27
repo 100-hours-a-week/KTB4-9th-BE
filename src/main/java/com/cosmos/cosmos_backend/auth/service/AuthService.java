@@ -12,11 +12,13 @@ import com.cosmos.cosmos_backend.auth.jwt.JwtTokenProvider;
 import com.cosmos.cosmos_backend.auth.repository.RefreshTokenRepository;
 import com.cosmos.cosmos_backend.auth.repository.UserOauthAccountRepository;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
+import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserPoint;
 import com.cosmos.cosmos_backend.ranking.repository.UserPointRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -116,12 +118,12 @@ public class AuthService {
                 refreshTokenRepository
                         .findByRefreshTokenHash(refreshTokenHash)
                         .orElseThrow(() ->
-                                new RuntimeException("refresh_token_invalid"));
+                                new BusinessException(HttpStatus.UNAUTHORIZED,"refresh_token_invalid"));
 
         // 3. 만료 여부 확인
         if (savedRefreshToken.getExpiresAt().isBefore(LocalDateTime.now())) {
             refreshTokenRepository.delete(savedRefreshToken);
-            throw new RuntimeException("refresh_token_invalid");
+            throw new BusinessException(HttpStatus.UNAUTHORIZED, "refresh_token_invalid");
         }
 
         // 4. 해당 Refresh Token의 사용자 조회
