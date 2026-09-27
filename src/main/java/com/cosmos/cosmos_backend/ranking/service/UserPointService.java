@@ -122,8 +122,6 @@ public class UserPointService {
             );
 
             userDifficultyPointRepository.save(difficultyPoint);
-
-            difficultyPoint.increaseCorrectProblemCount();
         }
 
 
@@ -143,8 +141,6 @@ public class UserPointService {
             );
 
             userCategoryPointRepository.save(categoryPoint);
-
-            categoryPoint.increaseCorrectProblemCount();
         }
 
     }
