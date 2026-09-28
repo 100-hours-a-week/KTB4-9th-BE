@@ -2,8 +2,10 @@ package com.cosmos.cosmos_backend.common.exception;
 
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -32,6 +34,24 @@ public class GlobalExceptionHandler {
                 .orElse("invalid_request");
         // 2. 400과 함께 message + data 형식으로 반환
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.of(message, null));
+    }
+
+    // 요청 본문(JSON) 해석 실패 처리 (재시도해도 성공할 수 없는 클라이언트 잘못이라 400)
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMalformedJson(HttpMessageNotReadableException e) {
+        // 1. 요청 형식 문제로 서버 로그에는 경고 수준으로만 남김
+        log.warn("잘못된 요청 본문: {}", e.getMessage());
+        // 2. 400과 함께 message + data 형식으로 반환
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.of("invalid_request_body", null));
+    }
+
+    // DB 제약(unique, not null 등) 위반 처리 (재시도해도 성공할 수 없는 클라이언트 잘못이라 400)
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        // 1. 요청 데이터 문제로 서버 로그에는 경고 수준으로만 남김
+        log.warn("DB 제약 위반: {}", e.getMessage());
+        // 2. 400과 함께 message + data 형식으로 반환
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.of("invalid_request_data", null));
     }
 
     // 위에서 처리하지 못한 모든 예외 처리
