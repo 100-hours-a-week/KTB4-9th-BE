@@ -23,10 +23,10 @@ public class TestCase {
     @Column(name = "problem_id", nullable = false)
     private Long problemId;
 
-    @Column(nullable = false, length = 16)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String input;
 
-    @Column(name = "expected_output", nullable = false, length = 16)
+    @Column(name = "expected_output", nullable = false, columnDefinition = "TEXT")
     private String expectedOutput;
 
     @Column(name = "display_order", nullable = false)
