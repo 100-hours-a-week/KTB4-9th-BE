@@ -29,13 +29,13 @@ public class ProblemExample {
     @Column(name = "problem_id", nullable = false)
     private Long problemId;
 
-    @Column(nullable = false, length = 16)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String input;
 
-    @Column(nullable = false, length = 16)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String output;
 
-    @Column(length = 255)
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @Column(name = "display_order", nullable = false)
