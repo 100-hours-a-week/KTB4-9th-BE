@@ -22,6 +22,7 @@ import com.cosmos.cosmos_backend.problem.repository.KeywordRepository;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,8 @@ public class ApproachSubmissionService {
 
 
     private final UserPointService userPointService;
+
+    private final Clock clock;
 
     public ApproachSubmitResult submit(Long userId, Long problemId, String selectedCategory, String naturalSolution) {
         // 1. problemId로 문제를 조회 (없으면 404 예외를 던짐)
@@ -121,7 +124,7 @@ public class ApproachSubmissionService {
             submission.markAsSolved();
 
             // 오늘의 학습 기록 갱신
-            LocalDate activityDate = LocalDate.now();
+            LocalDate activityDate = LocalDate.now(clock);
 
             Optional<ActivityRecord> activityRecord =
                     activityRecordRepository.findByUserIdAndActivityDate(

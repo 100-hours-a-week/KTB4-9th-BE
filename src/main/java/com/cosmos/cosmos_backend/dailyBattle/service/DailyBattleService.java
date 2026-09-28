@@ -31,10 +31,12 @@ public class DailyBattleService {
 
     private final BattleParticipationRepository battleParticipationRepository;
 
+    private final Clock clock;
+
     @Transactional
     public Long createDailyBattle(AiBattleCreateRequestDto request){
 
-        LocalDate date = LocalDate.now();
+        LocalDate date = LocalDate.now(clock);
 
         DailyBattle saving_problem = new DailyBattle(
                 date,
