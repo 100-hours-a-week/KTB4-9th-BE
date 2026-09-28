@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.cosmos.cosmos_backend.codesubmission.client.Judge0Client;
 import com.cosmos.cosmos_backend.codesubmission.domain.CodeSubmission;
+import com.cosmos.cosmos_backend.codesubmission.service.CodeSubmissionService.CodeSubmissionResult;
 import com.cosmos.cosmos_backend.codesubmission.domain.JudgingResult;
 import com.cosmos.cosmos_backend.codesubmission.domain.JudgingStatus;
 import com.cosmos.cosmos_backend.codesubmission.dto.response.CodeSubmitResponse;
@@ -122,7 +123,8 @@ class CodeSubmissionServiceTest {
                 .thenReturn(List.of(JudgingResult.CORRECT, JudgingResult.CORRECT, JudgingResult.CORRECT));
 
         // When
-        CodeSubmission submission = service.submit(USER_ID, PROBLEM_ID, "PYTHON", "print(1)");
+        CodeSubmissionResult result = service.submit(USER_ID, PROBLEM_ID, "PYTHON", "print(1)");
+        CodeSubmission submission = result.submission();
 
         // Then
         assertThat(submission.getJudgingResult()).isEqualTo(JudgingResult.CORRECT);
@@ -145,7 +147,8 @@ class CodeSubmissionServiceTest {
         ));
 
         // When
-        CodeSubmission submission = service.submit(USER_ID, PROBLEM_ID, "JAVA", "class Main {}");
+        CodeSubmissionResult result = service.submit(USER_ID, PROBLEM_ID, "JAVA", "class Main {}");
+        CodeSubmission submission = result.submission();
 
         // Then
         assertThat(submission.getJudgingResult()).isEqualTo(JudgingResult.WRONG_ANSWER);
@@ -196,7 +199,8 @@ class CodeSubmissionServiceTest {
         when(judge0Client.judge(any(), any(), any(), any())).thenReturn(List.of(JudgingResult.CORRECT));
 
         // When
-        CodeSubmission submission = service.submit(USER_ID, PROBLEM_ID, "PYTHON", "print(1)");
+        CodeSubmissionResult result = service.submit(USER_ID, PROBLEM_ID, "PYTHON", "print(1)");
+        CodeSubmission submission = result.submission();
 
         // Then
         assertThat(submission.getSubmittedAt()).isAfterOrEqualTo(before);
@@ -212,7 +216,8 @@ class CodeSubmissionServiceTest {
         when(judge0Client.judge(any(), any(), any(), any())).thenReturn(List.of(JudgingResult.CORRECT, JudgingResult.CORRECT));
 
         // When
-        CodeSubmission submission = service.submit(USER_ID, PROBLEM_ID, "JAVASCRIPT", "console.log(1)");
+        CodeSubmissionResult result = service.submit(USER_ID, PROBLEM_ID, "JAVASCRIPT", "console.log(1)");
+        CodeSubmission submission = result.submission();
 
         // Then
         assertThat(submission).isSameAs(existing);
@@ -232,7 +237,8 @@ class CodeSubmissionServiceTest {
         when(judge0Client.judge(any(), any(), any(), any())).thenReturn(List.of(JudgingResult.CORRECT));
 
         // When
-        CodeSubmission submission = service.submit(USER_ID, PROBLEM_ID, "PYTHON", "print(1)");
+        CodeSubmissionResult result = service.submit(USER_ID, PROBLEM_ID, "PYTHON", "print(1)");
+        CodeSubmission submission = result.submission();
 
         // Then
         assertThat(submission.getSubmittedCount()).isEqualTo(5);
