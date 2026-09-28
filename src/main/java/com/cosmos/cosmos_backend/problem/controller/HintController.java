@@ -6,6 +6,9 @@ import com.cosmos.cosmos_backend.problem.domain.HintType;
 import com.cosmos.cosmos_backend.problem.dto.request.HintRequest;
 import com.cosmos.cosmos_backend.problem.dto.response.HintResponse;
 import com.cosmos.cosmos_backend.problem.service.HintService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,15 +24,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/problems/{problemId}/hints")
 @RequiredArgsConstructor
+@Tag(name = "힌트", description = "문제의 단계별 힌트 조회 API")
 public class HintController {
 
     private final HintService hintService;
 
     @PostMapping("/comment")
+    @Operation(summary = "주석 힌트 조회", description = "선택한 언어의 단계별 주석 힌트를 조회합니다.")
     public ResponseEntity<ApiResponse<HintResponse>> getCommentHint(
-            @PathVariable String problemId,
+            @Parameter(description = "문제 ID", required = true, example = "1") @PathVariable String problemId,
             @Valid @RequestBody HintRequest request,
-            @AuthenticationPrincipal Jwt jwt
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
     ) {
         // 1. 주석 힌트 조회는 공통 처리에 맡김
         HintResponse response = retrieve(problemId, request, jwt, HintType.COMMENT);
@@ -39,10 +44,11 @@ public class HintController {
     }
 
     @PostMapping("/answer")
+    @Operation(summary = "정답 힌트 조회", description = "선택한 언어의 정답 코드 힌트를 조회합니다.")
     public ResponseEntity<ApiResponse<HintResponse>> getAnswerHint(
-            @PathVariable String problemId,
+            @Parameter(description = "문제 ID", required = true, example = "1") @PathVariable String problemId,
             @Valid @RequestBody HintRequest request,
-            @AuthenticationPrincipal Jwt jwt
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
     ) {
         // 1. 정답 힌트 조회는 공통 처리에 맡김
         HintResponse response = retrieve(problemId, request, jwt, HintType.SOLUTION);

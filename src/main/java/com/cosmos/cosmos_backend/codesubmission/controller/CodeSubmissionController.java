@@ -6,6 +6,9 @@ import com.cosmos.cosmos_backend.codesubmission.dto.response.CodeSubmitResponse;
 import com.cosmos.cosmos_backend.codesubmission.service.CodeSubmissionService;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,15 +24,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/problems/{problemId}/code-submissions")
 @RequiredArgsConstructor
+@Tag(name = "코드 제출", description = "소스 코드 제출 및 채점 API")
 public class CodeSubmissionController {
 
     private final CodeSubmissionService codeSubmissionService;
 
     @PostMapping
+    @Operation(summary = "코드 제출 및 채점", description = "문제 풀이 코드를 제출하고 테스트 케이스 채점 결과를 반환합니다.")
     public ResponseEntity<ApiResponse<CodeSubmitResponse>> submit(
-            @PathVariable String problemId,
+            @Parameter(description = "문제 ID", required = true, example = "1") @PathVariable String problemId,
             @Valid @RequestBody CodeSubmitRequest request,
-            @AuthenticationPrincipal Jwt jwt
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
     ) {
         // 1. 경로의 problemId를 숫자로 변환
         Long id = parseProblemId(problemId);
