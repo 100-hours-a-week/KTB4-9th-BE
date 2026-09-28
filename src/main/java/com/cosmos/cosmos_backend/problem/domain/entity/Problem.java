@@ -33,7 +33,7 @@ public class Problem {
     @Column(nullable = false, length = 30)
     private String title;
 
-    @Column(nullable = false, length = 2048)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @Column(name = "input_format", nullable = false, columnDefinition = "TEXT")
