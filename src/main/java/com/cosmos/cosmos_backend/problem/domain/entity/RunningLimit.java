@@ -22,7 +22,7 @@ import lombok.NoArgsConstructor;
         uniqueConstraints = @UniqueConstraint(columnNames = {"problem_id", "language"}),
         check = {
                 @CheckConstraint(name = "running_limits_time_limit_ms_positive", constraint = "time_limit_ms > 0"),
-                @CheckConstraint(name = "running_limits_memory_limit_mb_positive", constraint = "memory_limit_mb > 0")
+                @CheckConstraint(name = "running_limits_memory_limit_kb_positive", constraint = "memory_limit_kb > 0")
         }
 )
 @Getter
@@ -43,13 +43,13 @@ public class RunningLimit {
     @Column(name = "time_limit_ms", nullable = false)
     private Float timeLimitMs;
 
-    @Column(name = "memory_limit_mb", nullable = false)
-    private Integer memoryLimitMb;
+    @Column(name = "memory_limit_kb", nullable = false)
+    private Integer memoryLimitKb;
 
-    public RunningLimit(Long problemId, Language language, Float timeLimitMs, Integer memoryLimitMb) {
+    public RunningLimit(Long problemId, Language language, Float timeLimitMs, Integer memoryLimitKb) {
         this.problemId = problemId;
         this.language = language;
         this.timeLimitMs = timeLimitMs;
-        this.memoryLimitMb = memoryLimitMb;
+        this.memoryLimitKb = memoryLimitKb;
     }
 }

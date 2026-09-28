@@ -48,7 +48,7 @@ public record ProblemDetailResponse(
                         .map(limit -> new AiProblemsCreateRequestDto.ExecutionLimits(
                                 limit.getLanguage(),
                                 limit.getTimeLimitMs(),
-                                limit.getMemoryLimitMb() * 1024 // MB → KB 변환
+                                limit.getMemoryLimitKb()
                         ))
                         .toList(),
                 // 4. 공개 예시

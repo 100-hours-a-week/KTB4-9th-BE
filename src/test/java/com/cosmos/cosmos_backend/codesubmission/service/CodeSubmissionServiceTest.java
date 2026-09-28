@@ -157,8 +157,8 @@ class CodeSubmissionServiceTest {
     void submit_passesLanguageSourceTestCasesAndLimitOfThatLanguageToJudge0() {
         // Given
         List<TestCase> testCases = givenTestCases(2);
-        RunningLimit pythonLimit = new RunningLimit(PROBLEM_ID, Language.PYTHON, 3000F, 256);
-        RunningLimit javaLimit = new RunningLimit(PROBLEM_ID, Language.JAVA, 2000F, 256);
+        RunningLimit pythonLimit = new RunningLimit(PROBLEM_ID, Language.PYTHON, 3000F, 262144);
+        RunningLimit javaLimit = new RunningLimit(PROBLEM_ID, Language.JAVA, 2000F, 262144);
         givenLimits(javaLimit, pythonLimit);
         givenNoPreviousSubmission();
         when(judge0Client.judge(any(), any(), any(), any())).thenReturn(List.of(JudgingResult.CORRECT, JudgingResult.CORRECT));
