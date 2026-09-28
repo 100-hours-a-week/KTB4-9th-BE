@@ -83,7 +83,7 @@ public class Judge0Client {
                         base64(testCase.getInput()),
                         base64(testCase.getExpectedOutput()),
                         limit == null ? null : limit.getTimeLimitMs() / 1000.0,
-                        limit == null ? null : Math.min(limit.getMemoryLimitMb() * 1024, properties.maxMemoryKb())
+                        limit == null ? null : Math.min(limit.getMemoryLimitKb(), properties.maxMemoryKb())
                 ))
                 .toList();
 

@@ -71,7 +71,7 @@ class ProblemServiceTest {
         when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(1L))
                 .thenReturn(List.of(new ProblemExample(1L, "nums=[2,7]", "[0,1]", null, 1)));
         when(runningLimitRepository.findByProblemId(1L))
-                .thenReturn(List.of(new RunningLimit(1L, Language.PYTHON, 4000F, 500)));
+                .thenReturn(List.of(new RunningLimit(1L, Language.PYTHON, 4000F, 512000)));
 
         when(usedHintRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.empty());
 
@@ -84,7 +84,7 @@ class ProblemServiceTest {
         assertThat(response.category()).isEqualTo(Category.ARRAY);
         assertThat(response.inputFormat()).isEqualTo("정수 배열 nums와 목표값 target이 주어집니다.");
         assertThat(response.executionLimits()).hasSize(1);
-        assertThat(response.executionLimits().get(0).memoryLimitKb()).isEqualTo(500 * 1024);
+        assertThat(response.executionLimits().get(0).memoryLimitKb()).isEqualTo(512000);
         assertThat(response.examples()).hasSize(1);
         assertThat(response.examples().get(0).input()).isEqualTo("nums=[2,7]");
         // 힌트 사용 기록이 없으면 0
