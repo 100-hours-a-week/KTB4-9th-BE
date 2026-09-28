@@ -21,3 +21,11 @@ judge0:
     JAVASCRIPT: 63
     JAVA: 62
     CPP: 54
+
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:local}
+  release: ${SENTRY_RELEASE:}
+  send-default-pii: false
+  traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
