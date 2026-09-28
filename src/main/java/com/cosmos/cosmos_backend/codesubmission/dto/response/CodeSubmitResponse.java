@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 
 /** 코드 제출(채점) 응답 data. */
 public record CodeSubmitResponse(
@@ -19,7 +20,8 @@ public record CodeSubmitResponse(
         @JsonProperty("total_test_count") Integer totalTestCount,
         @JsonProperty("submitted_count") Integer submittedCount,
         @JsonProperty("submitted_at") OffsetDateTime submittedAt,
-        @JsonProperty("judged_at") OffsetDateTime judgedAt
+        @JsonProperty("judged_at") OffsetDateTime judgedAt,
+        @JsonProperty("test_results") List<JudgingResult> testResults
 ) {
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
@@ -31,8 +33,8 @@ public record CodeSubmitResponse(
     ) {
     }
 
-    /** 저장된 제출을 응답 형태로 조립. 시각은 +09:00 형식. */
-    public static CodeSubmitResponse of(CodeSubmission submission) {
+    /** 저장된 제출과 테스트케이스별 판정을 응답 형태로 조립. 시각은 +09:00 형식. */
+    public static CodeSubmitResponse of(CodeSubmission submission, List<JudgingResult> testResults) {
         return new CodeSubmitResponse(
                 submission.getProblemId(),
                 submission.getLanguage(),
@@ -42,7 +44,8 @@ public record CodeSubmitResponse(
                 submission.getTotalTestCount(),
                 submission.getSubmittedCount(),
                 toOffset(submission.getSubmittedAt()),
-                toOffset(submission.getJudgedAt())
+                toOffset(submission.getJudgedAt()),
+                testResults
         );
     }
 
