@@ -7,6 +7,9 @@ import com.cosmos.cosmos_backend.auth.dto.TokenRefreshResult;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.auth.service.AuthService;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +27,7 @@ import java.net.URI;
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
+@Tag(name = "인증", description = "카카오 OAuth 로그인과 사용자 인증 API")
 public class AuthController {
 
     private final AuthService authService;
@@ -41,9 +45,10 @@ public class AuthController {
 
     // oauth 로그인 결과에 대한 콜백
     @GetMapping("/oauth/{provider}/callback")
+    @Operation(summary = "OAuth 로그인 콜백", description = "OAuth 인가 코드로 로그인하고 accessToken과 refreshToken 쿠키를 발급합니다.", security = {})
     public ResponseEntity<Void> login(
-            @PathVariable String provider,
-            @RequestParam String code
+            @Parameter(description = "OAuth 제공자. 현재 KAKAO만 지원합니다.", required = true, example = "kakao") @PathVariable String provider,
+            @Parameter(description = "OAuth 제공자가 발급한 인가 코드", required = true) @RequestParam String code
     ) {
 
         // 1. 요청에서 provider와 code를 받음
@@ -80,7 +85,8 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public LoginResponseDto getMe(@AuthenticationPrincipal Jwt jwt) {
+    @Operation(summary = "내 정보 조회", description = "accessToken 쿠키로 인증된 사용자의 기본 정보를 조회합니다.")
+    public LoginResponseDto getMe(@Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
 
         // 1. Spring Security가 검증한 JWT에서 userId(sub) 가져오기
         Long userId = Long.valueOf(jwt.getSubject());
@@ -98,7 +104,9 @@ public class AuthController {
     }
 
     @PostMapping("/token/refresh")
+    @Operation(summary = "토큰 재발급", description = "refreshToken 쿠키를 검증하고 accessToken과 refreshToken 쿠키를 새로 발급합니다.", security = {})
     public ResponseEntity<Void> refreshToken(
+            @Parameter(description = "로그인 시 발급된 refreshToken 쿠키", required = true)
             @CookieValue(
                     name = "refreshToken",
                     required = false
@@ -149,7 +157,9 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @Operation(summary = "로그아웃", description = "저장된 refreshToken을 폐기하고 인증 쿠키를 삭제합니다.", security = {})
     public ResponseEntity<Void> logout(
+            @Parameter(description = "폐기할 refreshToken 쿠키. 쿠키가 없어도 로그아웃 응답은 정상 처리됩니다.")
             @CookieValue(name = "refreshToken", required = false)
             String refreshToken
     ) {

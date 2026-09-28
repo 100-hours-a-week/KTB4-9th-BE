@@ -3,11 +3,13 @@ package com.cosmos.cosmos_backend.dailyBattle.controller;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -17,12 +19,14 @@ import java.net.URI;
 @RestController
 @RequestMapping("/daily-battles")
 @RequiredArgsConstructor
+@Tag(name = "데일리 배틀", description = "데일리 배틀 문제 생성 및 참여 API")
 public class DailyBattleController {
 
     private final DailyBattleService  dailyBattleService;
 
     // 배틀 문제 저장
     @PostMapping("/problem")
+    @Operation(summary = "데일리 배틀 문제 생성", description = "AI가 생성한 배틀 문제와 테스트 케이스를 저장합니다.")
     public ResponseEntity<Void> createDailyBattle(
             @Valid @RequestBody AiBattleCreateRequestDto request
     ) {
@@ -36,9 +40,10 @@ public class DailyBattleController {
 
     //배틀 참여
     @PostMapping("/{battle_id}/participations")
+    @Operation(summary = "데일리 배틀 참여", description = "배틀에 참여하고 문제 정보, 테스트 케이스와 남은 시간을 반환합니다.")
     public BattleParticipationResponseDto battleParticipation(
-            @PathVariable @Positive Long battleId,
-            @AuthenticationPrincipal Jwt jwt
+            @Parameter(description = "배틀 ID", required = true, example = "1") @PathVariable("battle_id") @Positive Long battleId,
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
     ){
 
         Long userId = Long.parseLong(jwt.getSubject());
