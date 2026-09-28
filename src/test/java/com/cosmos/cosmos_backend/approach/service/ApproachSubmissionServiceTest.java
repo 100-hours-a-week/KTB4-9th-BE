@@ -26,6 +26,9 @@ import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.repository.KeywordRepository;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -60,9 +63,10 @@ class ApproachSubmissionServiceTest {
     @Mock
     private ActivityRecordRepository activityRecordRepository;
 
-    private ApproachSubmissionService service;
-
+    @Mock
     private UserPointService userPointService;
+
+    private ApproachSubmissionService service;
 
     @BeforeEach
     void setUp() {
@@ -73,9 +77,10 @@ class ApproachSubmissionServiceTest {
                 return action.doInTransaction(null);
             }
         };
+        Clock fixedClock = Clock.fixed(Instant.parse("2026-09-28T00:00:00Z"), ZoneId.of("Asia/Seoul"));
         service = new ApproachSubmissionService(
                 problemRepository, keywordRepository, runningLimitRepository, approachSubmissionRepository,
-                aiEvaluationClient, fakeTransactionTemplate, activityRecordRepository, userPointService
+                aiEvaluationClient, fakeTransactionTemplate, activityRecordRepository, userPointService, fixedClock
         );
     }
 

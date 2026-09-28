@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -80,11 +81,11 @@ public class ApproachSubmission {
         this.naturalSolution = naturalSolution;
         this.categoryResult = categoryResult;
         this.submittedCount = 1;
-        this.submittedAt = LocalDateTime.now();
+        this.submittedAt = LocalDateTime.now(ZoneOffset.UTC);
         this.totalScore = score;
         this.aiFeedback = feedback;
         this.evaluationStatus = EvaluationStatus.COMPLETED;
-        this.evaluatedAt = LocalDateTime.now();
+        this.evaluatedAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     /** 재제출 처리. AI 평가가 성공했을 때만 호출됨. 이전 결과를 새 결과로 덮어씀. */
@@ -93,11 +94,11 @@ public class ApproachSubmission {
         this.naturalSolution = naturalSolution;
         this.categoryResult = categoryResult;
         this.submittedCount += 1;
-        this.submittedAt = LocalDateTime.now();
+        this.submittedAt = LocalDateTime.now(ZoneOffset.UTC);
         this.totalScore = score;
         this.aiFeedback = feedback;
         this.evaluationStatus = EvaluationStatus.COMPLETED;
-        this.evaluatedAt = LocalDateTime.now();
+        this.evaluatedAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     public void markAsSolved() {

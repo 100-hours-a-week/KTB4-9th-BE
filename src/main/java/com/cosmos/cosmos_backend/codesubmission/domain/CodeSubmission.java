@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -102,6 +103,6 @@ public class CodeSubmission {
         this.judgingResult = result;
         this.passedTestCount = passedTestCount;
         this.totalTestCount = totalTestCount;
-        this.judgedAt = LocalDateTime.now();
+        this.judgedAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 }

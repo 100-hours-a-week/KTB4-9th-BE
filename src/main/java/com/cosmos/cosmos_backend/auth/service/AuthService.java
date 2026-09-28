@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 @Service
@@ -120,8 +121,8 @@ public class AuthService {
                         .orElseThrow(() ->
                                 new BusinessException(HttpStatus.UNAUTHORIZED,"refresh_token_invalid"));
 
-        // 3. 만료 여부 확인
-        if (savedRefreshToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+        // 3. 만료 여부 확인 (만료 시각이 UTC 기준이라 비교도 UTC로)
+        if (savedRefreshToken.getExpiresAt().isBefore(LocalDateTime.now(ZoneOffset.UTC))) {
             refreshTokenRepository.delete(savedRefreshToken);
             throw new BusinessException(HttpStatus.UNAUTHORIZED, "refresh_token_invalid");
         }
