@@ -7,6 +7,7 @@ import com.cosmos.cosmos_backend.activityRecord.repository.ActivityRecordReposit
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,11 +18,13 @@ public class ActivityRecordService {
 
     private final ActivityRecordRepository activityRecordRepository;
 
+    private final Clock clock;
+
     public ActivityRecordResponseDto getLearningRecord(Long userId) {
 
         // 1. 조회할 기간 계산하기 (20주 = 140일)
         // 오늘을 포함해서 총 140일로
-        LocalDate endDate = LocalDate.now();
+        LocalDate endDate = LocalDate.now(clock);
         LocalDate startDate = endDate.minusDays(139);
 
         // 2. 140일 동안 사용자의 학습 기록 조회

@@ -9,6 +9,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +24,8 @@ public class DailyProblemService {
 
     private final DailyProblemRepository dailyProblemRepository;
 
+    private final Clock clock;
+
     @Transactional
     public void createDailyProblems(AiProblemsCreateRequestDto problemsCreateRequest) {
 
@@ -30,7 +33,7 @@ public class DailyProblemService {
         List<Problem> problems = problemService.createProblems(problemsCreateRequest);
 
         // 2. 오늘 날짜
-        LocalDate dailyProblemDate = LocalDate.now();
+        LocalDate dailyProblemDate = LocalDate.now(clock);
 
         // 3. 저장된 문제들을 DailyProblem으로 등록
         int displayOrder = 1;
@@ -53,7 +56,7 @@ public class DailyProblemService {
     public DailyProblemResponseDto getDailyProblems() {
 
         // 오늘 날짜
-        LocalDate date = LocalDate.now();
+        LocalDate date = LocalDate.now(clock);
 
         // 1. 데일리 문제 리스트 디비에서 받아오기
         List<DailyProblem> dailyProblemList = dailyProblemRepository.findByRecommendDateOrderByDisplayOrderDesc(date);
