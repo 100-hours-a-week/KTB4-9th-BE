@@ -8,6 +8,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Base64;
 
 @Component
@@ -47,8 +48,9 @@ public class RefreshTokenProvider {
         }
     }
 
+    // 만료 시각은 언제 발생했는지를 나타내는 값이라 UTC 기준으로 계산
     public LocalDateTime getExpiresAt() {
-        return LocalDateTime.now()
+        return LocalDateTime.now(ZoneOffset.UTC)
                 .plusSeconds(refreshTokenExpiration);
     }
 }

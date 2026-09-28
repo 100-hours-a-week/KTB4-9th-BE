@@ -13,6 +13,7 @@ import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
 import com.cosmos.cosmos_backend.problem.repository.TestCaseRepository;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,8 +35,8 @@ public class CodeSubmissionService {
 
     /** 코드를 채점하고 결과를 저장. 채점이 성공했을 때만 저장하고 제출 횟수를 올림. */
     public CodeSubmission submit(Long userId, Long problemId, String language, String sourceCode) {
-        // 1. 제출을 접수한 시각을 기록
-        LocalDateTime receivedAt = LocalDateTime.now();
+        // 1. 제출을 접수한 시각을 기록 (UTC 기준)
+        LocalDateTime receivedAt = LocalDateTime.now(ZoneOffset.UTC);
 
         // 2. problemId로 문제가 있는지 확인 (없으면 404 예외를 던짐)
         if (!problemRepository.existsById(problemId)) {

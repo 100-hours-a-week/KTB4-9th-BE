@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
@@ -50,6 +52,28 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().message()).isEqualTo("invalid_field");
+    }
+
+    @Test
+    void handleMalformedJson_returns400WithInvalidRequestBodyMessage() {
+        HttpMessageNotReadableException exception = new HttpMessageNotReadableException("json parse error", null);
+
+        ResponseEntity<ApiResponse<Object>> response = handler.handleMalformedJson(exception);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).isEqualTo("invalid_request_body");
+        assertThat(response.getBody().data()).isNull();
+    }
+
+    @Test
+    void handleDataIntegrityViolation_returns400WithInvalidRequestDataMessage() {
+        DataIntegrityViolationException exception = new DataIntegrityViolationException("duplicate key");
+
+        ResponseEntity<ApiResponse<Object>> response = handler.handleDataIntegrityViolation(exception);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).isEqualTo("invalid_request_data");
+        assertThat(response.getBody().data()).isNull();
     }
 
     @Test
