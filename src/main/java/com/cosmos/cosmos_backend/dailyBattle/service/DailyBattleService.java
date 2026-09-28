@@ -106,11 +106,11 @@ public class DailyBattleService {
                 .getStartedAt()
                 .atOffset(ZoneOffset.ofHours(9));
 
-        // 남은 시간 계산
+        // 남은 시간 계산 (마감이 KST 기준 시각이라 현재 시각도 KST로 계산)
         LocalDateTime battleEndTime = dailyBattle.getBattleDate()
                 .atTime(12, 10);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         Long remainedTimeSecond = Math.max(
                 0L,

@@ -18,6 +18,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.domain.entity.TestCase;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
+import java.time.ZoneOffset;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
 import com.cosmos.cosmos_backend.problem.repository.TestCaseRepository;
 import java.time.LocalDateTime;
@@ -190,7 +191,8 @@ class CodeSubmissionServiceTest {
         givenTestCases(1);
         givenLimits();
         givenNoPreviousSubmission();
-        LocalDateTime before = LocalDateTime.now();
+        // 접수 시각은 UTC로 저장되므로, 비교 기준도 UTC로 맞춤
+        LocalDateTime before = LocalDateTime.now(ZoneOffset.UTC);
         when(judge0Client.judge(any(), any(), any(), any())).thenReturn(List.of(JudgingResult.CORRECT));
 
         // When

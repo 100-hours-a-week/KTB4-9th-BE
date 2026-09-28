@@ -10,10 +10,7 @@ import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
-import com.cosmos.cosmos_backend.common.Datatype;
 import com.cosmos.cosmos_backend.common.Difficulty;
-import com.cosmos.cosmos_backend.common.Language;
-import com.cosmos.cosmos_backend.common.Scope;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.entity.Keyword;
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
@@ -180,18 +177,18 @@ public class ApproachSubmissionService {
 
     // 문제·키워드·실행 제한을 AI 요청 형태로 조립
     private AiEvaluationRequest buildAiRequest(Problem problem, String naturalSolution, List<Keyword> keywords, List<RunningLimit> runningLimits) {
-        // 1. 실행 제한을 AI 요청 형태로 변환 (MB → KB, 언어는 소문자로)
+        // 1. 실행 제한을 AI 요청 형태로 변환 (MB → KB, enum은 이름 그대로 보냄)
         List<AiEvaluationRequest.ExecutionLimit> executionLimits = runningLimits.stream()
                 .map(limit -> new AiEvaluationRequest.ExecutionLimit(
-                        toAiLanguage(limit.getLanguage()), limit.getTimeLimitMs(), limit.getMemoryLimitMb() * 1024))
+                        limit.getLanguage().name(), limit.getTimeLimitMs(), limit.getMemoryLimitMb() * 1024))
                 .toList();
 
-        // 2. 입력 제한을 AI 요청 형태로 변환 (scope·dataType은 우리 이름과 달라서 AI가 아는 값으로 바꿔줌)
+        // 2. 입력 제한을 AI 요청 형태로 변환 (scope·dataType 모두 우리 enum 이름 그대로 보냄)
         List<AiEvaluationRequest.InputConstraint> inputConstraints = problem.getConstraints().stream()
                 .map(constraint -> new AiEvaluationRequest.InputConstraint(
                         constraint.target(),
-                        toAiScope(constraint.scope()),
-                        toAiDataType(constraint.dataType()),
+                        constraint.scope().name(),
+                        constraint.dataType().name(),
                         constraint.minValue(),
                         constraint.maxValue(),
                         constraint.specialConditions()
@@ -209,26 +206,6 @@ public class ApproachSubmissionService {
                 executionLimits,
                 naturalSolution
         );
-    }
-
-    // scope를 AI가 기대하는 소문자 값으로 변환
-    private String toAiScope(Scope scope) {
-        return scope.name().toLowerCase();
-    }
-
-    // dataType을 AI가 기대하는 값으로 변환 (이름이 다르거나 없는 값은 매핑)
-    private String toAiDataType(Datatype dataType) {
-        return switch (dataType) {
-            case STRING -> "str";
-            case BOOLEAN -> "bool";
-            case FLOAT -> "double"; // AI에 FLOAT가 없어서 double로 보냄
-            default -> dataType.name().toLowerCase();
-        };
-    }
-
-    // language를 AI가 기대하는 소문자 값으로 변환
-    private String toAiLanguage(Language language) {
-        return language.name().toLowerCase();
     }
 
     // 우리 키워드 목록 순서를 기준으로 AI 판정을 병합 (AI가 언급 안 했으면 false, AI가 준 모르는 키워드는 버림)

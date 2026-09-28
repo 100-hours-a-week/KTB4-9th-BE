@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cosmos.cosmos_backend.common.Language;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 
 class CodeSubmissionTest {
 
-    private static final LocalDateTime RECEIVED_AT = LocalDateTime.now().minusSeconds(2);
+    // 제출/채점 시각은 UTC 기준으로 저장되므로, 비교 대상도 UTC로 맞춤
+    private static final LocalDateTime RECEIVED_AT = LocalDateTime.now(ZoneOffset.UTC).minusSeconds(2);
 
     @Test
     void firstSubmission_isCompletedWithCountOne() {

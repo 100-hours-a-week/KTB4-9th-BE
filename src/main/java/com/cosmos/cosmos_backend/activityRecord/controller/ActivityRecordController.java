@@ -2,10 +2,12 @@ package com.cosmos.cosmos_backend.activityRecord.controller;
 
 import com.cosmos.cosmos_backend.activityRecord.dto.ActivityRecordResponseDto;
 import com.cosmos.cosmos_backend.activityRecord.service.ActivityRecordService;
+import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,7 +25,7 @@ public class ActivityRecordController {
     // 잔디 기록 조회 -> 응답으로 20주 데이터 받아감
     @GetMapping("/me")
     @Operation(summary = "내 학습 활동 조회", description = "최근 20주 동안 날짜별로 해결한 문제 수를 조회합니다.")
-    public ActivityRecordResponseDto getLearningRecord(
+    public ResponseEntity<ApiResponse<ActivityRecordResponseDto>> getLearningRecord(
             @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
     ){
 
@@ -32,7 +34,7 @@ public class ActivityRecordController {
 
         ActivityRecordResponseDto activityRecordResponseDto = activityRecordService.getLearningRecord(userId);
 
-        return activityRecordResponseDto;
+        return ResponseEntity.ok(ApiResponse.of( "user_learning_record_retrieval_success", activityRecordResponseDto));
     }
 
 
