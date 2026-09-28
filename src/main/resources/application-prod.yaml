@@ -35,3 +35,6 @@ judge0:
 server:
   servlet:
     context-path: /api
+
+sentry:
+  environment: ${SENTRY_ENVIRONMENT:production}

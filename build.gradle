@@ -27,6 +27,9 @@ dependencies {
 	// 헬스체크
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
+	// 에러 및 성능 모니터링
+	implementation 'io.sentry:sentry-spring-boot-4-starter:8.53.0'
+
 	// JWT 생성/검증 및 Resource Server 인증
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
