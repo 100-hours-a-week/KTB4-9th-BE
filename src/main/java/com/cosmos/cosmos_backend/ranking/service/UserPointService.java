@@ -14,6 +14,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -22,9 +23,14 @@ import java.util.Optional;
 public class UserPointService {
 
     private final UserPointRepository userPointRepository;
+
     private final UserDifficultyPointRepository userDifficultyPointRepository;
+
     private final UserCategoryPointRepository userCategoryPointRepository;
+
     private final UserRepository userRepository;
+
+    private final Clock clock;
 
     @Transactional
     public void updatePoint(
@@ -44,7 +50,7 @@ public class UserPointService {
         userPoint.increaseTotalCorrectProblemCount();
 
         // 3. 연속 정답 일수 계산
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         LocalDate yesterday = today.minusDays(1);
 
         // 오늘의 첫 정답인지 확인 (마지막 정답 날짜가 없거나, 오늘이 아니거나라면 첫정답)
