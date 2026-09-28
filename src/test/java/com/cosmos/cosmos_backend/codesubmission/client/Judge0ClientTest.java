@@ -79,7 +79,7 @@ class Judge0ClientTest {
     void judge_sendsBase64FieldsLanguageIdAndLimits_andReturnsVerdictsInOrder() throws IOException {
         // Given: 1번째 통과(3), 2번째 오답(4)
         fake = new FakeJudge0(index -> index == 1 ? 3 : 4);
-        RunningLimit limit = new RunningLimit(1L, Language.PYTHON, 3000F, 256);
+        RunningLimit limit = new RunningLimit(1L, Language.PYTHON, 3000F, 262144);
 
         // When
         List<JudgingResult> verdicts = client().judge(Language.PYTHON, "print('안녕')", testCases(2), limit);
@@ -106,9 +106,9 @@ class Judge0ClientTest {
 
     @Test
     void judge_capsMemoryLimitAtServerMaximum() throws IOException {
-        // Given: 600MB = 614400KB, 서버 최대치는 512000KB
+        // Given: 614400KB, 서버 최대치는 512000KB
         fake = new FakeJudge0(index -> 3);
-        RunningLimit limit = new RunningLimit(1L, Language.JAVA, 2000F, 600);
+        RunningLimit limit = new RunningLimit(1L, Language.JAVA, 2000F, 614400);
 
         client().judge(Language.JAVA, "class Main {}", testCases(1), limit);
 

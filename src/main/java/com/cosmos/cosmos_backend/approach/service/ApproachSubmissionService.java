@@ -177,10 +177,10 @@ public class ApproachSubmissionService {
 
     // 문제·키워드·실행 제한을 AI 요청 형태로 조립
     private AiEvaluationRequest buildAiRequest(Problem problem, String naturalSolution, List<Keyword> keywords, List<RunningLimit> runningLimits) {
-        // 1. 실행 제한을 AI 요청 형태로 변환 (MB → KB, enum은 이름 그대로 보냄)
+        // 1. 실행 제한을 AI 요청 형태로 변환 (enum은 이름 그대로 보냄)
         List<AiEvaluationRequest.ExecutionLimit> executionLimits = runningLimits.stream()
                 .map(limit -> new AiEvaluationRequest.ExecutionLimit(
-                        limit.getLanguage().name(), limit.getTimeLimitMs(), limit.getMemoryLimitMb() * 1024))
+                        limit.getLanguage().name(), limit.getTimeLimitMs(), limit.getMemoryLimitKb()))
                 .toList();
 
         // 2. 입력 제한을 AI 요청 형태로 변환 (scope·dataType 모두 우리 enum 이름 그대로 보냄)

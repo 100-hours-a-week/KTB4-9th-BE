@@ -58,10 +58,8 @@ public record AiProblemCreateOndemandResponseDto(
     public record ExecutionLimit(
             Language language,
 
-            @JsonProperty("time_limit_ms")
             Float timeLimitMs,
 
-            @JsonProperty("memory_limit_kb")
             Integer memoryLimitKb
     ) {
     }
@@ -74,13 +72,13 @@ public record AiProblemCreateOndemandResponseDto(
 
     public record HintComment(
             Language language,
-            String comment
+            String content
     ) {
     }
 
     public record SolutionCode(
             Language language,
-            String code
+            String content
     ) {
     }
 }
