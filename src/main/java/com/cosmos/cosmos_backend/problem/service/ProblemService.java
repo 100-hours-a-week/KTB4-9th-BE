@@ -281,7 +281,7 @@ public class ProblemService {
                         .map(comment ->
                                 new AiProblemsCreateRequestDto.HintComments(
                                         comment.language(),
-                                        comment.comment()
+                                        comment.content()
                                 )
                         )
                         .toList(),
@@ -291,7 +291,7 @@ public class ProblemService {
                         .map(solution ->
                                 new AiProblemsCreateRequestDto.HintSolutionCodes(
                                         solution.language(),
-                                        solution.code()
+                                        solution.content()
                                 )
                         )
                         .toList()
