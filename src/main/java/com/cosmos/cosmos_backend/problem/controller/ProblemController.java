@@ -5,6 +5,9 @@ import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.service.ProblemService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Map;
 
 import jakarta.validation.Valid;
@@ -18,14 +21,16 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/problems")
 @RequiredArgsConstructor
+@Tag(name = "문제", description = "문제 생성 및 상세 조회 API")
 public class ProblemController {
 
     private final ProblemService problemService;
 
     @GetMapping("/{problemId}")
+    @Operation(summary = "문제 상세 조회", description = "문제 내용, 입출력 조건, 실행 제한, 예제와 사용한 힌트 단계를 조회합니다.")
     public ResponseEntity<ApiResponse<Map<String, ProblemDetailResponse>>> getProblemDetail(
-            @PathVariable String problemId,
-            @AuthenticationPrincipal Jwt jwt
+            @Parameter(description = "문제 ID", required = true, example = "1") @PathVariable String problemId,
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
     ) {
         // 1. Spring Security가 검증한 JWT에서 로그인한 사용자 id(sub)를 꺼냄
         Long userId = Long.valueOf(jwt.getSubject());
@@ -49,6 +54,7 @@ public class ProblemController {
     }
 
     @PostMapping("")
+    @Operation(summary = "문제 일괄 저장", description = "AI가 생성한 한 개 이상의 문제와 관련 데이터를 저장합니다.")
     public ResponseEntity<Void> createProblems(
             @Valid
             @RequestBody AiProblemsCreateRequestDto problemCreateRequest) {
