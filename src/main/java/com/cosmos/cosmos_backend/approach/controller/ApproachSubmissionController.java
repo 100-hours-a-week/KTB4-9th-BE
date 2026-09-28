@@ -6,6 +6,9 @@ import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.service.ApproachSubmissionService;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,15 +24,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/problems/{problemId}/solution-submissions")
 @RequiredArgsConstructor
+@Tag(name = "풀이 제출", description = "자연어 풀이 제출 및 AI 평가 API")
 public class ApproachSubmissionController {
 
     private final ApproachSubmissionService approachSubmissionService;
 
     @PostMapping
+    @Operation(summary = "자연어 풀이 제출", description = "선택한 알고리즘 분류와 자연어 풀이를 제출하고 AI 평가 결과를 반환합니다.")
     public ResponseEntity<ApiResponse<ApproachSubmitResponse>> submit(
-            @PathVariable String problemId,
+            @Parameter(description = "문제 ID", required = true, example = "1") @PathVariable String problemId,
             @Valid @RequestBody ApproachSubmitRequest request,
-            @AuthenticationPrincipal Jwt jwt
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
     ) {
         // 1. 경로의 problemId를 숫자로 변환
         Long id = parseProblemId(problemId);
