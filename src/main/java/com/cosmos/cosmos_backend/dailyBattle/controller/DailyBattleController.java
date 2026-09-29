@@ -1,5 +1,6 @@
 package com.cosmos.cosmos_backend.dailyBattle.controller;
 
+import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
@@ -27,7 +28,7 @@ public class DailyBattleController {
     // 배틀 문제 저장
     @PostMapping("/problem")
     @Operation(summary = "데일리 배틀 문제 생성", description = "AI가 생성한 배틀 문제와 테스트 케이스를 저장합니다.")
-    public ResponseEntity<Void> createDailyBattle(
+    public ResponseEntity<ApiResponse<Void>> createDailyBattle(
             @Valid @RequestBody AiBattleCreateRequestDto request
     ) {
 
@@ -35,22 +36,29 @@ public class DailyBattleController {
 
         return ResponseEntity
                 .created(URI.create("/daily-battles/" + battleId))
-                .build();
+                .body(ApiResponse.of(
+                        "daily_battle_problem_creation_success"
+                ));
     }
 
     //배틀 참여
     @PostMapping("/{battle_id}/participations")
     @Operation(summary = "데일리 배틀 참여", description = "배틀에 참여하고 문제 정보, 테스트 케이스와 남은 시간을 반환합니다.")
-    public BattleParticipationResponseDto battleParticipation(
+    public ResponseEntity<ApiResponse<BattleParticipationResponseDto>> battleParticipation(
             @Parameter(description = "배틀 ID", required = true, example = "1") @PathVariable("battle_id") @Positive Long battleId,
-            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt userInfo
     ){
 
-        Long userId = Long.parseLong(jwt.getSubject());
+        Long userId = Long.parseLong(userInfo.getSubject());
 
         BattleParticipationResponseDto battleParticipationResponse = dailyBattleService.battleParticipation(battleId, userId);
 
-        return battleParticipationResponse;
+        return ResponseEntity.ok(
+                ApiResponse.of(
+                        "battle_participation_resumed",
+                        battleParticipationResponse
+                )
+        );
     }
 
 }

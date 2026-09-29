@@ -3,10 +3,12 @@ package com.cosmos.cosmos_backend.auth.controller;
 import com.cosmos.cosmos_backend.auth.domain.entity.User;
 import com.cosmos.cosmos_backend.auth.dto.LoginResponseDto;
 import com.cosmos.cosmos_backend.auth.dto.LoginResult;
+import com.cosmos.cosmos_backend.auth.dto.LogoutResult;
 import com.cosmos.cosmos_backend.auth.dto.TokenRefreshResult;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.auth.service.AuthService;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,12 +39,6 @@ public class AuthController {
     @Value("${cookie.secure}")
     private boolean cookieSecure;
 
-    @Value("${jwt.access-token-expiration}")
-    private long accessTokenExpiration;
-
-    @Value("${jwt.refresh-token-expiration}")
-    private long refreshTokenExpiration;
-
     // oauth 로그인 결과에 대한 콜백
     @GetMapping("/oauth/{provider}/callback")
     @Operation(summary = "OAuth 로그인 콜백", description = "OAuth 인가 코드로 로그인하고 accessToken과 refreshToken 쿠키를 발급합니다.", security = {})
@@ -55,31 +51,10 @@ public class AuthController {
         // 2. 실제 로그인 처리는 Service에게 맡김
         LoginResult loginResult = authService.login(provider, code);
 
-        // Access Token 쿠키 생성
-        ResponseCookie accessTokenCookie = ResponseCookie
-                .from("accessToken", loginResult.accessToken())
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .path("/")
-                .maxAge(accessTokenExpiration)
-                .build();
-
-        // refresh token 쿠키 생성
-        ResponseCookie refreshTokenCookie = ResponseCookie
-                .from("refreshToken", loginResult.refreshToken())
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .path("/api/auth")
-                .maxAge(refreshTokenExpiration)
-                .build();
-
-
         return ResponseEntity
                 .status(HttpStatus.FOUND)
-                .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
-                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, loginResult.accessToken().toString())
+                .header(HttpHeaders.SET_COOKIE, loginResult.refreshToken().toString())
                 .location(URI.create("https://cosmoscode.site/"))
                 .build();
     }
@@ -122,43 +97,23 @@ public class AuthController {
         TokenRefreshResult result =
                 authService.refreshToken(refreshToken);
 
-        // 3. 새로운 Access Token 쿠키
-        ResponseCookie accessTokenCookie = ResponseCookie
-                .from("accessToken", result.accessToken())
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .path("/")
-                .maxAge(accessTokenExpiration)
-                .build();
-
-        // 4. 새로운 Refresh Token 쿠키
-        ResponseCookie refreshTokenCookie = ResponseCookie
-                .from("refreshToken", result.refreshToken())
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .path("/api/auth")
-                .maxAge(refreshTokenExpiration)
-                .build();
-
         // 5. Body 없이 새로운 쿠키 두 개 전달
         return ResponseEntity
                 .noContent()
                 .header(
                         HttpHeaders.SET_COOKIE,
-                        accessTokenCookie.toString()
+                        result.accessToken().toString()
                 )
                 .header(
                         HttpHeaders.SET_COOKIE,
-                        refreshTokenCookie.toString()
+                        result.refreshToken().toString()
                 )
                 .build();
     }
 
     @PostMapping("/logout")
     @Operation(summary = "로그아웃", description = "저장된 refreshToken을 폐기하고 인증 쿠키를 삭제합니다.", security = {})
-    public ResponseEntity<Void> logout(
+    public ResponseEntity<ApiResponse<Void>> logout(
             @Parameter(description = "폐기할 refreshToken 쿠키. 쿠키가 없어도 로그아웃 응답은 정상 처리됩니다.")
             @CookieValue(name = "refreshToken", required = false)
             String refreshToken
@@ -166,41 +121,25 @@ public class AuthController {
 
         // 1. refreshToken이 존재하면 AuthService.logout() 호출
         if (refreshToken != null && !refreshToken.isBlank()){
-            authService.logout(refreshToken);
+            LogoutResult logoutResult = authService.logout(refreshToken);
+
+            // 두 Set-Cookie를 담아서 204 반환
+            return ResponseEntity
+                    .noContent()
+                    .header(
+                            HttpHeaders.SET_COOKIE,
+                            logoutResult.accessToken().toString()
+                    )
+                    .header(
+                            HttpHeaders.SET_COOKIE,
+                            logoutResult.refreshToken().toString()
+                    )
+                    .build();
+
+        } else {
+            throw new BusinessException(HttpStatus.UNAUTHORIZED, "refresh_token_missing");
         }
 
-        // 2. accessToken 삭제용 쿠키 생성
-        ResponseCookie accessTokenCookie = ResponseCookie
-                .from("accessToken", "")
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .path("/")
-                .maxAge(0)
-                .build();
-
-        // 3. refreshToken 삭제용 쿠키 생성
-        ResponseCookie refreshTokenCookie = ResponseCookie
-                .from("refreshToken", "")
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .path("/api/auth")
-                .maxAge(0)
-                .build();
-
-        // 4. 두 Set-Cookie를 담아서 204 반환
-        return ResponseEntity
-                .noContent()
-                .header(
-                        HttpHeaders.SET_COOKIE,
-                        accessTokenCookie.toString()
-                )
-                .header(
-                        HttpHeaders.SET_COOKIE,
-                        refreshTokenCookie.toString()
-                )
-                .build();
     }
 
 }
