@@ -1,8 +1,10 @@
 package com.cosmos.cosmos_backend.auth.dto;
 
+import org.springframework.http.ResponseCookie;
+
 public record LoginResult(
         LoginResponseDto response,
-        String accessToken,
-        String refreshToken
+        ResponseCookie accessToken,
+        ResponseCookie refreshToken
 ) {
 }
