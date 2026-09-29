@@ -45,9 +45,9 @@ public class ProblemSelectionService {
             throw limitExceeded(today, usedBefore);
         }
 
-        // 3. 안 푼 문제를 랜덤으로 조회, 없으면 AI에게 문제 생성을 요청해 저장한 문제를 사용
+        // 3. 안 푼 문제(오늘의 데일리 문제 제외)를 랜덤으로 조회, 없으면 AI에게 문제 생성을 요청해 저장한 문제를 사용
         Problem problem = problemRepository
-                .findRandomUnsolved(difficulty.name(), category == null ? null : category.name(), userId)
+                .findRandomUnsolved(difficulty.name(), category == null ? null : category.name(), userId, today)
                 .orElse(null);
         if (problem == null) {
             problem = generateProblem(difficulty, category);

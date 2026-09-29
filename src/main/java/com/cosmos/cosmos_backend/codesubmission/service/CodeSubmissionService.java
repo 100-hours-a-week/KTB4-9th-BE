@@ -33,8 +33,11 @@ public class CodeSubmissionService {
     private final Judge0Client judge0Client;
     private final TransactionTemplate transactionTemplate;
 
+    /** submit()의 반환값: 저장된 제출 요약 + 테스트케이스별 판정 목록. */
+    public record CodeSubmissionResult(CodeSubmission submission, List<JudgingResult> testResults) {}
+
     /** 코드를 채점하고 결과를 저장. 채점이 성공했을 때만 저장하고 제출 횟수를 올림. */
-    public CodeSubmission submit(Long userId, Long problemId, String language, String sourceCode) {
+    public CodeSubmissionResult submit(Long userId, Long problemId, String language, String sourceCode) {
         // 1. 제출을 접수한 시각을 기록 (UTC 기준)
         LocalDateTime receivedAt = LocalDateTime.now(ZoneOffset.UTC);
 
@@ -74,7 +77,7 @@ public class CodeSubmissionService {
                 .orElse(JudgingResult.CORRECT);
 
         // 8. 성공했을 때만 이 트랜잭션 안에서 잠근 채로 기존 제출을 갱신하거나 새로 저장
-        return transactionTemplate.execute(status ->
+        CodeSubmission submission = transactionTemplate.execute(status ->
                 codeSubmissionRepository.findForUpdateByUserIdAndProblemId(userId, problemId)
                         .map(existing -> {
                             // 1. 잠근 뒤 다시 확인 (앞의 빠른 확인 이후 다른 요청이 올렸을 수 있음)
@@ -89,6 +92,9 @@ public class CodeSubmissionService {
                                 new CodeSubmission(userId, problemId, lang, sourceCode, receivedAt, result, passed, verdicts.size())
                         ))
         );
+
+        // 9. 테스트케이스별 판정도 같이 반환 (화면에서 테스트별 통과/실패 표시에 사용)
+        return new CodeSubmissionResult(submission, verdicts);
     }
 
     // language 문자열을 Language enum으로 변환

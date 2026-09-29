@@ -1,6 +1,7 @@
 package com.cosmos.cosmos_backend.problem.repository;
 
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,19 +10,22 @@ import org.springframework.data.repository.query.Param;
 
 public interface ProblemRepository extends JpaRepository<Problem, Long> {
 
-    // 난이도(+카테고리)에 맞고, 이 사용자가 풀이를 제출한 적 없는 문제를 랜덤으로 1건 조회 (category가 null이면 카테고리 무관)
+    // 난이도(+카테고리)에 맞고, 이 사용자가 풀이를 제출한 적 없고, 오늘의 데일리 문제가 아닌 문제를 랜덤으로 1건 조회 (category가 null이면 카테고리 무관)
     @Query(value = """
             SELECT p.* FROM problems p
             WHERE p.difficulty = :difficulty
               AND (:category IS NULL OR p.category = :category)
               AND NOT EXISTS (SELECT 1 FROM problem_solution_submissions s
                               WHERE s.problem_id = p.id AND s.user_id = :userId)
+              AND NOT EXISTS (SELECT 1 FROM daily_problems d
+                              WHERE d.problem_id = p.id AND d.recommend_date = :today)
             ORDER BY RAND()
             LIMIT 1
             """, nativeQuery = true)
     Optional<Problem> findRandomUnsolved(@Param("difficulty") String difficulty,
                                          @Param("category") String category,
-                                         @Param("userId") Long userId);
+                                         @Param("userId") Long userId,
+                                         @Param("today") LocalDate today);
 
     // 아무도 풀이를 제출한 적 없는 문제를 난이도·카테고리별로 센다
     @Query(value = """

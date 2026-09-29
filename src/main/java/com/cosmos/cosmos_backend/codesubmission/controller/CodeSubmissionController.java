@@ -1,6 +1,5 @@
 package com.cosmos.cosmos_backend.codesubmission.controller;
 
-import com.cosmos.cosmos_backend.codesubmission.domain.CodeSubmission;
 import com.cosmos.cosmos_backend.codesubmission.dto.request.CodeSubmitRequest;
 import com.cosmos.cosmos_backend.codesubmission.dto.response.CodeSubmitResponse;
 import com.cosmos.cosmos_backend.codesubmission.service.CodeSubmissionService;
@@ -43,10 +42,12 @@ public class CodeSubmissionController {
         Long userId = Long.valueOf(jwt.getSubject());
 
         // 3. 채점은 Service에게 맡김 (Judge0 채점이 끝난 뒤에 반환됨)
-        CodeSubmission submission = codeSubmissionService.submit(userId, id, request.language(), request.sourceCode());
+        CodeSubmissionService.CodeSubmissionResult result =
+                codeSubmissionService.submit(userId, id, request.language(), request.sourceCode());
 
         // 4. 채점 결과를 message + data 형식으로 감싸서 200으로 반환
-        return ResponseEntity.ok(ApiResponse.of("code_submission_completed", CodeSubmitResponse.of(submission)));
+        return ResponseEntity.ok(ApiResponse.of("code_submission_completed",
+                CodeSubmitResponse.of(result.submission(), result.testResults())));
     }
 
     // problemId 문자열을 숫자로 변환

@@ -12,6 +12,8 @@ import com.cosmos.cosmos_backend.common.Language;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.exception.GlobalExceptionHandler;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,7 +59,9 @@ class CodeSubmissionControllerTest {
         loginAs("7");
         LocalDateTime received = LocalDateTime.of(2026, 9, 4, 15, 30, 0);
         CodeSubmission submission = new CodeSubmission(7L, 15L, Language.JAVA, "class Main {}", received, JudgingResult.CORRECT, 10, 10);
-        when(codeSubmissionService.submit(7L, 15L, "JAVA", "class Main {}")).thenReturn(submission);
+        List<JudgingResult> testResults = Collections.nCopies(10, JudgingResult.CORRECT);
+        when(codeSubmissionService.submit(7L, 15L, "JAVA", "class Main {}"))
+                .thenReturn(new CodeSubmissionService.CodeSubmissionResult(submission, testResults));
 
         // When & Then
         var body = mvc().post().uri("/problems/15/code-submissions")
@@ -77,6 +81,7 @@ class CodeSubmissionControllerTest {
         body.extractingPath("$.data.submitted_count").isEqualTo(1);
         body.extractingPath("$.data.submitted_at").isEqualTo("2026-09-04T15:30:00+09:00");
         body.extractingPath("$.data.judged_at").isNotNull();
+        body.extractingPath("$.data.test_results").asList().hasSize(10);
     }
 
     @Test
@@ -84,7 +89,8 @@ class CodeSubmissionControllerTest {
         // Given
         loginAs("7");
         CodeSubmission submission = new CodeSubmission(7L, 1L, Language.PYTHON, "a", LocalDateTime.now(), JudgingResult.WRONG_ANSWER, 0, 1);
-        when(codeSubmissionService.submit(7L, 1L, "PYTHON", "a")).thenReturn(submission);
+        when(codeSubmissionService.submit(7L, 1L, "PYTHON", "a"))
+                .thenReturn(new CodeSubmissionService.CodeSubmissionResult(submission, List.of(JudgingResult.WRONG_ANSWER)));
 
         // When & Then: 헤더 없이도 200, 헤더가 있어도 200
         mvc().post().uri("/problems/1/code-submissions")

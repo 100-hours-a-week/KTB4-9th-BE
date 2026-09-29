@@ -106,7 +106,7 @@ class ProblemSelectionServiceTest {
     void select_returnsProblemAndUsageOne_whenFirstUseToday() {
         // Given
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
-        when(problemRepository.findRandomUnsolved("LV3", null, 10L)).thenReturn(Optional.of(problem()));
+        when(problemRepository.findRandomUnsolved("LV3", null, 10L, TODAY)).thenReturn(Optional.of(problem()));
         when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.empty());
         when(dailyGeneratedCountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L))
@@ -132,7 +132,7 @@ class ProblemSelectionServiceTest {
     void select_increasesUsageToThree_whenAlreadyUsedTwice() {
         // Given
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.of(2));
-        when(problemRepository.findRandomUnsolved("LV3", null, 10L)).thenReturn(Optional.of(problem()));
+        when(problemRepository.findRandomUnsolved("LV3", null, 10L, TODAY)).thenReturn(Optional.of(problem()));
         when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY))
                 .thenReturn(Optional.of(countRow(TODAY, 2)));
         when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
@@ -149,7 +149,7 @@ class ProblemSelectionServiceTest {
     void select_acceptsBothNumberAndLvPrefixForLevel() {
         // Given
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
-        when(problemRepository.findRandomUnsolved("LV3", null, 10L)).thenReturn(Optional.of(problem()));
+        when(problemRepository.findRandomUnsolved("LV3", null, 10L, TODAY)).thenReturn(Optional.of(problem()));
         when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.empty());
         when(dailyGeneratedCountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
@@ -159,7 +159,7 @@ class ProblemSelectionServiceTest {
         service.select(10L, "LV3", null);
 
         // Then
-        verify(problemRepository, times(2)).findRandomUnsolved("LV3", null, 10L);
+        verify(problemRepository, times(2)).findRandomUnsolved("LV3", null, 10L, TODAY);
     }
 
     @Test
@@ -203,7 +203,7 @@ class ProblemSelectionServiceTest {
     void select_passesCategoryToQuery_whenCategorySpecified() {
         // Given
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
-        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L)).thenReturn(Optional.of(problem()));
+        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L, TODAY)).thenReturn(Optional.of(problem()));
         when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.empty());
         when(dailyGeneratedCountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
@@ -212,7 +212,7 @@ class ProblemSelectionServiceTest {
         service.select(10L, "3", "DP");
 
         // Then
-        verify(problemRepository).findRandomUnsolved("LV3", "DP", 10L);
+        verify(problemRepository).findRandomUnsolved("LV3", "DP", 10L, TODAY);
     }
 
     @Test
@@ -242,7 +242,7 @@ class ProblemSelectionServiceTest {
     void select_generatesProblemWithAi_andIncreasesCount_whenNoUnsolvedProblem() {
         // Given
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.of(1));
-        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L)).thenReturn(Optional.empty());
+        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L, TODAY)).thenReturn(Optional.empty());
         when(problemService.createOnDemandProblem(Difficulty.LV3, Category.DP)).thenReturn(problem());
         when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.of(countRow(TODAY, 1)));
         when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
@@ -259,7 +259,7 @@ class ProblemSelectionServiceTest {
     void select_doesNotCallAi_whenUnsolvedProblemExists() {
         // Given
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
-        when(problemRepository.findRandomUnsolved("LV3", null, 10L)).thenReturn(Optional.of(problem()));
+        when(problemRepository.findRandomUnsolved("LV3", null, 10L, TODAY)).thenReturn(Optional.of(problem()));
         when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.empty());
         when(dailyGeneratedCountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
@@ -275,7 +275,7 @@ class ProblemSelectionServiceTest {
     void select_asksAiWithConcreteCategory_whenCategoryIsRandom() {
         // Given
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
-        when(problemRepository.findRandomUnsolved("LV3", null, 10L)).thenReturn(Optional.empty());
+        when(problemRepository.findRandomUnsolved("LV3", null, 10L, TODAY)).thenReturn(Optional.empty());
         when(problemService.createOnDemandProblem(eq(Difficulty.LV3), any(Category.class))).thenReturn(problem());
         when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.empty());
         when(dailyGeneratedCountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -294,7 +294,7 @@ class ProblemSelectionServiceTest {
     void select_throws503_andDoesNotIncreaseCount_whenAiServerUnreachable() {
         // Given
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.of(1));
-        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L)).thenReturn(Optional.empty());
+        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L, TODAY)).thenReturn(Optional.empty());
         when(problemService.createOnDemandProblem(Difficulty.LV3, Category.DP))
                 .thenThrow(new ResourceAccessException("connection refused"));
 
@@ -312,7 +312,7 @@ class ProblemSelectionServiceTest {
     void select_passesThroughBusinessException_andDoesNotIncreaseCount_whenAiResponseInvalid() {
         // Given
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
-        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L)).thenReturn(Optional.empty());
+        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L, TODAY)).thenReturn(Optional.empty());
         when(problemService.createOnDemandProblem(Difficulty.LV3, Category.DP))
                 .thenThrow(new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "ai_problem_creation_failed"));
 
@@ -329,7 +329,7 @@ class ProblemSelectionServiceTest {
     void select_throws429_whenLimitReachedByAnotherRequestAfterLock() {
         // Given (빠른 확인 시점엔 2회였는데, 잠근 뒤엔 다른 요청이 올려서 3회가 된 상황)
         when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.of(2));
-        when(problemRepository.findRandomUnsolved("LV3", null, 10L)).thenReturn(Optional.of(problem()));
+        when(problemRepository.findRandomUnsolved("LV3", null, 10L, TODAY)).thenReturn(Optional.of(problem()));
         when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY))
                 .thenReturn(Optional.of(countRow(TODAY, 3)));
 
@@ -348,7 +348,7 @@ class ProblemSelectionServiceTest {
         ProblemSelectionService nextDayService = serviceAt(Instant.parse("2026-09-05T15:30:00Z")); // KST 2026-09-06 00:30
         LocalDate nextDay = LocalDate.of(2026, 9, 6);
         when(dailyGeneratedCountRepository.findCount(10L, nextDay)).thenReturn(Optional.empty());
-        when(problemRepository.findRandomUnsolved("LV3", null, 10L)).thenReturn(Optional.of(problem()));
+        when(problemRepository.findRandomUnsolved("LV3", null, 10L, nextDay)).thenReturn(Optional.of(problem()));
         when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, nextDay)).thenReturn(Optional.empty());
         when(dailyGeneratedCountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
