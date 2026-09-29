@@ -39,15 +39,17 @@ public class RankingService {
     // 전체 랭킹 조회
     public GlobalRankingResponseDto getRanking(Long userId) {
 
-        Optional<UserPoint> userPoint = userPointRepository.findByUser_Id(userId);
+        // 0. 유저 정보 조회 (유저 포인트 정보, 유저 자체 정보)
+        UserPoint userPoint = userPointRepository.findByUser_Id(userId).orElseThrow(()-> new BusinessException(
+                HttpStatus.NOT_FOUND, "user_point_not_found"
+        ));
 
-        // 0. 유저 정보 조회
         User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
-                HttpStatus.NOT_FOUND, "User not found"
+                HttpStatus.NOT_FOUND, "user_not_found"
         ));
 
         // 1. 유저 개인 포인트 계산
-        Long myPoint = userPoint.get().getTotalPoint();
+        Long myPoint = userPoint.getTotalPoint();
 
         // 2. 유저 랭킹 계산
         Long myRank = userPointRepository.countByTotalPointGreaterThan(myPoint) + 1;
@@ -69,8 +71,8 @@ public class RankingService {
                 user.getProfileImageUrl(),
                 myRank,
                 myPoint,
-                userPoint.get().getTotalCorrectProblemCount(),
-                userPoint.get().getCurrentStreakDay()
+                userPoint.getTotalCorrectProblemCount(),
+                userPoint.getCurrentStreakDay()
         );
 
         // 4-3. Top 100 응답 조립
@@ -118,13 +120,15 @@ public class RankingService {
 
         // 0. 유저 정보 조회
         User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
-                HttpStatus.NOT_FOUND, "User not found"
+                HttpStatus.NOT_FOUND, "user_not_found"
         ));
 
-        UserPoint myRankingInfo = userPointRepository.findByUser_Id(userId).orElse(null);
+        UserPoint myRankingInfo = userPointRepository.findByUser_Id(userId).orElseThrow(() -> new BusinessException(
+                HttpStatus.NOT_FOUND, "user_point_not_found"
+        ));
 
         // 1. 해당 난이도의 유저 개인 포인트 조회
-        Optional<UserDifficultyPoint> userDifficultyPoint = userDifficultyPointRepository.findByUser_IdAndDifficulty(userId, difficulty);
+        UserDifficultyPoint userDifficultyPoint = userDifficultyPointRepository.findByUser_IdAndDifficulty(userId, difficulty).orElse(null);
 
         Long myPoint = null;
 
@@ -141,8 +145,8 @@ public class RankingService {
         MyRankingResponseDto myRanking;
 
         // 4-2. 내 랭킹 응답 조립
-        if(userDifficultyPoint.isPresent() && userDifficultyPoint.get().getPoint() > 0){
-            myPoint = userDifficultyPoint.get().getPoint();
+        if(userDifficultyPoint != null && userDifficultyPoint.getPoint() > 0){
+            myPoint = userDifficultyPoint.getPoint();
             myRank = userDifficultyPointRepository.countByDifficultyAndPointGreaterThan(difficulty, myPoint) + 1;
             myRanking = new MyRankingResponseDto(
                     userId,
@@ -150,7 +154,7 @@ public class RankingService {
                     user.getProfileImageUrl(),
                     myRank,
                     myPoint,
-                    userDifficultyPoint.get().getCorrectProblemCount(),
+                    userDifficultyPoint.getCorrectProblemCount(),
                     myRankingInfo.getCurrentStreakDay()
 
             );
@@ -178,7 +182,9 @@ public class RankingService {
 
             previousRanking = rankings;
 
-            UserPoint eachUserInfo = userPointRepository.findByUser_Id(top100User.get(i).getUser().getId()).orElse(null);
+            UserPoint eachUserInfo = userPointRepository.findByUser_Id(top100User.get(i).getUser().getId()).orElseThrow(() -> new BusinessException(
+                    HttpStatus.NOT_FOUND, "user_point_not_found"
+            ));
 
             RankingCommonResponseDto rankingCommonResponse =
                     new RankingCommonResponseDto(
@@ -209,10 +215,12 @@ public class RankingService {
 
         // 0. 유저 정보 조회
         User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
-                HttpStatus.NOT_FOUND, "User not found"
+                HttpStatus.NOT_FOUND, "user_not_found"
         ));
 
-        UserPoint myRankingInfo = userPointRepository.findByUser_Id(userId).orElse(null);
+        UserPoint myRankingInfo = userPointRepository.findByUser_Id(userId).orElseThrow(() -> new BusinessException(
+                HttpStatus.NOT_FOUND, "user_point_not_found"
+        ));
 
         // 1. 해당 카테고리의 유저 개인 포인트 조회
         Optional<UserCategoryPoint> userCategoryPoint = userCategoryPointRepository.findByUser_IdAndCategory(userId, category);
@@ -271,7 +279,9 @@ public class RankingService {
 
             previousRanking = rankings;
 
-            UserPoint eachUserInfo = userPointRepository.findByUser_Id(top100User.get(i).getUser().getId()).orElse(null);
+            UserPoint eachUserInfo = userPointRepository.findByUser_Id(top100User.get(i).getUser().getId()).orElseThrow(() -> new BusinessException(
+                    HttpStatus.NOT_FOUND, "user_point_not_found"
+            ));
 
             RankingCommonResponseDto rankingCommonResponse =
                     new RankingCommonResponseDto(

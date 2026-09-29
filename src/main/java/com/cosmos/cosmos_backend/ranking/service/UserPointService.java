@@ -4,6 +4,7 @@ import com.cosmos.cosmos_backend.auth.domain.entity.User;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
+import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserCategoryPoint;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserDifficultyPoint;
 import com.cosmos.cosmos_backend.ranking.domain.entity.UserPoint;
@@ -12,6 +13,7 @@ import com.cosmos.cosmos_backend.ranking.repository.UserDifficultyPointRepositor
 import com.cosmos.cosmos_backend.ranking.repository.UserPointRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -40,11 +42,15 @@ public class UserPointService {
     ) {
 
         // 0. User 조회
-        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+        User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
+                HttpStatus.NOT_FOUND, "user_not_found"
+        ));
 
         // 정답 →
         // 1. UserPoint 조회
-        UserPoint userPoint = userPointRepository.findByUser_Id(userId).orElseThrow(() -> new IllegalArgumentException("사용자 포인트 정보를 찾을 수 없습니다."));
+        UserPoint userPoint = userPointRepository.findByUser_Id(userId).orElseThrow(() -> new BusinessException(
+                HttpStatus.NOT_FOUND, "user_point_not_found"
+        ));
 
         // 2. 전체 정답 문제 수 증가
         userPoint.increaseTotalCorrectProblemCount();
@@ -95,7 +101,6 @@ public class UserPointService {
                 break;
         }
 
-
         Long streakBonus = 0L;
 
         // 4-1. 오늘 최초 정답인 경우에만 streak 보너스 지급
@@ -112,7 +117,7 @@ public class UserPointService {
         // 5. 전체 포인트 업데이트
         userPoint.increaseTotalPoint(totalEarnedPoint);
 
-        // 6. 해당 난이도 UserDifficultyPoint 업데이트
+        // 6. 해당 난이도 UserDifficultyPoint 업데이트 → 처음이면 행 만들기
         Optional<UserDifficultyPoint> userDifficultyPoint = userDifficultyPointRepository.findByUser_IdAndDifficulty(userId, difficulty);
 
         if (userDifficultyPoint.isPresent()) {

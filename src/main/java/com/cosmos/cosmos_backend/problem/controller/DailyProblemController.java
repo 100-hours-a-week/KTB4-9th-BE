@@ -1,6 +1,7 @@
 package com.cosmos.cosmos_backend.problem.controller;
 
 
+import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.dto.response.DailyProblemResponseDto;
 import com.cosmos.cosmos_backend.problem.service.DailyProblemService;
@@ -34,11 +35,16 @@ public class DailyProblemController {
     // 홈 화면에서 데일리 문제 표시용
     @GetMapping("")
     @Operation(summary = "데일리 문제 조회", description = "오늘의 난이도별 추천 문제를 조회합니다.", security = {})
-    public DailyProblemResponseDto getDailyProblems() {
+    public ResponseEntity<ApiResponse<DailyProblemResponseDto>> getDailyProblems() {
 
         DailyProblemResponseDto dailyProblemResponse = dailyProblemService.getDailyProblems();
 
-        return dailyProblemResponse;
+        return ResponseEntity.ok(
+                ApiResponse.of(
+                        "daily_problems_retrieval_success",
+                        dailyProblemResponse
+                )
+        );
     }
 
 }

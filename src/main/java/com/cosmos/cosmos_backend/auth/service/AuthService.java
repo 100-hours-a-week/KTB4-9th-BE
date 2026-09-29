@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +44,15 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
 
     private final UserPointRepository userPointRepository;
+
+    @Value("${cookie.secure}")
+    private boolean cookieSecure;
+
+    @Value("${jwt.access-token-expiration}")
+    private long accessTokenExpiration;
+
+    @Value("${jwt.refresh-token-expiration}")
+    private long refreshTokenExpiration;
 
     @Transactional
     public LoginResult login(String provider, String code) {
@@ -104,7 +114,27 @@ public class AuthService {
                 user.getUsername(),
                 user.getProfileImageUrl());
 
-        return new LoginResult(responseDto,accessToken,originRefreshToken);
+        // Access Token 쿠키 생성
+        ResponseCookie accessTokenCookie = ResponseCookie
+                .from("accessToken", accessToken)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(accessTokenExpiration)
+                .build();
+
+        // refresh token 쿠키 생성
+        ResponseCookie refreshTokenCookie = ResponseCookie
+                .from("refreshToken", originRefreshToken)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/api/auth")
+                .maxAge(refreshTokenExpiration)
+                .build();
+
+        return new LoginResult(responseDto,accessTokenCookie,refreshTokenCookie);
     }
 
     @Transactional
@@ -131,19 +161,19 @@ public class AuthService {
         User user = savedRefreshToken.getUser();
 
         // 5. 새로운 Access Token 생성
-        String newAccessToken =
+        String accessToken =
                 jwtTokenProvider.createAccessToken(
                         user.getId(),
                         user.getUsername()
                 );
 
         // 6. 새로운 Refresh Token 생성
-        String newOriginRefreshToken =
+        String changedOriginRefreshToken =
                 refreshTokenProvider.createRefreshToken();
 
         // 7. 새로운 Refresh Token hash
         String newRefreshTokenHash =
-                refreshTokenProvider.hashRefreshToken(newOriginRefreshToken);
+                refreshTokenProvider.hashRefreshToken(changedOriginRefreshToken);
 
         // 8. 기존 Refresh Token 제거
         refreshTokenRepository.delete(savedRefreshToken);
@@ -157,15 +187,35 @@ public class AuthService {
 
         refreshTokenRepository.save(newRefreshToken);
 
+        // 3. 새로운 Access Token 쿠키
+        ResponseCookie accessTokenCookie = ResponseCookie
+                .from("accessToken", accessToken)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(accessTokenExpiration)
+                .build();
+
+        // 4. 새로운 Refresh Token 쿠키
+        ResponseCookie refreshTokenCookie = ResponseCookie
+                .from("refreshToken", changedOriginRefreshToken)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/api/auth")
+                .maxAge(refreshTokenExpiration)
+                .build();
+
         // 10. Controller에 새 토큰 전달
         return new TokenRefreshResult(
-                newAccessToken,
-                newOriginRefreshToken
+                accessTokenCookie,
+                refreshTokenCookie
         );
     }
 
     @Transactional
-    public void logout(String originRefreshToken) {
+    public LogoutResult logout(String originRefreshToken) {
 
         // 1. 전달받은 Refresh Token 원문을 hash로 변환
         String refreshTokenHash = refreshTokenProvider.hashRefreshToken(originRefreshToken);
@@ -178,6 +228,28 @@ public class AuthService {
         if (savedRefreshToken.isPresent()) {
             refreshTokenRepository.delete(savedRefreshToken.get());
         }
+
+        // 4. accessToken 삭제용 쿠키 생성
+        ResponseCookie accessTokenCookie = ResponseCookie
+                .from("accessToken", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(0)
+                .build();
+
+        // 5. refreshToken 삭제용 쿠키 생성
+        ResponseCookie refreshTokenCookie = ResponseCookie
+                .from("refreshToken", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/api/auth")
+                .maxAge(0)
+                .build();
+
+        return new LogoutResult(accessTokenCookie, refreshTokenCookie);
     }
 
 }
