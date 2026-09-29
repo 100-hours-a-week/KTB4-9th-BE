@@ -30,7 +30,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/oauth/**", "/auth/token/refresh",
                                 "/auth/logout"
                         ).permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                         .requestMatchers("/daily-problems").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/problems", "/problems/new").permitAll()

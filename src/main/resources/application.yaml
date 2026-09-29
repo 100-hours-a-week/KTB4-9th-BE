@@ -29,3 +29,18 @@ sentry:
   release: ${SENTRY_RELEASE:}
   send-default-pii: false
   traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+

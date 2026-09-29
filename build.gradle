@@ -24,8 +24,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
 
-	// 헬스체크
+	// 헬스체크 및 프로메테우스 메트릭
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
 
 	// 에러 및 성능 모니터링
 	implementation 'io.sentry:sentry-spring-boot-4-starter:8.53.0'
