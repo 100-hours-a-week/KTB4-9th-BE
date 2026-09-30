@@ -360,4 +360,35 @@ class ProblemSelectionServiceTest {
         assertThat(response.dailyUsage().date()).isEqualTo(nextDay);
         assertThat(response.dailyUsage().usedCount()).isEqualTo(1);
     }
+
+    @Test
+    void getDailyUsage_returnsZero_whenNoRowToday() {
+        // Given
+        when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
+
+        // When
+        var usage = service.getDailyUsage(10L);
+
+        // Then
+        assertThat(usage.date()).isEqualTo(TODAY);
+        assertThat(usage.limit()).isEqualTo(3);
+        assertThat(usage.usedCount()).isEqualTo(0);
+        assertThat(usage.remainingCount()).isEqualTo(3);
+        assertThat(usage.resetAt()).isEqualTo(OffsetDateTime.of(2026, 9, 6, 0, 0, 0, 0, ZoneOffset.ofHours(9)));
+    }
+
+    @Test
+    void getDailyUsage_returnsUsedCount_andDoesNotIncreaseIt() {
+        // Given
+        when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.of(2));
+
+        // When
+        var usage = service.getDailyUsage(10L);
+
+        // Then
+        assertThat(usage.usedCount()).isEqualTo(2);
+        assertThat(usage.remainingCount()).isEqualTo(1);
+        verify(dailyGeneratedCountRepository, never()).findForUpdateByUserIdAndUsageDate(any(), any());
+        verify(dailyGeneratedCountRepository, never()).save(any());
+    }
 }

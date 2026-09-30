@@ -23,6 +23,21 @@ public class ProblemSelectionController {
 
     private final ProblemSelectionService problemSelectionService;
 
+    @GetMapping("/daily-usage")
+    @Operation(summary = "오늘 문제 생성 사용 현황", description = "오늘 문제 생성 횟수를 조회합니다. 횟수는 올라가지 않습니다.")
+    public ResponseEntity<ApiResponse<ProblemSelectionResponse.DailyUsageStatus>> getDailyUsage(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
+    ) {
+        // 1. Spring Security가 검증한 JWT에서 로그인한 사용자 id(sub)를 꺼냄
+        Long userId = Long.valueOf(jwt.getSubject());
+
+        // 2. 조회는 Service에게 맡김
+        ProblemSelectionResponse.DailyUsageStatus response = problemSelectionService.getDailyUsage(userId);
+
+        // 3. message + data 형식으로 감싸서 200으로 반환
+        return ResponseEntity.ok(ApiResponse.of("daily_usage_retrieval_success", response));
+    }
+
     @GetMapping
     @Operation(summary = "문제 선택", description = "필수 난이도와 선택 카테고리 조건에 맞는 미풀이 문제를 선택합니다. 카테고리를 생략하면 전체 카테고리 중 선택합니다.")
     public ResponseEntity<ApiResponse<ProblemSelectionResponse>> selectProblem(
