@@ -104,7 +104,7 @@ public class ApproachSubmissionService {
 
 
         // 이번 제출이 정답인지 확인
-        Boolean correct = submission.getCategoryResult() && submission.getTotalScore() == 100;
+        Boolean correct = submission.getCategoryResult() && submission.getTotalScore() >= 85;
 
 
         // 해당 문제에 대해 최초 정답일 경우에만 잔디, 포인트 갱신
