@@ -56,10 +56,12 @@ public record AiProblemsCreateRequestDto(
 
             @Schema(description = "풀이 평가에 사용할 핵심 키워드 목록")
             @JsonProperty("solutionKeywords")
+            @Size(min = 1, max = 20)
             List<String> solutionKeywords,
 
             @Schema(description = "공개 입출력 예제 목록")
             @JsonProperty("problemExamples")
+            @Size(min = 1, max = 3)
             List<ProblemExamples> problemExamples,
 
             @Schema(description = "입력값 제약 조건 목록")
@@ -74,6 +76,7 @@ public record AiProblemsCreateRequestDto(
 
             @Schema(description = "채점에 사용하는 비공개 테스트 케이스")
             @JsonProperty("hiddenTestCases")
+            @Size(min = 1, max = 10)
             List<HiddenTestCases> hiddenTests,
 
             @Schema(description = "언어별 주석 힌트. 값이 있다면 4개여야 합니다.")
