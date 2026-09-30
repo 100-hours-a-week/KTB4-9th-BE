@@ -3,9 +3,11 @@ package com.cosmos.cosmos_backend.global.config;
 import com.cosmos.cosmos_backend.auth.jwt.CookieBearerTokenResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -33,7 +35,9 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/daily-problems").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers("/problems", "/problems/new").permitAll()
+                        .requestMatchers(
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET,"/problems/new"),
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/problems")).permitAll()
                         .anyRequest().authenticated()
                 )
 
