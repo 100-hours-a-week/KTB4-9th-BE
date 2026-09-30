@@ -22,6 +22,9 @@ public record ProblemSelectionResponse(ProblemSummary problem, DailyUsage dailyU
 
     public record DailyUsage(LocalDate date, int limit, int usedCount, int remainingCount) {}
 
+    /** 사용 현황 조회 응답 data (성공 응답의 dailyUsage와 달리 resetAt이 있음). */
+    public record DailyUsageStatus(LocalDate date, int limit, int usedCount, int remainingCount, OffsetDateTime resetAt) {}
+
     /** 429일 때 error data에 담는 값 (성공 응답과 달리 resetAt이 있음). */
     public record DailyLimitExceededData(
             LocalDate date,

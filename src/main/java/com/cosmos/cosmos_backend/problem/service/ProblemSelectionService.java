@@ -32,6 +32,18 @@ public class ProblemSelectionService {
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
+    /** 오늘 문제 생성 사용 현황 조회. 횟수를 올리지 않고 읽기만 한다. */
+    public ProblemSelectionResponse.DailyUsageStatus getDailyUsage(Long userId) {
+        // 1. 오늘 날짜(KST)
+        LocalDate today = LocalDate.now(clock);
+
+        // 2. 오늘 사용 횟수 조회 (행이 없으면 0)
+        int usedCount = dailyGeneratedCountRepository.findCount(userId, today).orElse(0);
+
+        // 3. 한도, 남은 횟수, 초기화 시각을 담아 반환
+        return new ProblemSelectionResponse.DailyUsageStatus(today, DAILY_LIMIT, usedCount, DAILY_LIMIT - usedCount, resetAt(today));
+    }
+
     /** 문제 생성(선택). 안 푼 문제를 골라주고 오늘 사용 횟수를 올린다. */
     public ProblemSelectionResponse select(Long userId, String levelParam, String categoryParam) {
         // 1. 입력 검증 (level 필수, category는 없거나 RANDOM이면 null = 카테고리 무관)
@@ -99,11 +111,14 @@ public class ProblemSelectionService {
 
     // 429 예외 생성 (data에 남은 횟수와 초기화 시각을 담음)
     private BusinessException limitExceeded(LocalDate today, int usedCount) {
-        // 1. 초기화 시각은 다음 날 0시(KST)
-        OffsetDateTime resetAt = today.plusDays(1).atStartOfDay(clock.getZone()).toOffsetDateTime();
-        // 2. 429와 함께 남은 횟수 정보를 담아 반환
+        // 1. 429와 함께 남은 횟수 정보와 초기화 시각을 담아 반환
         return new BusinessException(HttpStatus.TOO_MANY_REQUESTS, "daily_problem_limit_exceeded",
-                new ProblemSelectionResponse.DailyLimitExceededData(today, DAILY_LIMIT, usedCount, DAILY_LIMIT - usedCount, resetAt));
+                new ProblemSelectionResponse.DailyLimitExceededData(today, DAILY_LIMIT, usedCount, DAILY_LIMIT - usedCount, resetAt(today)));
+    }
+
+    // 초기화 시각은 다음 날 0시(KST)
+    private OffsetDateTime resetAt(LocalDate today) {
+        return today.plusDays(1).atStartOfDay(clock.getZone()).toOffsetDateTime();
     }
 
     // "3" 또는 "LV3"를 Difficulty로 변환

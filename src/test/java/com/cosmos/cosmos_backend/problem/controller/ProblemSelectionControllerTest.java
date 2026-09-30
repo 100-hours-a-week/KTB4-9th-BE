@@ -135,4 +135,26 @@ class ProblemSelectionControllerTest {
                 .bodyJson()
                 .extractingPath("$.message").isEqualTo("matching_problem_not_found");
     }
+
+    @Test
+    void getDailyUsage_returns200WithUsage_andPassesUserId() {
+        // Given
+        loginAs("42");
+        when(problemSelectionService.getDailyUsage(42L))
+                .thenReturn(new ProblemSelectionResponse.DailyUsageStatus(
+                        LocalDate.of(2026, 9, 5), 3, 1, 2, OffsetDateTime.of(2026, 9, 6, 0, 0, 0, 0, ZoneOffset.ofHours(9))));
+
+        // When & Then
+        var body = mvc().get().uri("/problems/daily-usage")
+                .assertThat()
+                .hasStatusOk()
+                .bodyJson();
+
+        body.extractingPath("$.message").isEqualTo("daily_usage_retrieval_success");
+        body.extractingPath("$.data.date").isEqualTo("2026-09-05");
+        body.extractingPath("$.data.limit").isEqualTo(3);
+        body.extractingPath("$.data.usedCount").isEqualTo(1);
+        body.extractingPath("$.data.remainingCount").isEqualTo(2);
+        body.extractingPath("$.data.resetAt").isEqualTo("2026-09-06T00:00:00+09:00");
+    }
 }
