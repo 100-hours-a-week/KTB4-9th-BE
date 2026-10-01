@@ -32,8 +32,8 @@ public class DailyProblemService {
         // 1. 문제 저장
         List<Problem> problems = problemService.createProblems(problemsCreateRequest);
 
-        // 2. 오늘 날짜
-        LocalDate dailyProblemDate = LocalDate.now(clock);
+        // 2. 내일 날짜
+        LocalDate dailyProblemDate = LocalDate.now(clock).plusDays(1);
 
         // 3. 저장된 문제들을 DailyProblem으로 등록
         int displayOrder = 1;
