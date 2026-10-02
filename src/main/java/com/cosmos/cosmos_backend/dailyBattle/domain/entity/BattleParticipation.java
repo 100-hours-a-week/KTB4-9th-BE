@@ -26,7 +26,7 @@ public class BattleParticipation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long participationId;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "battle_id", nullable = false)
     DailyBattle dailyBattle;
 
