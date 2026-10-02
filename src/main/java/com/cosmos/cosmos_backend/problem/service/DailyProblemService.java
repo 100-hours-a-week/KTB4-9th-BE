@@ -59,7 +59,7 @@ public class DailyProblemService {
         LocalDate date = LocalDate.now(clock);
 
         // 1. 데일리 문제 리스트 디비에서 받아오기
-        List<DailyProblem> dailyProblemList = dailyProblemRepository.findByRecommendDateOrderByDisplayOrderDesc(date);
+        List<DailyProblem> dailyProblemList = dailyProblemRepository.findWithProblemByRecommendDateOrderByDisplayOrderDesc(date);
 
         // 2. 데일리 문제 리스트로 응답 구성
         List<DailyProblemResponseDto.DailyProblems> dailyProblems = new ArrayList<>();

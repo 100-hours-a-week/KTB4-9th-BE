@@ -25,7 +25,7 @@ public class UserPoint {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long userPointId;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
