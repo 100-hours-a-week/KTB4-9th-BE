@@ -137,7 +137,20 @@ public class AuthController {
                     .build();
 
         } else {
-            throw new BusinessException(HttpStatus.UNAUTHORIZED, "refresh_token_missing");
+            // 리프레시 토큰이 유효하지 않거나 없어도 로그아웃은 정상처리 (쿠키 만료까지)
+            LogoutResult logoutResult = authService.logout(" ");
+
+            return ResponseEntity
+                    .noContent()
+                    .header(
+                            HttpHeaders.SET_COOKIE,
+                            logoutResult.accessToken().toString()
+                    )
+                    .header(
+                            HttpHeaders.SET_COOKIE,
+                            logoutResult.refreshToken().toString()
+                    )
+                    .build();
         }
 
     }
