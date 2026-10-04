@@ -1,35 +1,49 @@
 services:
+  # Java 프로파일 수집용 Pyroscope
   pyroscope:
     image: grafana/pyroscope:latest
+    # Pyroscope 포트
     ports:
       - "4040:4040"
 
+  # 모니터링 대시보드용 Grafana
   grafana:
     image: grafana/grafana:latest
+    # Grafana 접속 포트
     ports:
       - "3000:3000"
+    # Grafana 관리자 계정 (.env 비밀번호 사용)
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      # 사용자 가입 비활성화
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # Pyroscope 플러그인 설치
       GF_PLUGINS_PREINSTALL_SYNC: grafana-pyroscope-app
+    # Grafana 데이터소스·대시보드 설정 연결
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    # Pyroscope 실행 의존성
     depends_on:
       - pyroscope
 
+  # Spring 지표 수집·k6 결과 저장용 Prometheus
   prometheus:
     image: prom/prometheus:v3.13.0
+    # Prometheus 실행·보관·remote write 설정
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=7d
       - --web.enable-remote-write-receiver
+    # Prometheus 접속 포트
     ports:
       - "9090:9090"
+    # Prometheus 설정·데이터 볼륨 연결
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
 
 volumes:
+  # Prometheus 데이터 보관 볼륨
   prometheus-data:

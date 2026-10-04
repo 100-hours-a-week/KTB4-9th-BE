@@ -1,17 +1,28 @@
+# Grafana 프로비저닝 API 버전
 apiVersion: 1
 
+# Grafana 데이터소스 자동 등록
 datasources:
+  # Java 프로파일 데이터소스
   - name: Pyroscope
     type: grafana-pyroscope-datasource
+    # Grafana 서버에서 직접 연결
     access: proxy
+    # Pyroscope 컨테이너 주소
     url: http://pyroscope:4040
+    # 데이터소스 고정 ID
     uid: pyroscope
+    # 기본 데이터소스
     isDefault: true
+    # Grafana UI 편집 비활성화
     editable: false
+  # Spring·k6 지표 데이터소스
   - name: prometheus
     type: prometheus
     access: proxy
+    # Prometheus 컨테이너 주소
     url: http://prometheus:9090
+    # 대시보드 쿼리용 고정 ID
     uid: ffzytyvhrfmrkf
     isDefault: false
     editable: false
