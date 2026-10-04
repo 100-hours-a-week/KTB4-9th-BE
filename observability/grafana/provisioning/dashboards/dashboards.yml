@@ -1,11 +1,19 @@
+# Grafana 프로비저닝 API 버전
 apiVersion: 1
 
+# 대시보드 자동 등록 설정
 providers:
   - name: COSMOS local load-test dashboards
+    # Grafana 조직 ID
     orgId: 1
+    # 대시보드 폴더 이름
     folder: COSMOS
+    # 파일 기반 대시보드 공급자
     type: file
+    # 파일 삭제 시 Grafana 대시보드 유지
     disableDeletion: true
+    # Grafana UI 편집 허용
     editable: true
     options:
+      # 대시보드 JSON 경로
       path: /etc/grafana/provisioning/dashboards
