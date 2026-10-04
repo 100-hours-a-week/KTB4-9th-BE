@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: COSMOS local load-test dashboards
+    orgId: 1
+    folder: COSMOS
+    type: file
+    disableDeletion: true
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

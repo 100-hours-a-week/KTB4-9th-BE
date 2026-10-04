@@ -1,0 +1,42 @@
+# Local load-test profile. Combine with compose.yml to keep JVM/Hikari settings
+# at their defaults while limiting each tested service to the deployment size.
+services:
+  mysql:
+    cpus: 2.0
+    mem_limit: 4g
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  backend-loadtest:
+    image: eclipse-temurin:25-jdk-alpine
+    working_dir: /workspace
+    command: ["./gradlew", "bootRun", "-Ppyroscope=true", "--no-daemon"]
+    cpus: 2.0
+    mem_limit: 4g
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/workspace
+      - gradle-cache:/root/.gradle
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cosmos
+      SPRING_DATASOURCE_USERNAME: cosmos
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in your shell}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in your shell}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your shell}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:?Set KAKAO_CLIENT_ID in your shell}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:?Set KAKAO_CLIENT_SECRET in your shell}
+      KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:?Set KAKAO_REDIRECT_URI in your shell}
+      AI_BASE_URL: http://host.docker.internal:8000
+      PYROSCOPE_SERVER_ADDRESS: http://host.docker.internal:4040
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  gradle-cache:
