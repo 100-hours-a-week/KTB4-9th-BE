@@ -85,22 +85,31 @@ public class ApproachSubmissionService {
 
         Boolean alreadySolved = beforeSubmission.isPresent() && beforeSubmission.get().getIsSolved();
 
-        // 8. 성공했을 때만 이 트랜잭션 안에서 잠근 채로 기존 제출을 갱신하거나 새로 저장
-        ApproachSubmission submission = transactionTemplate.execute(status ->
-                approachSubmissionRepository.findForUpdateByUserIdAndProblemId(userId, problemId)
-                        .map(existing -> {
-                            // 1. 잠근 뒤 다시 확인 (앞의 빠른 확인 이후 다른 요청이 올렸을 수 있음)
-                            if (existing.getSubmittedCount() >= ApproachSubmission.MAX_SUBMISSION_COUNT) {
-                                throw limitExceeded(problemId, existing.getSubmittedCount());
-                            }
-                            // 2. 재제출 처리 (커밋 때 UPDATE가 나감)
-                            existing.resubmit(category, naturalSolution, categoryResult, result.score(), result.feedback());
-                            return existing;
-                        })
-                        .orElseGet(() -> approachSubmissionRepository.save(
-                                new ApproachSubmission(userId, problemId, category, naturalSolution, categoryResult, result.score(), result.feedback())
-                        ))
-        );
+        // 8. 성공했을 때만 이 트랜잭션 안에서 기존 제출을 갱신하거나 새로 저장
+        ApproachSubmission submission = transactionTemplate.execute(status -> {
+            // 1. 락 없이 기존 제출이 있는지 확인
+            boolean exists = approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId).isPresent();
+
+            // 2. 최초 제출이면 락 없이 새로 저장
+            if (!exists) {
+                return approachSubmissionRepository.save(
+                        new ApproachSubmission(userId, problemId, category, naturalSolution, categoryResult, result.score(), result.feedback())
+                );
+            }
+
+            // 3. 재제출이면 그 행을 잠그고 조회
+            ApproachSubmission existing = approachSubmissionRepository
+                    .findForUpdateByUserIdAndProblemId(userId, problemId).orElseThrow();
+
+            // 4. 잠근 뒤 다시 확인 (앞의 빠른 확인 이후 다른 요청이 올렸을 수 있음)
+            if (existing.getSubmittedCount() >= ApproachSubmission.MAX_SUBMISSION_COUNT) {
+                throw limitExceeded(problemId, existing.getSubmittedCount());
+            }
+
+            // 5. 재제출 처리 (커밋 때 UPDATE가 나감)
+            existing.resubmit(category, naturalSolution, categoryResult, result.score(), result.feedback());
+            return existing;
+        });
 
 
         // 이번 제출이 정답인지 확인

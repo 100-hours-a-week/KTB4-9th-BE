@@ -102,7 +102,6 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -115,6 +114,7 @@ class ApproachSubmissionServiceTest {
         assertThat(submission.getEvaluationStatus().name()).isEqualTo("COMPLETED");
         assertThat(submission.getTotalScore()).isEqualTo(85);
         assertThat(submission.getAiFeedback()).isEqualTo("좋은 접근이에요");
+        verify(approachSubmissionRepository, never()).findForUpdateByUserIdAndProblemId(any(), any());
     }
 
     @Test
@@ -125,6 +125,7 @@ class ApproachSubmissionServiceTest {
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
         ApproachSubmission existing = new ApproachSubmission(10L, 1L, Category.ARRAY, "이전 풀이", false, 20, "이전 피드백");
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
         when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
 
         // When
@@ -145,7 +146,6 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -189,7 +189,6 @@ class ApproachSubmissionServiceTest {
                         new AiEvaluationResult.KeywordJudgement("AI가 준 모르는 키워드", true)
                 )
         ));
-        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -210,7 +209,6 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -288,7 +286,9 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(submissionWithCount(4)));
+        ApproachSubmission fourth = submissionWithCount(4);
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(fourth));
+        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(fourth));
 
         // When
         ApproachSubmitResult result = service.submit(10L, 1L, "ARRAY", "다섯 번째 풀이");
@@ -307,6 +307,7 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
         when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
 
         // When & Then
