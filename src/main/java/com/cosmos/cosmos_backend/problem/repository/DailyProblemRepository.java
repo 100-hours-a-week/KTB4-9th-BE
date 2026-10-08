@@ -9,7 +9,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface DailyProblemRepository extends JpaRepository<DailyProblem, Long> {
-    // daily problem과 problem 패치조인
+    // daily problem과 problem 패치 조인 적용
     @Query("""
     select dp
     from DailyProblem dp
@@ -20,4 +20,6 @@ public interface DailyProblemRepository extends JpaRepository<DailyProblem, Long
     List<DailyProblem> findWithProblemByRecommendDateOrderByDisplayOrderDesc(
             @Param("date") LocalDate date
     );
+
+
 }

@@ -41,6 +41,10 @@ dependencies {
 	// JWT 생성/검증 및 Resource Server 인증
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
+	// 캐시
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
+	implementation 'com.github.ben-manes.caffeine:caffeine'
+
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 
