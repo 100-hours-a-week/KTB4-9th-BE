@@ -26,13 +26,11 @@ public class BattleParticipation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long participationId;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "battle_id", nullable = false)
-    DailyBattle dailyBattle;
+    private Long dailyBattleId;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    User user;
+    private User user;
 
     @Column(nullable = true)
     private Boolean allCorrect;
@@ -49,8 +47,8 @@ public class BattleParticipation {
     private LocalDateTime submittedAt;
 
 
-    public BattleParticipation(DailyBattle dailyBattle, User user) {
-        this.dailyBattle = dailyBattle;
+    public BattleParticipation(Long dailyBattleId, User user) {
+        this.dailyBattleId = dailyBattleId;
         this.user = user;
         this.participationStatus = ParticipationStatus.IN_PROGRESS;
 
