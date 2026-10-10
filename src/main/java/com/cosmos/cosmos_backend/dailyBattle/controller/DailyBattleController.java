@@ -1,8 +1,12 @@
 package com.cosmos.cosmos_backend.dailyBattle.controller;
 
+import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.request.DailyBattleSubmissionRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleSubmissionResponseDto;
+import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -10,12 +14,18 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Objects;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/daily-battles")
@@ -24,6 +34,10 @@ import java.net.URI;
 public class DailyBattleController {
 
     private final DailyBattleService  dailyBattleService;
+
+    private final DailyBattleRepository dailyBattleRepository;
+
+    private final Clock clock;
 
     // 배틀 문제 저장
     @PostMapping("/problem")
@@ -49,7 +63,13 @@ public class DailyBattleController {
             @Parameter(hidden = true) @AuthenticationPrincipal Jwt userInfo
     ){
 
-        Long userId = Long.parseLong(userInfo.getSubject());
+        // 배틀 시간 확인
+        battleTimeCheck();
+
+        // 배틀 존재 확인
+        battleInfoCheck(battleId);
+
+        Long userId = Long.parseLong(Objects.requireNonNull(userInfo.getSubject()));
 
         BattleParticipationResponseDto battleParticipationResponse = dailyBattleService.battleParticipation(battleId, userId);
 
@@ -60,5 +80,59 @@ public class DailyBattleController {
                 )
         );
     }
+
+    // 배틀 제출
+    @PostMapping("/{battle_id}/submissions")
+    public ResponseEntity<BattleSubmissionResponseDto> battleSubmission(
+            @Valid DailyBattleSubmissionRequestDto battleSubmissionRequest,
+            @PathVariable("battle_id") @Positive Long battleId,
+            @AuthenticationPrincipal Jwt userInfo
+    ){
+
+        // 배틀 시간 확인
+        battleTimeCheck();
+
+        // 배틀 존재 확인
+        battleInfoCheck(battleId);
+
+        Long userId = Long.valueOf(userInfo.getSubject());
+
+        BattleSubmissionResponseDto battleSubmissionResponse = dailyBattleService.battleSubmission(battleSubmissionRequest, battleId, userId);
+
+        return ResponseEntity.accepted().body(ApiResponse.of(
+                "battle_submission_resumed",
+                battleSubmissionResponse).data()
+
+        );
+    }
+
+
+    // 배틀 시간 확인
+    private void battleTimeCheck(){
+
+        // 12시 ~ 12:10 사이가 아니면 참여 불가
+        LocalTime now = LocalTime.now(clock);
+
+        LocalTime start = LocalTime.of(12, 0);
+        LocalTime end = LocalTime.of(12, 10);
+
+        if (now.isBefore(start) || !now.isBefore(end)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Not_Battle_Time");
+        }
+
+    }
+
+    // 배틀 존재 확인
+    private void battleInfoCheck(Long battleId){
+
+        dailyBattleRepository.findById(battleId)
+                .orElseThrow(() ->
+                        new BusinessException(HttpStatus.NOT_FOUND, "Battle_Not_Found"
+                        )
+                );
+
+    }
+
+
 
 }
