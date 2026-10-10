@@ -6,6 +6,34 @@ services:
     ports:
       - "4040:4040"
 
+  # MySQL Slow Query Log 저장소
+  loki:
+    image: grafana/loki:3.7.0
+    command:
+      - -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+
+  # MySQL Slow Query Log 파일을 Loki로 전송
+  alloy:
+    image: grafana/alloy:v1.20.1
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    ports:
+      - "12345:12345"
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - mysql-slow-logs:/var/log/mysql:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on:
+      - loki
+
   # 모니터링 대시보드용 Grafana
   grafana:
     image: grafana/grafana:latest
@@ -26,6 +54,7 @@ services:
     # Pyroscope 실행 의존성
     depends_on:
       - pyroscope
+      - loki
 
   # Spring 지표 수집·k6 결과 저장용 Prometheus
   prometheus:
@@ -47,3 +76,10 @@ services:
 volumes:
   # Prometheus 데이터 보관 볼륨
   prometheus-data:
+  # Loki 로그 데이터 보관 볼륨
+  loki-data:
+  # Alloy 파일 읽기 위치 보관 볼륨
+  alloy-data:
+  # MySQL Compose와 공유하는 Slow Query Log 볼륨
+  mysql-slow-logs:
+    name: cosmos-mysql-slow-logs

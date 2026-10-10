@@ -29,6 +29,13 @@ cookie:
 ai:
   root-url : ${AI_BASE_URL}
 
+# 로컬 부하테스트에서 Tomcat HTTP 작업 스레드 풀 메트릭 노출
+# 스레드 수나 풀 크기는 변경하지 않고 Actuator/Micrometer 계측만 활성화
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
+
 management:
   endpoints:
     web:

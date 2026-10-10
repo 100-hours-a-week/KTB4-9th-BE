@@ -57,7 +57,7 @@
             "uid": "ffzytyvhrfmrkf"
           },
           "editorMode": "code",
-          "expr": "sum(rate(k6_http_reqs_total{testid=~\"$testid\"}[10s]))",
+          "expr": "sum(rate(k6_http_reqs_total{testid=~\"$testid\",phase=~\"measurement|^$\"}[10s]))",
           "legendFormat": "RPS",
           "refId": "A"
         }
@@ -101,7 +101,7 @@
             "uid": "ffzytyvhrfmrkf"
           },
           "editorMode": "code",
-          "expr": "k6_http_req_duration_avg{testid=~\"$testid\"} * 1000",
+          "expr": "k6_http_req_duration_avg{testid=~\"$testid\",phase=~\"measurement|^$\"} * 1000",
           "legendFormat": "avg",
           "refId": "A"
         },
@@ -111,7 +111,7 @@
             "uid": "ffzytyvhrfmrkf"
           },
           "editorMode": "code",
-          "expr": "k6_http_req_duration_p95{testid=~\"$testid\"} * 1000",
+          "expr": "k6_http_req_duration_p95{testid=~\"$testid\",phase=~\"measurement|^$\"} * 1000",
           "legendFormat": "p95",
           "refId": "B"
         },
@@ -121,7 +121,7 @@
             "uid": "ffzytyvhrfmrkf"
           },
           "editorMode": "code",
-          "expr": "k6_http_req_duration_p99{testid=~\"$testid\"} * 1000",
+          "expr": "k6_http_req_duration_p99{testid=~\"$testid\",phase=~\"measurement|^$\"} * 1000",
           "legendFormat": "p99",
           "refId": "C"
         },
@@ -131,7 +131,7 @@
             "uid": "ffzytyvhrfmrkf"
           },
           "editorMode": "code",
-          "expr": "k6_http_req_duration_max{testid=~\"$testid\"} * 1000",
+          "expr": "k6_http_req_duration_max{testid=~\"$testid\",phase=~\"measurement|^$\"} * 1000",
           "legendFormat": "max",
           "refId": "D"
         }
@@ -175,7 +175,7 @@
             "uid": "ffzytyvhrfmrkf"
           },
           "editorMode": "code",
-          "expr": "k6_http_req_failed_rate{testid=~\"$testid\"} * 100",
+          "expr": "k6_http_req_failed_rate{testid=~\"$testid\",phase=~\"measurement|^$\"} * 100",
           "legendFormat": "실패율",
           "refId": "A"
         }
@@ -218,7 +218,7 @@
             "uid": "ffzytyvhrfmrkf"
           },
           "editorMode": "code",
-          "expr": "k6_vus{testid=~\"$testid\"}",
+          "expr": "k6_vus{testid=~\"$testid\",phase=~\"measurement|^$\"}",
           "legendFormat": "VUs",
           "refId": "A"
         }
@@ -1010,6 +1010,549 @@
       ],
       "title": "Hikari 커넥션 점유시간",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ffzytyvhrfmrkf"
+      },
+      "description": "캐시 조회 중 기존 결과를 재사용한 비율입니다.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 86
+      },
+      "id": 21,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(cache_gets_total{cache=\"dailyProblems\",result=\"hit\"}[30s])) / sum(rate(cache_gets_total{cache=\"dailyProblems\"}[30s]))",
+          "legendFormat": "적중률",
+          "refId": "A"
+        }
+      ],
+      "title": "Caffeine 캐시 적중률",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ffzytyvhrfmrkf"
+      },
+      "description": "캐시 적중과 실패 횟수를 초당 조회 수로 표시합니다.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 86
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(cache_gets_total{cache=\"dailyProblems\",result=\"hit\"}[30s]))",
+          "legendFormat": "hit/s",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(cache_gets_total{cache=\"dailyProblems\",result=\"miss\"}[30s]))",
+          "legendFormat": "miss/s",
+          "refId": "B"
+        }
+      ],
+      "title": "Caffeine 캐시 조회 (회/초)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ffzytyvhrfmrkf"
+      },
+      "description": "dailyProblems 캐시에 현재 보관된 날짜별 응답 수입니다. maximumSize는 2입니다.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 86
+      },
+      "id": 23,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "cache_size{cache=\"dailyProblems\"}",
+          "legendFormat": "항목 수",
+          "refId": "A"
+        }
+      ],
+      "title": "Caffeine 캐시 항목 수",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ffzytyvhrfmrkf"
+      },
+      "description": "최대 크기 제한 등으로 캐시에서 제거된 항목 수입니다.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 86
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(cache_evictions_total{cache=\"dailyProblems\"}[1m])) * 60",
+          "legendFormat": "퇴출/분",
+          "refId": "A"
+        }
+      ],
+      "title": "Caffeine 캐시 퇴출 (회/분)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ffzytyvhrfmrkf"
+      },
+      "description": "constant-arrival-rate가 목표한 시점에 시작하지 못한 iteration 비율입니다. 값이 0보다 크면 VU 부족 또는 서버 응답 지연으로 설정한 요청률을 유지하지 못한 것입니다.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 94
+      },
+      "id": 25,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(k6_dropped_iterations_total{testid=~\"$testid\",phase=~\"measurement|^$\"}[10s]))",
+          "legendFormat": "dropped iterations/s",
+          "refId": "A"
+        }
+      ],
+      "title": "k6 유실 iteration (회/초)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ffzytyvhrfmrkf"
+      },
+      "description": "k6 스크립트의 check(response, {'status is 200': ...}) 성공률입니다. HTTP 실패율과 별개로 정확히 200 응답인지 확인합니다.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 94
+      },
+      "id": 26,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "avg by (check) (k6_checks_rate{testid=~\"$testid\",phase=~\"measurement|^$\"}) * 100",
+          "legendFormat": "{{check}} 성공률",
+          "refId": "A"
+        }
+      ],
+      "title": "k6 status 200 체크 성공률",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "MySQL long_query_time 기준을 넘겨 Slow Query Log에 기록된 쿼리 수입니다. 기본 기준은 100ms이며 MYSQL_SLOW_QUERY_TIME으로 변경할 수 있습니다.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 102
+      },
+      "id": 27,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=\"mysql-slow-query\"}[1m]))",
+          "legendFormat": "slow queries/min",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "MySQL Slow Query 발생 건수 (최근 1분)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "MySQL Slow Query Log 원문입니다. 각 항목에서 Query_time, Lock_time, Rows_sent, Rows_examined와 실행 SQL을 확인할 수 있습니다.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 110
+      },
+      "id": 28,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "{job=\"mysql-slow-query\"}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "MySQL Slow Query Log",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ffzytyvhrfmrkf"
+      },
+      "description": "내장 Tomcat이 HTTP 요청 처리에 사용하는 작업 스레드 풀입니다. 사용 중은 현재 요청을 처리하는 스레드, 현재는 생성된 스레드, 최대는 풀의 상한입니다. 사용자 수와 일대일로 대응하지 않습니다.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 122
+      },
+      "id": 29,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "sum(tomcat_threads_busy_threads)",
+          "legendFormat": "사용 중 (busy)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "sum(tomcat_threads_current_threads)",
+          "legendFormat": "현재 생성됨 (current)",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "sum(tomcat_threads_config_max_threads)",
+          "legendFormat": "최대 (max)",
+          "refId": "C"
+        }
+      ],
+      "title": "Tomcat HTTP 스레드 풀",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ffzytyvhrfmrkf"
+      },
+      "description": "Tomcat 최대 작업 스레드 수 가운데 현재 요청 처리에 사용 중인 비율입니다. 100%에 가까운 상태가 지속되면서 응답시간이 증가하면 HTTP 처리 스레드 풀 포화를 의심할 수 있습니다.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 122
+      },
+      "id": 30,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(tomcat_threads_busy_threads) / clamp_min(sum(tomcat_threads_config_max_threads), 1)",
+          "legendFormat": "최대 대비 사용률",
+          "refId": "A"
+        }
+      ],
+      "title": "Tomcat 스레드 풀 사용률",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ffzytyvhrfmrkf"
+      },
+      "description": "Tomcat 작업 스레드를 포함한 JVM 전체 스레드의 상태별 개수입니다. runnable 급증은 CPU 작업 증가, blocked 급증은 락 경합 가능성을 나타냅니다. waiting과 timed-waiting에는 정상적인 대기 스레드도 포함됩니다.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 130
+      },
+      "id": 31,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ffzytyvhrfmrkf"
+          },
+          "editorMode": "code",
+          "expr": "sum by (state) (jvm_threads_states_threads)",
+          "legendFormat": "{{state}}",
+          "refId": "A"
+        }
+      ],
+      "title": "JVM 스레드 상태",
+      "type": "timeseries"
     }
   ],
   "refresh": "5s",
@@ -1018,7 +1561,8 @@
     "COSMOS",
     "k6",
     "JFR",
-    "HikariCP"
+    "HikariCP",
+    "Tomcat"
   ],
   "templating": {
     "list": [
@@ -1057,5 +1601,5 @@
   "timezone": "browser",
   "title": "COSMOS Daily Problems 부하테스트",
   "uid": "cosmos-daily-problems-load-test",
-  "version": 10
+  "version": 14
 }
