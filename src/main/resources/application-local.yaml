@@ -10,8 +10,6 @@ spring:
       ddl-auto: update
     properties:
       hibernate:
-        session_factory:
-          statement_inspector: com.cosmos.cosmos_backend.global.metrics.SqlStatementInspector
 
 kakao:
   client-id: ${KAKAO_CLIENT_ID}

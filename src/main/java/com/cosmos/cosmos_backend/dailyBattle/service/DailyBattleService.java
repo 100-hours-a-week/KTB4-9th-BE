@@ -10,10 +10,11 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleCaseResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleSubmissionResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -77,12 +78,12 @@ public class DailyBattleService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "User_Not_Found"));
 
         // 이미 배틀에 참여중인지 확인
-        // 참여중이라면 새 엔티티 생성 없음, 새 참여일경우에만 새 엔티티 생성
-        BattleParticipation battleParticipation = battleParticipationRepository.findByUser_Id(user.getId())
-                .orElse(null);
+        // 참여중이라면 새 엔티티 생성 없음
+        BattleParticipation participationInfo = battleParticipationCheck(battleId, user.getId());
 
-        if(battleParticipation == null){
-            battleParticipation = new BattleParticipation(
+        // 새 참여일경우에만 새 엔티티 생성
+        if(participationInfo == null){
+            BattleParticipation battleParticipation = new BattleParticipation(
                     battleId,
                     user
             );
@@ -92,7 +93,7 @@ public class DailyBattleService {
         }
 
         // 이미 배틀 참여 완료 했으면 참여 불가
-        if(battleParticipation.getParticipationStatus() !=  ParticipationStatus.IN_PROGRESS){
+        if(participationInfo.getParticipationStatus() != ParticipationStatus.IN_PROGRESS){
             throw new BusinessException(HttpStatus.CONFLICT, "Battle_already_participated");
         }
 
@@ -117,11 +118,6 @@ public class DailyBattleService {
             battleCaseResponseList.add(battleCases);
         }
 
-        //시작시간
-        OffsetDateTime startedAt = battleParticipation
-                .getStartedAt()
-                .atOffset(ZoneOffset.ofHours(9));
-
         // 남은 시간 계산 (마감이 KST 기준 시각이라 현재 시각도 KST로 계산)
         LocalDateTime battleEndTime = battleInfo.getBattleDate()
                 .atTime(12, 10);
@@ -141,14 +137,35 @@ public class DailyBattleService {
                 battleInfo.getBattleDate(),
                 title,
                 content,
-                battleParticipation.getParticipationStatus(),
-                startedAt,
+                participationInfo.getParticipationStatus(),
                 remainedTimeSecond,
                 battleCaseResponseList
         );
 
         //반환
         return battleParticipationResponseDto;
+    }
+
+    // TODO: 배틀 제출
+//    @Transactional
+//    public BattleSubmissionResponseDto battleSubmission(Long battleId, Long userId){
+//
+//        return null;
+//    }
+
+    // 기존 참여 확인 메소드 → 해당 배틀에 대한 유저의 제출 여부 확인
+    @Transactional(readOnly = true)
+    private BattleParticipation battleParticipationCheck(Long battleId, Long userId){
+
+        Optional<BattleParticipation> battleParticipationCheck = battleParticipationRepository.findByDailyBattleIdAndUser_Id(battleId, userId);
+
+        // 참여 행이 있으면 참여정보 전달, 없으면 Null
+        if(battleParticipationCheck.isPresent()){
+            return battleParticipationCheck.get();
+        } else {
+            return null;
+        }
+
     }
 
 }

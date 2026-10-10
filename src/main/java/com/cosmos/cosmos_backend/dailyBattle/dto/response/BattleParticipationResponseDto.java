@@ -18,8 +18,6 @@ public record BattleParticipationResponseDto (
 
         ParticipationStatus participationStatus,
 
-        OffsetDateTime startedAt,
-
         Long remainingSecond,
 
         List<BattleCaseResponseDto> cases

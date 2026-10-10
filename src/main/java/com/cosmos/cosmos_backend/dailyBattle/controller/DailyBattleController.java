@@ -4,6 +4,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleSubmissionResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -80,8 +81,23 @@ public class DailyBattleController {
         );
     }
 
-    // 배틀 제출
-
+    // TODO : 배틀 제출
+//    @PostMapping("/{battle_id}/submissions")
+//    public ResponseEntity<BattleSubmissionResponseDto> battleSubmission(
+//            @PathVariable("battle_id") @Positive Long battleId,
+//            @AuthenticationPrincipal Jwt userInfo
+//    ){
+//
+//        Long userId = Long.parseLong(Objects.requireNonNull(userInfo.getSubject()));
+//
+//        BattleSubmissionResponseDto battleSubmissionResponse = DailyBattleService.battleSubmission(battleId, userId);
+//
+//        return ResponseEntity.accepted().body(ApiResponse.of(
+//                "battle_submission_resumed",
+//                battleSubmissionResponse).data()
+//
+//        );
+//    }
 
 
 

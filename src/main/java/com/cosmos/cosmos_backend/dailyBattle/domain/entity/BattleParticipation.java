@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Table(name = "battle_participations",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_battle_participation_battle_user_id",
-                columnNames = {"user_id", "battle_id"}
+                columnNames = {"user_id", "daily_battle_id"}
         ))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -26,9 +26,10 @@ public class BattleParticipation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long participationId;
 
+    @Column(name = "daily_battle_id")
     private Long dailyBattleId;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
