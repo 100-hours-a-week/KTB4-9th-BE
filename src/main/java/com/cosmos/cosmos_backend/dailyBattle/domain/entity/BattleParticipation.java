@@ -55,4 +55,26 @@ public class BattleParticipation {
 
     }
 
+    // 정답처리
+    public void isCorrect(){
+        this.allCorrect = true;
+        this.participationStatus = ParticipationStatus.EVALUATING_COMPLETED;
+    }
+
+    // 오답처리
+    public void isWrong(){
+        this.allCorrect = false;
+        this.participationStatus = ParticipationStatus.EVALUATING_COMPLETED;
+    }
+
+    // 중도 포기 처리
+    public void dropOut(){
+        this.participationStatus = ParticipationStatus.DROPPED_OUT;
+    }
+
+    // 타임아웃 처리
+    public void timeOut(){
+        this.participationStatus = ParticipationStatus.TIME_OVER;
+    }
+
 }

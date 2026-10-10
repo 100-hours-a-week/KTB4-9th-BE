@@ -8,6 +8,7 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.request.DailyBattleSubmissionRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleCaseResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleSubmissionResponseDto;
@@ -146,12 +147,54 @@ public class DailyBattleService {
         return battleParticipationResponseDto;
     }
 
-    // TODO: 배틀 제출
-//    @Transactional
-//    public BattleSubmissionResponseDto battleSubmission(Long battleId, Long userId){
+    // 배틀 제출 메소드
+    @Transactional
+    public BattleSubmissionResponseDto battleSubmission(DailyBattleSubmissionRequestDto battleSubmissionRequest, Long battleId, Long userId){
+
+        // 배틀 참여 정보 확인
+        BattleParticipation participationInfo = battleParticipationCheck(battleId, userId);
+
+        // 참여 정보가 없거나 이미 참여 완료했다면 예외처리
+         if (participationInfo == null){
+             throw new BusinessException(HttpStatus.NOT_FOUND, "Battle_participation_information_not_found");
+         } else if (participationInfo.getParticipationStatus() != ParticipationStatus.IN_PROGRESS) {
+             throw new BusinessException(HttpStatus.CONFLICT, "Battle_already_participated");
+         }
+
+         // TODO: 문제 채점 처리
+        // TODO : 타임아웃 처리
+        //  TODO: 중도포기
+//         // 문제 정답 확인
+//         List<BattleCase> battleCaseList = battleCaseRepository.findByDailyBattle_BattleId(battleId);
 //
-//        return null;
-//    }
+//         List<DailyBattleSubmissionRequestDto.Answer> battleAnswer = new ArrayList<>();
+//
+//        for (BattleCase battleCase : battleCaseList) {
+//            Integer caseNum = battleCase.getDisplayOrder();
+//            String expectedOutput = battleCase.getExpectedOutput();
+//
+//            DailyBattleSubmissionRequestDto.Answer answer = new DailyBattleSubmissionRequestDto.Answer(caseNum, expectedOutput);
+//
+//            battleAnswer.add(answer);
+//        }
+//
+//        // 정답일 경우 정답처리, 오답일 경우 오답처리
+//         if(battleAnswer.equals(battleSubmissionRequest.userAnswers())){
+//             participationInfo.isCorrect();
+//         } else {
+//             participationInfo.isWrong();
+//         }
+
+
+        BattleSubmissionResponseDto battleSubmissionResponse = new BattleSubmissionResponseDto(
+            battleId,
+            userId,
+            ParticipationStatus.SUBMITTED,
+            LocalDateTime.now(clock)
+        );
+
+        return battleSubmissionResponse;
+    }
 
     // 기존 참여 확인 메소드 → 해당 배틀에 대한 유저의 제출 여부 확인
     @Transactional(readOnly = true)
