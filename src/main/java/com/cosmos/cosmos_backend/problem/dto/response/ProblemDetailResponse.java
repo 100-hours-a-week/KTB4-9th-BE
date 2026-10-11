@@ -21,7 +21,9 @@ public record ProblemDetailResponse(
         List<AiProblemsCreateRequestDto.ExecutionLimits> executionLimits,
         List<AiProblemsCreateRequestDto.ProblemExamples> examples,
         // 힌트 사용 단계 (0: 안 씀, 1: 주석 힌트까지, 2: 정답 힌트까지)
-        Integer usedHintStage
+        Integer usedHintStage,
+        // 내가 저장한 문제인지
+        boolean saved
 ) {
 
 
@@ -30,7 +32,8 @@ public record ProblemDetailResponse(
             Problem problem,
             List<ProblemExample> examples,
             List<RunningLimit> runningLimits,
-            int usedHintStage
+            int usedHintStage,
+            boolean saved
     ) {
         return new ProblemDetailResponse(
                 // 1. 문제 기본 정보
@@ -55,8 +58,9 @@ public record ProblemDetailResponse(
                 examples.stream()
                         .map(e -> new AiProblemsCreateRequestDto.ProblemExamples(e.getInput(), e.getOutput(), e.getDescription()))
                         .toList(),
-                // 5. 힌트 사용 단계
-                usedHintStage
+                // 5. 힌트 사용 단계와 저장 여부
+                usedHintStage,
+                saved
         );
     }
 }

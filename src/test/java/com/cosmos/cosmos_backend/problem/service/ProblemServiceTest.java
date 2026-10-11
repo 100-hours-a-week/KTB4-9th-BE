@@ -14,6 +14,7 @@ import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.domain.entity.UsedHint;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.*;
+import com.cosmos.cosmos_backend.savedproblem.repository.SavedProblemRepository;
 
 import java.util.List;
 import java.util.Optional;
@@ -48,10 +49,13 @@ class ProblemServiceTest {
     private UsedHintRepository usedHintRepository;
 
     @Mock
+    private SavedProblemRepository savedProblemRepository;
+
+    @Mock
     private AiProblemClient aiProblemClient;
 
     private ProblemService service() {
-        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, aiProblemClient);
+        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, savedProblemRepository, aiProblemClient);
     }
 
     @Test
@@ -89,6 +93,8 @@ class ProblemServiceTest {
         assertThat(response.examples().get(0).input()).isEqualTo("nums=[2,7]");
         // 힌트 사용 기록이 없으면 0
         assertThat(response.usedHintStage()).isEqualTo(0);
+        // 저장하지 않은 문제면 false
+        assertThat(response.saved()).isFalse();
     }
 
     @Test
@@ -108,6 +114,26 @@ class ProblemServiceTest {
 
         // Then
         assertThat(response.usedHintStage()).isEqualTo(2);
+    }
+
+    @Test
+    void getProblemDetail_returnsSavedTrue_whenUserSavedProblem() {
+        // Given
+        Problem problem = new Problem(
+                Difficulty.LV1, Category.ARRAY, "두 수의 합", "내용", "입력 형식", "출력 형식", List.of(), "배열"
+        );
+        setId(problem, 1L);
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(1L)).thenReturn(List.of());
+        when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
+        when(usedHintRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.empty());
+        when(savedProblemRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+
+        // When
+        ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
+
+        // Then
+        assertThat(response.saved()).isTrue();
     }
 
     @Test
