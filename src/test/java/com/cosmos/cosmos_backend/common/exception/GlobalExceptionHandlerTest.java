@@ -2,6 +2,7 @@ package com.cosmos.cosmos_backend.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.core.MethodParameter;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 class GlobalExceptionHandlerTest {
 
@@ -73,6 +75,18 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().message()).isEqualTo("invalid_request_data");
+        assertThat(response.getBody().data()).isNull();
+    }
+
+    @Test
+    void handleTypeMismatch_returns400WithInvalidRequestParameterMessage() {
+        MethodArgumentTypeMismatchException exception =
+                new MethodArgumentTypeMismatchException("LV9", Difficulty.class, "level", null, new IllegalArgumentException("bad enum"));
+
+        ResponseEntity<ApiResponse<Object>> response = handler.handleTypeMismatch(exception);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).isEqualTo("invalid_request_parameter");
         assertThat(response.getBody().data()).isNull();
     }
 
