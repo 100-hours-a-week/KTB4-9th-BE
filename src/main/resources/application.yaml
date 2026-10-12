@@ -1,6 +1,8 @@
 spring:
   application:
     name: cosmos-backend
+  jpa:
+    open-in-view: false
 
 ai:
   server:
