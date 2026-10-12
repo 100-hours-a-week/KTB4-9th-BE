@@ -2,10 +2,15 @@ package com.cosmos.cosmos_backend.problem.controller;
 
 import static org.mockito.Mockito.when;
 
+import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
+import com.cosmos.cosmos_backend.codesubmission.domain.JudgingResult;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
+import com.cosmos.cosmos_backend.common.Language;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.exception.GlobalExceptionHandler;
+import com.cosmos.cosmos_backend.problem.dto.response.MyApproachResponse;
+import com.cosmos.cosmos_backend.problem.dto.response.MyCodeResponse;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.service.ProblemService;
 import java.util.List;
@@ -53,7 +58,11 @@ class ProblemControllerTest {
         ProblemDetailResponse response = new ProblemDetailResponse(
                 1L, Difficulty.LV1, Category.ARRAY, "두 수의 합", "내용",
                 "입력 형식", "출력 형식", List.of(), List.of(), List.of(), 1,
-                true
+                true,
+                new MyApproachResponse(Category.ARRAY, "투 포인터로 푼다", "COMPLETED",
+                        new ApproachSubmitResponse.Result(true, 90, List.of(new ApproachSubmitResponse.KeywordJudgement("투 포인터", true)), "좋아요"),
+                        new ApproachSubmitResponse.SubmissionUsage(5, 1, 4)),
+                new MyCodeResponse(Language.PYTHON, "print(1)", JudgingResult.WRONG_ANSWER, 1, 3, 2)
         );
         loginAs("7");
         when(problemService.getProblemDetail(7L, 1L)).thenReturn(response);
@@ -70,6 +79,13 @@ class ProblemControllerTest {
         body.extractingPath("$.data.problem.usedHintStage").isEqualTo(1);
         // 저장 여부가 응답에 실림
         body.extractingPath("$.data.problem.saved").isEqualTo(true);
+        body.extractingPath("$.data.problem.myApproach.naturalSolution").isEqualTo("투 포인터로 푼다");
+        body.extractingPath("$.data.problem.myCode.language").isEqualTo("PYTHON");
+        body.extractingPath("$.data.problem.myApproach.result.approachScore").isEqualTo(90);
+        body.extractingPath("$.data.problem.myApproach.result.keywords[0].isIncluded").isEqualTo(true);
+        body.extractingPath("$.data.problem.myApproach.submissionUsage.usedCount").isEqualTo(1);
+        body.extractingPath("$.data.problem.myCode.passedTestCount").isEqualTo(1);
+        body.extractingPath("$.data.problem.myCode.submittedCount").isEqualTo(2);
     }
 
     @Test

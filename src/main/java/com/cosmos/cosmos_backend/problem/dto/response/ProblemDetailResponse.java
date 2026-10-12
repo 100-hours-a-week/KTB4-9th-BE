@@ -23,7 +23,10 @@ public record ProblemDetailResponse(
         // 힌트 사용 단계 (0: 안 씀, 1: 주석 힌트까지, 2: 정답 힌트까지)
         Integer usedHintStage,
         // 내가 저장한 문제인지
-        boolean saved
+        boolean saved,
+        // 내가 마지막으로 제출한 접근 방식과 코드 (제출한 적이 없으면 null)
+        MyApproachResponse myApproach,
+        MyCodeResponse myCode
 ) {
 
 
@@ -33,7 +36,9 @@ public record ProblemDetailResponse(
             List<ProblemExample> examples,
             List<RunningLimit> runningLimits,
             int usedHintStage,
-            boolean saved
+            boolean saved,
+            MyApproachResponse myApproach,
+            MyCodeResponse myCode
     ) {
         return new ProblemDetailResponse(
                 // 1. 문제 기본 정보
@@ -60,7 +65,9 @@ public record ProblemDetailResponse(
                         .toList(),
                 // 5. 힌트 사용 단계와 저장 여부
                 usedHintStage,
-                saved
+                saved,
+                myApproach,
+                myCode
         );
     }
 }
