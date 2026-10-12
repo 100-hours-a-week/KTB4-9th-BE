@@ -1,5 +1,7 @@
 package com.cosmos.cosmos_backend.problem.service;
 
+import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
+import com.cosmos.cosmos_backend.codesubmission.repository.CodeSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
@@ -8,6 +10,8 @@ import com.cosmos.cosmos_backend.problem.domain.HintType;
 import com.cosmos.cosmos_backend.problem.domain.entity.*;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.dto.response.AiProblemCreateOndemandResponseDto;
+import com.cosmos.cosmos_backend.problem.dto.response.MyApproachResponse;
+import com.cosmos.cosmos_backend.problem.dto.response.MyCodeResponse;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.*;
 import com.cosmos.cosmos_backend.savedproblem.repository.SavedProblemRepository;
@@ -31,6 +35,8 @@ public class ProblemService {
     private final TestCaseRepository testCaseRepository;
     private final UsedHintRepository usedHintRepository;
     private final SavedProblemRepository savedProblemRepository;
+    private final ApproachSubmissionRepository approachSubmissionRepository;
+    private final CodeSubmissionRepository codeSubmissionRepository;
 
     private final AiProblemClient aiProblemClient;
 
@@ -49,14 +55,24 @@ public class ProblemService {
         // 3. 내가 저장한 문제인지 조회
         boolean saved = savedProblemRepository.existsByUserIdAndProblemId(userId, problemId);
 
-        // 4. 예시, 실행 제한을 각각 조회
-        // 5. 조회한 값들을 응답 형태로 조립해서 반환
+        // 4. 내가 이전에 제출한 접근 방식과 코드를 조회 (없으면 null)
+        MyApproachResponse myApproach = approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId)
+                .map(MyApproachResponse::from)
+                .orElse(null);
+        MyCodeResponse myCode = codeSubmissionRepository.findByUserIdAndProblemId(userId, problemId)
+                .map(MyCodeResponse::from)
+                .orElse(null);
+
+        // 5. 예시, 실행 제한을 각각 조회
+        // 6. 조회한 값들을 응답 형태로 조립해서 반환
         return ProblemDetailResponse.of(
                 problem,
                 problemExampleRepository.findByProblemIdOrderByDisplayOrder(problemId),
                 runningLimitRepository.findByProblemId(problemId),
                 usedHintStage,
-                saved
+                saved,
+                myApproach,
+                myCode
         );
     }
 

@@ -6,6 +6,7 @@ import com.cosmos.cosmos_backend.approach.client.AiEvaluationClient;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
+import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
@@ -80,6 +81,11 @@ public class ApproachSubmissionService {
         // 7. AI 판정을 우리 키워드 목록 기준으로 병합
         List<AiEvaluationResult.KeywordJudgement> mergedKeywords = mergeKeywordJudgements(keywords, result.keywords());
 
+        // 저장용 형태로 변환
+        List<KeywordResult> keywordResults = mergedKeywords.stream()
+                .map(keyword -> new KeywordResult(keyword.keyword(), keyword.included()))
+                .toList();
+
         // 이미 정답을 맞춘적이 있는지 확인
         Optional<ApproachSubmission> beforeSubmission = approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId);
 
@@ -92,9 +98,9 @@ public class ApproachSubmissionService {
 
             // 2. 최초 제출이면 락 없이 새로 저장
             if (!exists) {
-                return approachSubmissionRepository.save(
-                        new ApproachSubmission(userId, problemId, category, naturalSolution, categoryResult, result.score(), result.feedback())
-                );
+                ApproachSubmission created = new ApproachSubmission(userId, problemId, category, naturalSolution, categoryResult, result.score(), result.feedback());
+                created.updateKeywordResults(keywordResults);
+                return approachSubmissionRepository.save(created);
             }
 
             // 3. 재제출이면 그 행을 잠그고 조회
@@ -108,6 +114,7 @@ public class ApproachSubmissionService {
 
             // 5. 재제출 처리 (커밋 때 UPDATE가 나감)
             existing.resubmit(category, naturalSolution, categoryResult, result.score(), result.feedback());
+            existing.updateKeywordResults(keywordResults);
             return existing;
         });
 
