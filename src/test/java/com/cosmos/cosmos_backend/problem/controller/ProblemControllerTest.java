@@ -52,7 +52,8 @@ class ProblemControllerTest {
         // Given
         ProblemDetailResponse response = new ProblemDetailResponse(
                 1L, Difficulty.LV1, Category.ARRAY, "두 수의 합", "내용",
-                "입력 형식", "출력 형식", List.of(), List.of(), List.of(), 1
+                "입력 형식", "출력 형식", List.of(), List.of(), List.of(), 1,
+                true
         );
         loginAs("7");
         when(problemService.getProblemDetail(7L, 1L)).thenReturn(response);
@@ -67,6 +68,8 @@ class ProblemControllerTest {
         // 명세서: data 안에 problem 한 겹이 더 있음
         body.extractingPath("$.data.problem.problemId").isEqualTo(1);
         body.extractingPath("$.data.problem.usedHintStage").isEqualTo(1);
+        // 저장 여부가 응답에 실림
+        body.extractingPath("$.data.problem.saved").isEqualTo(true);
     }
 
     @Test

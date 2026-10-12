@@ -10,6 +10,7 @@ import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.dto.response.AiProblemCreateOndemandResponseDto;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.*;
+import com.cosmos.cosmos_backend.savedproblem.repository.SavedProblemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class ProblemService {
     private final KeywordRepository keywordRepository;
     private final TestCaseRepository testCaseRepository;
     private final UsedHintRepository usedHintRepository;
+    private final SavedProblemRepository savedProblemRepository;
 
     private final AiProblemClient aiProblemClient;
 
@@ -44,13 +46,17 @@ public class ProblemService {
                 .map(UsedHint::getHintStage)
                 .orElse(0);
 
-        // 3. 예시, 실행 제한을 각각 조회
-        // 4. 조회한 값들을 응답 형태로 조립해서 반환
+        // 3. 내가 저장한 문제인지 조회
+        boolean saved = savedProblemRepository.existsByUserIdAndProblemId(userId, problemId);
+
+        // 4. 예시, 실행 제한을 각각 조회
+        // 5. 조회한 값들을 응답 형태로 조립해서 반환
         return ProblemDetailResponse.of(
                 problem,
                 problemExampleRepository.findByProblemIdOrderByDisplayOrder(problemId),
                 runningLimitRepository.findByProblemId(problemId),
-                usedHintStage
+                usedHintStage,
+                saved
         );
     }
 
