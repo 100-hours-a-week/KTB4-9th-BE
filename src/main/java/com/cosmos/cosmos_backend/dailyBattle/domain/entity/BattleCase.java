@@ -17,6 +17,7 @@ public class BattleCase {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "battle_case_id")
     private Long caseId;
 
     @ManyToOne(fetch = FetchType.LAZY)

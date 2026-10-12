@@ -161,30 +161,6 @@ public class DailyBattleService {
              throw new BusinessException(HttpStatus.CONFLICT, "Battle_already_participated");
          }
 
-         // TODO: 문제 채점 처리
-        // TODO : 타임아웃 처리
-        //  TODO: 중도포기
-//         // 문제 정답 확인
-//         List<BattleCase> battleCaseList = battleCaseRepository.findByDailyBattle_BattleId(battleId);
-//
-//         List<DailyBattleSubmissionRequestDto.Answer> battleAnswer = new ArrayList<>();
-//
-//        for (BattleCase battleCase : battleCaseList) {
-//            Integer caseNum = battleCase.getDisplayOrder();
-//            String expectedOutput = battleCase.getExpectedOutput();
-//
-//            DailyBattleSubmissionRequestDto.Answer answer = new DailyBattleSubmissionRequestDto.Answer(caseNum, expectedOutput);
-//
-//            battleAnswer.add(answer);
-//        }
-//
-//        // 정답일 경우 정답처리, 오답일 경우 오답처리
-//         if(battleAnswer.equals(battleSubmissionRequest.userAnswers())){
-//             participationInfo.isCorrect();
-//         } else {
-//             participationInfo.isWrong();
-//         }
-
 
         BattleSubmissionResponseDto battleSubmissionResponse = new BattleSubmissionResponseDto(
             battleId,
@@ -210,5 +186,30 @@ public class DailyBattleService {
         }
 
     }
+
+    // 문제 채점 메소드
+    // TODO: 문제 채점 처리
+    // TODO : 타임아웃 처리
+    //  TODO: 중도포기
+//         // 문제 정답 확인
+//         List<BattleCase> battleCaseList = battleCaseRepository.findByDailyBattle_BattleId(battleId);
+//
+//         List<DailyBattleSubmissionRequestDto.Answer> battleAnswer = new ArrayList<>();
+//
+//        for (BattleCase battleCase : battleCaseList) {
+//            Integer caseNum = battleCase.getDisplayOrder();
+//            String expectedOutput = battleCase.getExpectedOutput();
+//
+//            DailyBattleSubmissionRequestDto.Answer answer = new DailyBattleSubmissionRequestDto.Answer(caseNum, expectedOutput);
+//
+//            battleAnswer.add(answer);
+//        }
+//
+//        // 정답일 경우 정답처리, 오답일 경우 오답처리
+//         if(battleAnswer.equals(battleSubmissionRequest.userAnswers())){
+//             participationInfo.isCorrect();
+//         } else {
+//             participationInfo.isWrong();
+//         }
 
 }
