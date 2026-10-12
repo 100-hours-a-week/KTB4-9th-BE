@@ -7,6 +7,7 @@ import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.exception.GlobalExceptionHandler;
+import com.cosmos.cosmos_backend.savedproblem.domain.SavedProblemStatus;
 import com.cosmos.cosmos_backend.savedproblem.dto.response.SavedProblemResponse;
 import com.cosmos.cosmos_backend.savedproblem.service.SavedProblemService;
 import java.time.LocalDateTime;
@@ -117,7 +118,8 @@ class SavedProblemControllerTest {
         // Given: level 없이 요청하면 서비스에 null이 넘어감
         loginAs("7");
         when(savedProblemService.getSavedProblems(7L, null)).thenReturn(List.of(
-                new SavedProblemResponse(1L, "두 수의 합", Difficulty.LV1, Category.ARRAY, LocalDateTime.of(2026, 10, 8, 12, 0))
+                new SavedProblemResponse(1L, "두 수의 합", Difficulty.LV1, Category.ARRAY,
+                        LocalDateTime.of(2026, 10, 8, 12, 0), SavedProblemStatus.CORRECT, "투 포인터로 푼다")
         ));
 
         // When & Then
@@ -129,6 +131,8 @@ class SavedProblemControllerTest {
         body.extractingPath("$.message").isEqualTo("saved_problems_retrieval_success");
         body.extractingPath("$.data.problems[0].problemId").isEqualTo(1);
         body.extractingPath("$.data.problems[0].title").isEqualTo("두 수의 합");
+        body.extractingPath("$.data.problems[0].status").isEqualTo("CORRECT");
+        body.extractingPath("$.data.problems[0].solution").isEqualTo("투 포인터로 푼다");
     }
 
     @Test

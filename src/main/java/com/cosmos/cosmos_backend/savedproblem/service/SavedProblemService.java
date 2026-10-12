@@ -46,6 +46,8 @@ public class SavedProblemService {
     /** 저장 문제 목록 조회. difficulty가 null이면 전체. */
     @Transactional(readOnly = true)
     public List<SavedProblemResponse> getSavedProblems(Long userId, Difficulty difficulty) {
-        return savedProblemRepository.findSavedProblems(userId, difficulty);
+        return savedProblemRepository.findSavedProblems(userId, difficulty).stream()
+                .map(SavedProblemResponse::from)
+                .toList();
     }
 }
