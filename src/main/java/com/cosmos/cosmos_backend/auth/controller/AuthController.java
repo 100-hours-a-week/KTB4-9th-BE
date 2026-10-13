@@ -39,6 +39,9 @@ public class AuthController {
     @Value("${cookie.secure}")
     private boolean cookieSecure;
 
+    @Value("${frontend.base-url}")
+    private String frontendBaseUrl;
+
     // oauth 로그인 결과에 대한 콜백
     @GetMapping("/oauth/{provider}/callback")
     @Operation(summary = "OAuth 로그인 콜백", description = "OAuth 인가 코드로 로그인하고 accessToken과 refreshToken 쿠키를 발급합니다.", security = {})
@@ -55,7 +58,8 @@ public class AuthController {
                 .status(HttpStatus.FOUND)
                 .header(HttpHeaders.SET_COOKIE, loginResult.accessToken().toString())
                 .header(HttpHeaders.SET_COOKIE, loginResult.refreshToken().toString())
-                .location(URI.create("https://cosmoscode.site/"))
+                //.location(URI.create("https://cosmoscode.site/"))
+                .location(URI.create(frontendBaseUrl))
                 .build();
     }
 
