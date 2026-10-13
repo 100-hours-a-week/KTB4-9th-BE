@@ -24,6 +24,7 @@ public class BattleParticipation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "battle_participation_id")
     private Long participationId;
 
     @Column(name = "daily_battle_id")

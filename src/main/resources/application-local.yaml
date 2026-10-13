@@ -11,6 +11,10 @@ spring:
     properties:
       hibernate:
 
+logging:
+  level:
+    org.springframework.security.web.FilterChainProxy: TRACE
+
 kakao:
   client-id: ${KAKAO_CLIENT_ID}
   client-secret: ${KAKAO_CLIENT_SECRET}
@@ -20,6 +24,9 @@ jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 1800
   refresh-token-expiration: 1209600
+
+frontend:
+  base-url: ${FRONT_BASE_URL}
 
 cookie:
   secure: true
