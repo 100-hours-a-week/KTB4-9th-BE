@@ -21,7 +21,7 @@ public class RequestTimeFilterConfig {
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
 
         // 3. 배틀 제출에만 적용
-        registration.addUrlPatterns("/daily-battles/submissions");
+        registration.addUrlPatterns("/daily-battles/*");
 
         return registration;
     }

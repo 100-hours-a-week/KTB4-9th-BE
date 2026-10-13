@@ -11,6 +11,19 @@ import java.time.Instant;
 
 public class RequestTimeFilter extends OncePerRequestFilter {
 
+    // 1. 배틀 제출 api인지 확인
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+
+        String method = request.getMethod();
+        String path = request.getServletPath();
+
+        boolean isSubmission = method.equals("POST") && path.matches("^/daily-battles/[^/]+/submissions$");
+
+        return !isSubmission;
+    }
+
+    // 2. 배틀 제출 api일때만 시각 기록 필터 실행
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -22,7 +35,7 @@ public class RequestTimeFilter extends OncePerRequestFilter {
         Instant filterTime = Instant.now();
 
         // 2. request attribute에 저장
-        request.setAttribute("battle.filterTime", filterTime);
+        request.setAttribute("battle.receivedAt", filterTime);
 
         // 3. 다음 단계로 전달
         filterChain.doFilter(request, response);
