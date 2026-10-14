@@ -7,5 +7,5 @@ import java.util.List;
 import java.util.Optional;
 
 public interface BattleCaseRepository extends JpaRepository<BattleCase, Integer> {
-    List<BattleCase> findByDailyBattle_BattleId(Long battleId);
+    List<BattleCase> findByDailyBattle_BattleIdOrderByDisplayOrderAsc(Long battleId);
 }
