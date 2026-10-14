@@ -38,3 +38,6 @@ server:
 
 sentry:
   environment: ${SENTRY_ENVIRONMENT:production}
+
+frontend:
+  base-url: ${FRONTEND_BASE_URL}
