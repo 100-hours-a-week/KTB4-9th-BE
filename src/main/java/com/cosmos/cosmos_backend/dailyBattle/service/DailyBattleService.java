@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestAttribute;
 
 import java.time.*;
 import java.util.ArrayList;
@@ -79,6 +80,7 @@ public class DailyBattleService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "User_Not_Found"));
 
         // 이미 배틀에 참여중인지 확인
+        // TODO: 이미 참여중인 사용자의 참여 요청에 대한 응답
         // 참여중이라면 새 엔티티 생성 없음
         BattleParticipation participationInfo = battleParticipationCheck(battleId, user.getId());
 
@@ -130,7 +132,7 @@ public class DailyBattleService {
                 Duration.between(now, battleEndTime).getSeconds()
         );
 
-        // 배틀 참여 응답 dto 만들기
+        // 새로운 배틀 참여 응답 dto 만들기
         BattleParticipationResponseDto battleParticipationResponseDto = new BattleParticipationResponseDto(
                 battleInfo.getCategory(),
                 battleId,
@@ -149,7 +151,18 @@ public class DailyBattleService {
 
     // 배틀 제출 메소드
     @Transactional
-    public BattleSubmissionResponseDto battleSubmission(DailyBattleSubmissionRequestDto battleSubmissionRequest, Long battleId, Long userId){
+    public BattleSubmissionResponseDto battleSubmission(
+            DailyBattleSubmissionRequestDto battleSubmissionRequest,
+            Long battleId,
+            Long userId,
+            Instant submittedAt){
+
+        // 0. 배틀 존재 확인
+        DailyBattle battleInfo = battleValidCheck(battleId);
+
+        // 1.  배틀 날짜, 시간 확인
+        battleDateCheck(submittedAt, battleInfo.getBattleDate());
+        battleTimeCheck(submittedAt);
 
         // 배틀 참여 정보 확인
         BattleParticipation participationInfo = battleParticipationCheck(battleId, userId);
@@ -185,6 +198,51 @@ public class DailyBattleService {
             return null;
         }
 
+    }
+
+    // 배틀 존재 확인
+    @Transactional(readOnly = true)
+    private DailyBattle battleValidCheck(Long battleId){
+
+        DailyBattle dailyBattle = dailyBattleRepository.findById(battleId).orElseThrow(
+                () -> new BusinessException(HttpStatus.NOT_FOUND, "Battle_not_found")
+        );
+
+        return dailyBattle;
+    }
+
+
+    // 배틀 날짜 확인 (제출한 배틀이 오늘 것이 맞는지
+    private void battleDateCheck(Instant receivedAt, LocalDate battleDate) {
+
+        // 요청 접수 시각을 한국 날짜로 변환하고
+        LocalDate receivedDate = receivedAt.atZone(ZoneId.of("Asia/Seoul")).toLocalDate();
+
+        // 배틀 날짜와 비교
+        if (!receivedDate.equals(battleDate)) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "Not_Battle_Date"
+            );
+        }
+    }
+
+
+    // 배틀 제출 시간 유효 확인
+    private void battleTimeCheck(Instant receivedAt) {
+
+        // 요청 접수 시각을 한국 시간으로 변환
+        LocalTime receivedTime = receivedAt.atZone(ZoneId.of("Asia/Seoul")).toLocalTime();
+
+        // 배틀 시작, 마감 시각
+        LocalTime start = LocalTime.of(12, 0);
+        LocalTime end = LocalTime.of(12, 9, 59);
+
+        // 시간 유효한지 검증 (12:00:00.000 이상 ~ 12:09:59.000 미만에 접수된 요청만 유효)
+        if (receivedTime.isBefore(start) || !receivedTime.isBefore(end)) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST, "Not_Battle_Time"
+            );
+        }
     }
 
     // 문제 채점 메소드

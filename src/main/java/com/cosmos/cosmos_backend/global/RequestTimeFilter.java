@@ -35,7 +35,7 @@ public class RequestTimeFilter extends OncePerRequestFilter {
         Instant filterTime = Instant.now();
 
         // 2. request attribute에 저장
-        request.setAttribute("battle.receivedAt", filterTime);
+        request.setAttribute("battleReceivedAt", filterTime);
 
         // 3. 다음 단계로 전달
         filterChain.doFilter(request, response);
