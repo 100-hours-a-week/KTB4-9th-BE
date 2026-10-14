@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Objects;
@@ -59,17 +60,14 @@ public class DailyBattleController {
     @PostMapping("/{battle_id}/participations")
     @Operation(summary = "데일리 배틀 참여", description = "배틀에 참여하고 문제 정보, 테스트 케이스와 남은 시간을 반환합니다.")
     public ResponseEntity<ApiResponse<BattleParticipationResponseDto>> battleParticipation(
-            @Parameter(description = "배틀 ID", required = true, example = "1") @PathVariable("battle_id") @Positive Long battleId,
-            @Parameter(hidden = true) @AuthenticationPrincipal Jwt userInfo
+            @Parameter(description = "배틀 ID", required = true, example = "1")
+            @PathVariable("battle_id") @Positive Long battleId,
+            @Parameter(hidden = true)
+            @AuthenticationPrincipal Jwt userInfo
     ){
 
-        // 배틀 시간 확인
-        battleTimeCheck();
-
-        // 배틀 존재 확인
-        battleInfoCheck(battleId);
-
-        Long userId = Long.parseLong(Objects.requireNonNull(userInfo.getSubject()));
+        // 사용자 정보 추출
+        Long userId = Long.parseLong(userInfo.getSubject());
 
         BattleParticipationResponseDto battleParticipationResponse = dailyBattleService.battleParticipation(battleId, userId);
 
@@ -84,21 +82,17 @@ public class DailyBattleController {
     // 배틀 제출
     @PostMapping("/{battle_id}/submissions")
     public ResponseEntity<BattleSubmissionResponseDto> battleSubmission(
-            @Valid DailyBattleSubmissionRequestDto battleSubmissionRequest,
+            @Valid @RequestBody DailyBattleSubmissionRequestDto battleSubmissionRequest,
             @PathVariable("battle_id") @Positive Long battleId,
-            @AuthenticationPrincipal Jwt userInfo
-    ){
-
-        // 배틀 시간 확인
-        battleTimeCheck();
-
-        // 배틀 존재 확인
-        battleInfoCheck(battleId);
+            @AuthenticationPrincipal Jwt userInfo,
+            @RequestAttribute("battleReceivedAt") Instant submittedAt
+            ){
 
         Long userId = Long.valueOf(userInfo.getSubject());
 
-        BattleSubmissionResponseDto battleSubmissionResponse = dailyBattleService.battleSubmission(battleSubmissionRequest, battleId, userId);
+        BattleSubmissionResponseDto battleSubmissionResponse = dailyBattleService.battleSubmission(battleSubmissionRequest, battleId, userId, submittedAt);
 
+        // 202 반환
         return ResponseEntity.accepted().body(ApiResponse.of(
                 "battle_submission_resumed",
                 battleSubmissionResponse).data()
@@ -107,31 +101,6 @@ public class DailyBattleController {
     }
 
 
-    // 배틀 시간 확인
-    private void battleTimeCheck(){
-
-        // 12시 ~ 12:10 사이가 아니면 참여 불가
-        LocalTime now = LocalTime.now(clock);
-
-        LocalTime start = LocalTime.of(12, 0);
-        LocalTime end = LocalTime.of(12, 10);
-
-        if (now.isBefore(start) || !now.isBefore(end)) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Not_Battle_Time");
-        }
-
-    }
-
-    // 배틀 존재 확인
-    private void battleInfoCheck(Long battleId){
-
-        dailyBattleRepository.findById(battleId)
-                .orElseThrow(() ->
-                        new BusinessException(HttpStatus.NOT_FOUND, "Battle_Not_Found"
-                        )
-                );
-
-    }
 
 
 

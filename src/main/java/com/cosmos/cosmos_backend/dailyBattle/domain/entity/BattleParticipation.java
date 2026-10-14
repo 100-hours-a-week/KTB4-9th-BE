@@ -6,9 +6,12 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
@@ -24,7 +27,7 @@ public class BattleParticipation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "battle_participation_id")
+    @Column(name = "participation_id")
     private Long participationId;
 
     @Column(name = "daily_battle_id")
@@ -42,11 +45,13 @@ public class BattleParticipation {
     private ParticipationStatus participationStatus;
 
     @CreatedDate
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime startedAt;
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "started_at", nullable = false, updatable = false)
+    private Instant startedAt;
 
-    @Column(nullable = true, updatable = false)
-    private LocalDateTime submittedAt;
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
 
 
     public BattleParticipation(Long dailyBattleId, User user) {
@@ -54,6 +59,12 @@ public class BattleParticipation {
         this.user = user;
         this.participationStatus = ParticipationStatus.IN_PROGRESS;
 
+    }
+
+    //제출 처리
+    public void submit(Instant submittedAt) {
+        this.submittedAt = submittedAt;
+        this.participationStatus = ParticipationStatus.SUBMITTED;
     }
 
     // 정답처리

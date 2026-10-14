@@ -21,7 +21,7 @@ public class BattleSubmission {
     private Long battleSubmissionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "battle_participation_id",  nullable = false)
+    @JoinColumn(name = "participation_id",  nullable = false)
     private BattleParticipation participationId;
 
     @ManyToOne(fetch = FetchType.LAZY)
