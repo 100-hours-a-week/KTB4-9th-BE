@@ -22,11 +22,11 @@ public class BattleSubmission {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "participation_id",  nullable = false)
-    private BattleParticipation participationId;
+    private BattleParticipation participation;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "battle_case_id", nullable = false)
-    private BattleCase battleCaseId;
+    private BattleCase battleCase;
 
     @Column(name = "submitted_output", nullable = false)
     private String submittedOutput;
@@ -34,6 +34,11 @@ public class BattleSubmission {
     @Column(name = "is_correct", nullable = true)
     private Boolean isCorrect;
 
+    public BattleSubmission(BattleParticipation participation, BattleCase battleCase, String submittedOutput) {
+        this.participation = participation;
+        this.battleCase = battleCase;
+        this.submittedOutput = submittedOutput;
+    }
 
 
 }

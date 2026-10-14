@@ -6,6 +6,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
+import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.DailyBattleSubmissionRequestDto;
@@ -14,6 +15,7 @@ import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationRes
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleSubmissionResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
+import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestAttribute;
 
 import java.time.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +37,8 @@ public class DailyBattleService {
     private final UserRepository userRepository;
 
     private final BattleParticipationRepository battleParticipationRepository;
+
+    private final BattleSubmissionRepository battleSubmissionRepository;
 
     private final Clock clock;
 
@@ -108,7 +110,7 @@ public class DailyBattleService {
         String content = battleInfo.getContent();
 
         // 배틀 케이스 정보 불러오기 (인풋, 순서)
-        List<BattleCase> battleCaseList = battleCaseRepository.findByDailyBattle_BattleId(battleId);
+        List<BattleCase> battleCaseList = battleCaseRepository.findByDailyBattle_BattleIdOrderByDisplayOrderAsc(battleId);
 
         // 배틀 케이스 응답 dto 만들기
         List<BattleCaseResponseDto>  battleCaseResponseList = new ArrayList<>();
@@ -164,22 +166,90 @@ public class DailyBattleService {
         battleDateCheck(submittedAt, battleInfo.getBattleDate());
         battleTimeCheck(submittedAt);
 
-        // 배틀 참여 정보 확인
+        // 2. 배틀 참여 정보 확인
         BattleParticipation participationInfo = battleParticipationCheck(battleId, userId);
 
-        // 참여 정보가 없거나 이미 참여 완료했다면 예외처리
-         if (participationInfo == null){
-             throw new BusinessException(HttpStatus.NOT_FOUND, "Battle_participation_information_not_found");
-         } else if (participationInfo.getParticipationStatus() != ParticipationStatus.IN_PROGRESS) {
-             throw new BusinessException(HttpStatus.CONFLICT, "Battle_already_participated");
-         }
+        // 3. 참여 정보가 없으면 404
+        if (participationInfo == null){
+            throw new BusinessException(HttpStatus.NOT_FOUND, "Battle_participation_information_not_found");
+        }
 
+        // 요청 접수 시간 반환용
+        LocalDateTime submittedTime = submittedAt.atZone(ZoneId.of("Asia/Seoul")).toLocalDateTime();
 
+        // 4. 제출 상태로 변경
+        Integer updatedCountCheck = battleParticipationRepository.updateStatusIfMatch(
+                participationInfo.getParticipationId(),
+                ParticipationStatus.IN_PROGRESS,
+                ParticipationStatus.SUBMITTED,
+                submittedTime
+        );
+
+        // 5. 상태 변경 실패 시 중복 제출 예외
+        // 현재 상태가 IN_PROGRESS가 아니면 UPDATE가 실행되지 않고 0 반환
+        if (updatedCountCheck == 0) {
+            throw new BusinessException(HttpStatus.CONFLICT, "Battle_already_participated"
+            );
+        }
+
+        // 6. 제출 답안 3개 저장
+        List<DailyBattleSubmissionRequestDto.Answer> userAnswers = battleSubmissionRequest.userAnswers();
+
+        List<BattleCase> battleCaseList = battleCaseRepository.findByDailyBattle_BattleIdOrderByDisplayOrderAsc(battleId);
+
+        // 행 저장용 리스트
+        List<BattleSubmission> submissions = new ArrayList<>();
+
+        // 요청 정답의 케이스 순서 중복 검증
+        Set<Integer> caseNums = new HashSet<>();
+
+        for (DailyBattleSubmissionRequestDto.Answer answer : userAnswers) {
+            if (!caseNums.add(answer.caseNum())) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "Battle_case_number_duplicated"
+                );
+            }
+        }
+
+        for (DailyBattleSubmissionRequestDto.Answer answer : userAnswers) {
+
+            // 6-1. caseNum에 해당하는 BattleCase 찾기
+            BattleCase battleCase = null;
+
+            for (BattleCase bc : battleCaseList) {
+                if (bc.getDisplayOrder().equals(answer.caseNum())) {
+                    battleCase = bc;
+                    break;
+                }
+            }
+
+            // 일치하는 BattleCase가 없으면 예외
+            if (battleCase == null) {
+                throw new BusinessException(
+                        HttpStatus.BAD_REQUEST,
+                        "Battle_case_not_found"
+                );
+            }
+
+            // 6-2. BattleSubmission 엔티티 생성
+            BattleSubmission submission = new BattleSubmission(
+                    participationInfo,
+                    battleCase,
+                    answer.userAnswer()
+            );
+
+            // 6-3. 저장 리스트에 추가
+            submissions.add(submission);
+        }
+
+        // 6-4. 답안 3개 저장
+        battleSubmissionRepository.saveAll(submissions);
+
+        // 7. 응답 dto 만들기
         BattleSubmissionResponseDto battleSubmissionResponse = new BattleSubmissionResponseDto(
-            battleId,
-            userId,
-            ParticipationStatus.SUBMITTED,
-            LocalDateTime.now(clock)
+                battleId,
+                userId,
+                ParticipationStatus.SUBMITTED,
+                submittedTime
         );
 
         return battleSubmissionResponse;
