@@ -34,7 +34,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/daily-problems").permitAll()
-                        .requestMatchers("/daily-battles").permitAll()
+                        .requestMatchers("/daily-battles/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers(
                                 PathPatternRequestMatcher.pathPattern(HttpMethod.GET,"/problems/new"),
