@@ -67,6 +67,11 @@ public class BattleParticipation {
         this.participationStatus = ParticipationStatus.SUBMITTED;
     }
 
+    // 채점 중으로 처리
+    public void grading(){
+        this.participationStatus = ParticipationStatus.GRADING;
+    }
+
     // 정답처리
     public void isCorrect(){
         this.allCorrect = true;
