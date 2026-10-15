@@ -1,15 +1,30 @@
 package com.cosmos.cosmos_backend.dailyBattle.worker;
 
-import jakarta.persistence.Column;
-import org.springframework.scheduling.annotation.Scheduled;
+import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
+import com.cosmos.cosmos_backend.dailyBattle.service.BattleGradingService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import java.util.Optional;
 
 @Component
+@RequiredArgsConstructor
 public class BattleGradingWorker {
 
-    // 1초에 2번, 작업과 겹치면 작업 끝나고 다음거 가져오게
-    @Scheduled(fixedDelay = 500)
-    public void processBattleSubmissions() {
+    private final BattleParticipationRepository battleParticipationRepository;
 
+    private final BattleGradingService battleGradingService;
+
+    // 작업 선점, 채점 작업을 진행하는 워커
+    public void gradingBattleSubmissions() {
+
+        // 선점 작업 확인 (트랜잭션 1)
+        Optional<Long> preemptParticipationId = battleGradingService.preemptSubmission();
+
+        // 선점 작업 없으면 종료
+        if(preemptParticipationId.isEmpty()){
+            return;
+        }
+        // 선점 작업 있으면 채점으로 (트랜잭션 2)
+        battleGradingService.battleGrade(preemptParticipationId.get());
     }
 }
