@@ -4,6 +4,10 @@ spring:
     username: cosmos
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  task:
+    scheduling:
+      pool:
+        size: 2
 
   jpa:
     hibernate:

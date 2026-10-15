@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Optional;
 
 public interface BattleParticipationRepository extends JpaRepository<BattleParticipation,Long> {
@@ -31,4 +32,18 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
             @Param("submittedStatus") ParticipationStatus submittedStatus,
             @Param("submittedAt") LocalDateTime submittedAt
     );
+
+    // 채점 worker의 작업 선점을 위한 메소드(제출 처리인 상태인 행 중에 제출 시각 빠른것, 락 가진건 건너 뛰기)
+    @Query(value = """
+    SELECT *
+    FROM battle_participations
+    WHERE participation_status = 'SUBMITTED'
+    ORDER BY submitted_at ASC
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+    """, nativeQuery = true)
+    Optional<BattleParticipation> findSubmittedForUpdate();
+
+    // 채점 미완료된 제출있는지 확인
+    Boolean existsByDailyBattleIdAndParticipationStatusIn(Long battleId, Collection<ParticipationStatus> statuses);
 }
