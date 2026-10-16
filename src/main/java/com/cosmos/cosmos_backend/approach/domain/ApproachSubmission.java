@@ -13,9 +13,12 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** 사용자별 문제 풀이(자연어 접근 방식) 제출. */
 @Entity
@@ -56,6 +59,10 @@ public class ApproachSubmission {
 
     @Column(name = "ai_feedback", columnDefinition = "TEXT")
     private String aiFeedback;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "keyword_results", columnDefinition = "json")
+    private List<KeywordResult> keywordResults;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "evaluation_status", nullable = false, length = 64)
@@ -99,6 +106,11 @@ public class ApproachSubmission {
         this.aiFeedback = feedback;
         this.evaluationStatus = EvaluationStatus.COMPLETED;
         this.evaluatedAt = LocalDateTime.now(ZoneOffset.UTC);
+    }
+
+    /** 이번 제출의 AI 키워드 판정을 저장. 이전 값은 새 값으로 교체됨. */
+    public void updateKeywordResults(List<KeywordResult> keywordResults) {
+        this.keywordResults = keywordResults;
     }
 
     public void markAsSolved() {

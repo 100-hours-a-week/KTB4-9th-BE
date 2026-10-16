@@ -13,6 +13,7 @@ import com.cosmos.cosmos_backend.approach.client.AiEvaluationClient;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
+import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
@@ -102,7 +103,6 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -115,6 +115,44 @@ class ApproachSubmissionServiceTest {
         assertThat(submission.getEvaluationStatus().name()).isEqualTo("COMPLETED");
         assertThat(submission.getTotalScore()).isEqualTo(85);
         assertThat(submission.getAiFeedback()).isEqualTo("좋은 접근이에요");
+        verify(approachSubmissionRepository, never()).findForUpdateByUserIdAndProblemId(any(), any());
+    }
+
+    @Test
+    void submit_savesKeywordResults_onFirstSubmission() {
+        // Given
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of(new Keyword(1L, "해시맵"), new Keyword(1L, "순회")));
+        when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
+        when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess("해시맵"));
+        when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        ApproachSubmitResult result = service.submit(10L, 1L, "ARRAY", "해시맵으로 풉니다");
+
+        // Then
+        assertThat(result.submission().getKeywordResults())
+                .containsExactly(new KeywordResult("해시맵", true), new KeywordResult("순회", false));
+    }
+
+    @Test
+    void submit_replacesKeywordResults_onResubmission() {
+        // Given
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of(new Keyword(1L, "해시맵"), new Keyword(1L, "순회")));
+        when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
+        when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess("순회"));
+        ApproachSubmission existing = new ApproachSubmission(10L, 1L, Category.ARRAY, "이전 풀이", false, 20, "이전 피드백");
+        existing.updateKeywordResults(List.of(new KeywordResult("해시맵", true), new KeywordResult("순회", false)));
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
+        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
+
+        // When
+        ApproachSubmitResult result = service.submit(10L, 1L, "ARRAY", "순회로 풉니다");
+
+        // Then
+        assertThat(result.submission().getKeywordResults())
+                .containsExactly(new KeywordResult("해시맵", false), new KeywordResult("순회", true));
     }
 
     @Test
@@ -125,6 +163,7 @@ class ApproachSubmissionServiceTest {
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
         ApproachSubmission existing = new ApproachSubmission(10L, 1L, Category.ARRAY, "이전 풀이", false, 20, "이전 피드백");
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
         when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
 
         // When
@@ -145,7 +184,6 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -189,7 +227,6 @@ class ApproachSubmissionServiceTest {
                         new AiEvaluationResult.KeywordJudgement("AI가 준 모르는 키워드", true)
                 )
         ));
-        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -210,7 +247,6 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
         when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -288,7 +324,9 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
-        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(submissionWithCount(4)));
+        ApproachSubmission fourth = submissionWithCount(4);
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(fourth));
+        when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(fourth));
 
         // When
         ApproachSubmitResult result = service.submit(10L, 1L, "ARRAY", "다섯 번째 풀이");
@@ -307,6 +345,7 @@ class ApproachSubmissionServiceTest {
         when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(aiEvaluationClient.evaluate(any())).thenReturn(aiSuccess());
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
         when(approachSubmissionRepository.findForUpdateByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(existing));
 
         // When & Then

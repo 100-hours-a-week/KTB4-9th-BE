@@ -7,12 +7,15 @@ import com.cosmos.cosmos_backend.problem.dto.response.DailyProblemResponseDto;
 import com.cosmos.cosmos_backend.problem.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -53,6 +56,12 @@ public class DailyProblemService {
     }
 
     // 데일리 문제 조회 -> FE에서 처음 화면에서 조회
+    // 로컬 캐시 먼저 조회
+    @Cacheable(
+            cacheManager = "caffeineCacheManager",
+            cacheNames = "dailyProblems",
+            key = "T(java.time.LocalDate).now(@clock)"
+    )
     public DailyProblemResponseDto getDailyProblems() {
 
         // 오늘 날짜
@@ -61,44 +70,54 @@ public class DailyProblemService {
         // 1. 데일리 문제 리스트 디비에서 받아오기
         List<DailyProblem> dailyProblemList = dailyProblemRepository.findWithProblemByRecommendDateOrderByDisplayOrderDesc(date);
 
-        // 2. 데일리 문제 리스트로 응답 구성
-        List<DailyProblemResponseDto.DailyProblems> dailyProblems = new ArrayList<>();
+        //2. 데일리 문제 id 리스트로 받아오기
+        List<Long> problemIdList = dailyProblemList.stream()
+                .map(dailyProblem -> dailyProblem.getProblem().getId())
+                .toList();
 
-        for (int i = 0; i < dailyProblemList.size(); i++) {
+        // 3. 문제 id로 문제 예시 리스트 받아오기
+        List<ProblemExample> problemExamples = problemExampleRepository.findByProblemIdInOrderByProblemIdAscDisplayOrderAsc(problemIdList);
 
-            Problem problem = dailyProblemList.get(i).getProblem();
+        // 4. 문제 id, 문제 예시 리스트로 map 만들기
+        Map<Long, List<ProblemExample>> examplesByProblemId = problemExamples.stream().collect(Collectors.groupingBy(ProblemExample::getProblemId));
 
-            List<AiProblemsCreateRequestDto.ProblemExamples> examples = new ArrayList<>();
+        // 5. 응답 DTO 구성
+        List<DailyProblemResponseDto.DailyProblems> dailyProblems =
+                dailyProblemList.stream()
+                        .map(dailyProblem -> {
 
-            List<ProblemExample> problemExamples = problemExampleRepository.findByProblemIdOrderByDisplayOrder(problem.getId());
+                            Problem problem = dailyProblem.getProblem();
 
-            for (int j = 0 ; j < problemExamples.size(); j++) {
-                AiProblemsCreateRequestDto.ProblemExamples example = new AiProblemsCreateRequestDto.ProblemExamples(
-                        problemExamples.get(j).getInput(),
-                        problemExamples.get(j).getOutput(),
-                        problemExamples.get(j).getDescription()
-                );
+                            List<AiProblemsCreateRequestDto.ProblemExamples> exampleDtos =
+                                    examplesByProblemId
+                                            .getOrDefault(
+                                                    problem.getId(),
+                                                    List.of()
+                                            )
+                                            .stream()
+                                            .map(example ->
+                                                    new AiProblemsCreateRequestDto.ProblemExamples(
+                                                            example.getInput(),
+                                                            example.getOutput(),
+                                                            example.getDescription()
+                                                    )
+                                            )
+                                            .toList();
 
-                examples.add(example);
-            }
+                            return new DailyProblemResponseDto.DailyProblems(
+                                    problem.getId(),
+                                    problem.getDifficulty(),
+                                    problem.getCategory(),
+                                    problem.getTitle(),
+                                    problem.getContent(),
+                                    exampleDtos
+                            );
+                        })
+                        .toList();
 
-            DailyProblemResponseDto.DailyProblems dailyProblem = new DailyProblemResponseDto.DailyProblems(
-                    problem.getId(),
-                    problem.getDifficulty(),
-                    problem.getCategory(),
-                    problem.getTitle(),
-                    problem.getContent(),
-                    examples
-            );
-
-            dailyProblems.add(dailyProblem);
-        }
-
-        DailyProblemResponseDto dailyProblemResponse = new DailyProblemResponseDto(
+        return new DailyProblemResponseDto(
                 date,
                 dailyProblems
         );
-
-        return dailyProblemResponse;
     }
 }

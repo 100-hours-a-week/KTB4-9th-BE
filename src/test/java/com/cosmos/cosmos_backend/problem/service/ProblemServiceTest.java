@@ -4,6 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
+import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
+import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
+import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
+import com.cosmos.cosmos_backend.codesubmission.domain.CodeSubmission;
+import com.cosmos.cosmos_backend.codesubmission.domain.JudgingResult;
+import com.cosmos.cosmos_backend.codesubmission.repository.CodeSubmissionRepository;
 import com.cosmos.cosmos_backend.common.*;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.client.AiProblemClient;
@@ -14,7 +21,9 @@ import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.domain.entity.UsedHint;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.*;
+import com.cosmos.cosmos_backend.savedproblem.repository.SavedProblemRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -48,10 +57,19 @@ class ProblemServiceTest {
     private UsedHintRepository usedHintRepository;
 
     @Mock
+    private SavedProblemRepository savedProblemRepository;
+
+    @Mock
+    private ApproachSubmissionRepository approachSubmissionRepository;
+
+    @Mock
+    private CodeSubmissionRepository codeSubmissionRepository;
+
+    @Mock
     private AiProblemClient aiProblemClient;
 
     private ProblemService service() {
-        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, aiProblemClient);
+        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, savedProblemRepository, approachSubmissionRepository, codeSubmissionRepository, aiProblemClient);
     }
 
     @Test
@@ -89,6 +107,11 @@ class ProblemServiceTest {
         assertThat(response.examples().get(0).input()).isEqualTo("nums=[2,7]");
         // 힌트 사용 기록이 없으면 0
         assertThat(response.usedHintStage()).isEqualTo(0);
+        // 저장하지 않은 문제면 false
+        assertThat(response.saved()).isFalse();
+        // 제출한 적이 없으면 null
+        assertThat(response.myApproach()).isNull();
+        assertThat(response.myCode()).isNull();
     }
 
     @Test
@@ -108,6 +131,86 @@ class ProblemServiceTest {
 
         // Then
         assertThat(response.usedHintStage()).isEqualTo(2);
+    }
+
+    @Test
+    void getProblemDetail_returnsSavedTrue_whenUserSavedProblem() {
+        // Given
+        Problem problem = new Problem(
+                Difficulty.LV1, Category.ARRAY, "두 수의 합", "내용", "입력 형식", "출력 형식", List.of(), "배열"
+        );
+        setId(problem, 1L);
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(1L)).thenReturn(List.of());
+        when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
+        when(usedHintRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.empty());
+        when(savedProblemRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+
+        // When
+        ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
+
+        // Then
+        assertThat(response.saved()).isTrue();
+    }
+
+    @Test
+    void getProblemDetail_returnsMySubmissions_whenSubmitted() {
+        // Given
+        Problem problem = new Problem(
+                Difficulty.LV1, Category.ARRAY, "두 수의 합", "내용", "입력 형식", "출력 형식", List.of(), "배열"
+        );
+        setId(problem, 1L);
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(1L)).thenReturn(List.of());
+        when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
+        when(usedHintRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.empty());
+        ApproachSubmission approach = new ApproachSubmission(7L, 1L, Category.ARRAY, "투 포인터로 푼다", true, 90, "좋아요");
+        approach.updateKeywordResults(List.of(new KeywordResult("투 포인터", true), new KeywordResult("정렬", false)));
+        when(approachSubmissionRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.of(approach));
+        when(codeSubmissionRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.of(
+                new CodeSubmission(7L, 1L, Language.PYTHON, "print(1)", LocalDateTime.now(), JudgingResult.WRONG_ANSWER, 1, 3)
+        ));
+
+        // When
+        ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
+
+        // Then
+        assertThat(response.myApproach().naturalSolution()).isEqualTo("투 포인터로 푼다");
+        assertThat(response.myApproach().selectedCategory()).isEqualTo(Category.ARRAY);
+        assertThat(response.myCode().sourceCode()).isEqualTo("print(1)");
+        assertThat(response.myCode().language()).isEqualTo(Language.PYTHON);
+        assertThat(response.myApproach().result().approachScore()).isEqualTo(90);
+        assertThat(response.myApproach().result().aiFeedback()).isEqualTo("좋아요");
+        assertThat(response.myApproach().result().keywords()).extracting(ApproachSubmitResponse.KeywordJudgement::keyword)
+                .containsExactly("투 포인터", "정렬");
+        assertThat(response.myApproach().submissionUsage().usedCount()).isEqualTo(1);
+        assertThat(response.myApproach().submissionUsage().remainingCount()).isEqualTo(4);
+        assertThat(response.myCode().judgingResult()).isEqualTo(JudgingResult.WRONG_ANSWER);
+        assertThat(response.myCode().passedTestCount()).isEqualTo(1);
+        assertThat(response.myCode().totalTestCount()).isEqualTo(3);
+        assertThat(response.myCode().submittedCount()).isEqualTo(1);
+    }
+
+    @Test
+    void getProblemDetail_returnsEmptyKeywords_whenKeywordsWereNotSaved() {
+        // Given: 키워드 판정을 저장하지 않은 이전 제출
+        Problem problem = new Problem(
+                Difficulty.LV1, Category.ARRAY, "두 수의 합", "내용", "입력 형식", "출력 형식", List.of(), "배열"
+        );
+        setId(problem, 1L);
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(1L)).thenReturn(List.of());
+        when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
+        when(usedHintRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.empty());
+        when(approachSubmissionRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.of(
+                new ApproachSubmission(7L, 1L, Category.ARRAY, "이전 풀이", false, 40, "아쉬워요")
+        ));
+
+        // When
+        ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
+
+        // Then: 에러 없이 빈 키워드로 내려감
+        assertThat(response.myApproach().result().keywords()).isEmpty();
     }
 
     @Test

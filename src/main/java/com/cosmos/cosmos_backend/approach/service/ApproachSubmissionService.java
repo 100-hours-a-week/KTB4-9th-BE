@@ -6,6 +6,7 @@ import com.cosmos.cosmos_backend.approach.client.AiEvaluationClient;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
+import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
@@ -80,27 +81,42 @@ public class ApproachSubmissionService {
         // 7. AI 판정을 우리 키워드 목록 기준으로 병합
         List<AiEvaluationResult.KeywordJudgement> mergedKeywords = mergeKeywordJudgements(keywords, result.keywords());
 
+        // 저장용 형태로 변환
+        List<KeywordResult> keywordResults = mergedKeywords.stream()
+                .map(keyword -> new KeywordResult(keyword.keyword(), keyword.included()))
+                .toList();
+
         // 이미 정답을 맞춘적이 있는지 확인
         Optional<ApproachSubmission> beforeSubmission = approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId);
 
         Boolean alreadySolved = beforeSubmission.isPresent() && beforeSubmission.get().getIsSolved();
 
-        // 8. 성공했을 때만 이 트랜잭션 안에서 잠근 채로 기존 제출을 갱신하거나 새로 저장
-        ApproachSubmission submission = transactionTemplate.execute(status ->
-                approachSubmissionRepository.findForUpdateByUserIdAndProblemId(userId, problemId)
-                        .map(existing -> {
-                            // 1. 잠근 뒤 다시 확인 (앞의 빠른 확인 이후 다른 요청이 올렸을 수 있음)
-                            if (existing.getSubmittedCount() >= ApproachSubmission.MAX_SUBMISSION_COUNT) {
-                                throw limitExceeded(problemId, existing.getSubmittedCount());
-                            }
-                            // 2. 재제출 처리 (커밋 때 UPDATE가 나감)
-                            existing.resubmit(category, naturalSolution, categoryResult, result.score(), result.feedback());
-                            return existing;
-                        })
-                        .orElseGet(() -> approachSubmissionRepository.save(
-                                new ApproachSubmission(userId, problemId, category, naturalSolution, categoryResult, result.score(), result.feedback())
-                        ))
-        );
+        // 8. 성공했을 때만 이 트랜잭션 안에서 기존 제출을 갱신하거나 새로 저장
+        ApproachSubmission submission = transactionTemplate.execute(status -> {
+            // 1. 락 없이 기존 제출이 있는지 확인
+            boolean exists = approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId).isPresent();
+
+            // 2. 최초 제출이면 락 없이 새로 저장
+            if (!exists) {
+                ApproachSubmission created = new ApproachSubmission(userId, problemId, category, naturalSolution, categoryResult, result.score(), result.feedback());
+                created.updateKeywordResults(keywordResults);
+                return approachSubmissionRepository.save(created);
+            }
+
+            // 3. 재제출이면 그 행을 잠그고 조회
+            ApproachSubmission existing = approachSubmissionRepository
+                    .findForUpdateByUserIdAndProblemId(userId, problemId).orElseThrow();
+
+            // 4. 잠근 뒤 다시 확인 (앞의 빠른 확인 이후 다른 요청이 올렸을 수 있음)
+            if (existing.getSubmittedCount() >= ApproachSubmission.MAX_SUBMISSION_COUNT) {
+                throw limitExceeded(problemId, existing.getSubmittedCount());
+            }
+
+            // 5. 재제출 처리 (커밋 때 UPDATE가 나감)
+            existing.resubmit(category, naturalSolution, categoryResult, result.score(), result.feedback());
+            existing.updateKeywordResults(keywordResults);
+            return existing;
+        });
 
 
         // 이번 제출이 정답인지 확인
