@@ -1,0 +1,18 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+ai:
+  root-url: ${AI_SERVER_BASE_URL:http://ai-server:8000}
+  server:
+    base-url: ${AI_SERVER_BASE_URL:http://ai-server:8000}
+
+judge0:
+  base-url: ${JUDGE0_BASE_URL:https://dev-judge.cosmoscode.site}
+
+sentry:
+  environment: ${SENTRY_ENVIRONMENT:dev}
+
+frontend:
+  base-url: ${FRONTEND_BASE_URL:https://cosmoscode.site}

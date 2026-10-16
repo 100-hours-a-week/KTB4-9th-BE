@@ -30,13 +30,18 @@ jwt:
   refresh-token-expiration: 1209600
 
 frontend:
-  base-url: ${FRONT_BASE_URL}
+  base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
 
 cookie:
-  secure: true
+  secure: false
 
 ai:
-  root-url : ${AI_BASE_URL}
+  root-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
+  server:
+    base-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
+
+judge0:
+  base-url: ${JUDGE0_BASE_URL:http://localhost:2358}
 
 # 로컬 부하테스트에서 Tomcat HTTP 작업 스레드 풀 메트릭 노출
 # 스레드 수나 풀 크기는 변경하지 않고 Actuator/Micrometer 계측만 활성화
