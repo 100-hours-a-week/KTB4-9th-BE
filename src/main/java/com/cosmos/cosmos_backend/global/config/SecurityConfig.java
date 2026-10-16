@@ -1,6 +1,7 @@
 package com.cosmos.cosmos_backend.global.config;
 
 import com.cosmos.cosmos_backend.auth.jwt.CookieBearerTokenResolver;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -51,14 +52,14 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${frontend.base-url}") String frontendBaseUrl
+    ) {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
         // 프론트 서버
-        configuration.setAllowedOrigins(
-                List.of("https://cosmoscode.site")
-        );
+        configuration.setAllowedOrigins(List.of(frontendBaseUrl));
 
         configuration.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
