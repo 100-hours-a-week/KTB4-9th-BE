@@ -10,8 +10,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class BattleGradingWorker {
 
-    private final BattleParticipationRepository battleParticipationRepository;
-
     private final BattleGradingService battleGradingService;
 
     // 작업 선점, 채점 작업을 진행하는 워커

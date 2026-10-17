@@ -40,5 +40,14 @@ public class BattleSubmission {
         this.submittedOutput = submittedOutput;
     }
 
+    // 정답 처리
+    public void answerCorrect(){
+        this.isCorrect = true;
+    }
+
+    // 오답 처리
+    public void answerIncorrect(){
+        this.isCorrect = false;
+    }
 
 }
