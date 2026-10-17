@@ -62,36 +62,41 @@ public class BattleParticipation {
     }
 
     //제출 처리
-    public void submit(Instant submittedAt) {
+    public void markSubmit(Instant submittedAt) {
         this.submittedAt = submittedAt;
         this.participationStatus = ParticipationStatus.SUBMITTED;
     }
 
     // 채점 중으로 처리
-    public void grading(){
+    public void markGrading(){
         this.participationStatus = ParticipationStatus.GRADING;
+    }
+
+    // 채점 완료 처리
+    public void markEvaluatingComplete(){
+        this.participationStatus = ParticipationStatus.GRADING_COMPLETED;
+    }
+
+    // 중도 포기 처리
+    public void markDropOut(){
+        this.participationStatus = ParticipationStatus.DROPPED_OUT;
+    }
+
+    // 타임아웃 처리
+    public void markTimeOut(){
+        this.participationStatus = ParticipationStatus.TIME_OVER;
     }
 
     // 정답처리
     public void isCorrect(){
         this.allCorrect = true;
-        this.participationStatus = ParticipationStatus.EVALUATING_COMPLETED;
+        this.participationStatus = ParticipationStatus.GRADING_COMPLETED;
     }
 
     // 오답처리
     public void isWrong(){
         this.allCorrect = false;
-        this.participationStatus = ParticipationStatus.EVALUATING_COMPLETED;
-    }
-
-    // 중도 포기 처리
-    public void dropOut(){
-        this.participationStatus = ParticipationStatus.DROPPED_OUT;
-    }
-
-    // 타임아웃 처리
-    public void timeOut(){
-        this.participationStatus = ParticipationStatus.TIME_OVER;
+        this.participationStatus = ParticipationStatus.GRADING_COMPLETED;
     }
 
 }
