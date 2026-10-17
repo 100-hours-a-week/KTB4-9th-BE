@@ -18,7 +18,9 @@ import com.cosmos.cosmos_backend.common.Language;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.domain.entity.TestCase;
+import com.cosmos.cosmos_backend.problem.domain.entity.UsedHint;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
+import com.cosmos.cosmos_backend.problem.repository.UsedHintRepository;
 import java.time.ZoneOffset;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
 import com.cosmos.cosmos_backend.problem.repository.TestCaseRepository;
@@ -53,6 +55,9 @@ class CodeSubmissionServiceTest {
     private CodeSubmissionRepository codeSubmissionRepository;
 
     @Mock
+    private UsedHintRepository usedHintRepository;
+
+    @Mock
     private Judge0Client judge0Client;
 
     private CodeSubmissionService service;
@@ -68,7 +73,7 @@ class CodeSubmissionServiceTest {
         };
         service = new CodeSubmissionService(
                 problemRepository, testCaseRepository, runningLimitRepository,
-                codeSubmissionRepository, judge0Client, fakeTransactionTemplate
+                codeSubmissionRepository, usedHintRepository, judge0Client, fakeTransactionTemplate
         );
     }
 
@@ -328,6 +333,37 @@ class CodeSubmissionServiceTest {
         assertBusiness(() -> service.submit(USER_ID, PROBLEM_ID, "RUBY", "puts 1"),
                 HttpStatus.BAD_REQUEST, "invalid_language");
         verify(judge0Client, never()).judge(any(), any(), any(), any());
+    }
+
+    @Test
+    void submit_throws409_andNeverCallsJudge0_whenAnswerHintAlreadyUsed() {
+        // Given: 정답 힌트(2단계)를 본 사용자
+        when(problemRepository.existsById(PROBLEM_ID)).thenReturn(true);
+        when(usedHintRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID))
+                .thenReturn(Optional.of(new UsedHint(USER_ID, PROBLEM_ID, 2)));
+
+        // When & Then
+        assertBusiness(() -> service.submit(USER_ID, PROBLEM_ID, "PYTHON", "print(1)"),
+                HttpStatus.CONFLICT, "answer_hint_already_used");
+        verify(judge0Client, never()).judge(any(), any(), any(), any());
+        verify(codeSubmissionRepository, never()).save(any());
+    }
+
+    @Test
+    void submit_judgesNormally_whenOnlyCommentHintUsed() {
+        // Given: 주석 힌트(1단계)만 본 사용자
+        givenTestCases(1);
+        givenLimits();
+        givenNoPreviousSubmission();
+        when(usedHintRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID))
+                .thenReturn(Optional.of(new UsedHint(USER_ID, PROBLEM_ID, 1)));
+        when(judge0Client.judge(any(), any(), any(), any())).thenReturn(List.of(JudgingResult.CORRECT));
+
+        // When
+        CodeSubmissionResult result = service.submit(USER_ID, PROBLEM_ID, "PYTHON", "print(1)");
+
+        // Then
+        assertThat(result.submission().getJudgingResult()).isEqualTo(JudgingResult.CORRECT);
     }
 
     // 이미 count번 제출한 기존 제출을 만든다.

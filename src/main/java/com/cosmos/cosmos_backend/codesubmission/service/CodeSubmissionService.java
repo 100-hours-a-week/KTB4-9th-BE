@@ -12,6 +12,7 @@ import com.cosmos.cosmos_backend.problem.domain.entity.TestCase;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
 import com.cosmos.cosmos_backend.problem.repository.TestCaseRepository;
+import com.cosmos.cosmos_backend.problem.repository.UsedHintRepository;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -30,6 +31,7 @@ public class CodeSubmissionService {
     private final TestCaseRepository testCaseRepository;
     private final RunningLimitRepository runningLimitRepository;
     private final CodeSubmissionRepository codeSubmissionRepository;
+    private final UsedHintRepository usedHintRepository;
     private final Judge0Client judge0Client;
     private final TransactionTemplate transactionTemplate;
 
@@ -49,13 +51,21 @@ public class CodeSubmissionService {
         // 3. language 문자열을 enum으로 변환 (없는 값이면 400 예외를 던짐)
         Language lang = parseLanguage(language);
 
-        // 4. 이 문제의 제출 횟수가 한도를 채웠으면 Judge0를 부르기 전에 429 (잠금 없는 빠른 차단)
+        // 4. 정답 힌트를 열람한 사용자는 제출할 수 없음 (409 예외를 던짐)
+        boolean sawAnswerHint = usedHintRepository.findByUserIdAndProblemId(userId, problemId)
+                .map(usedHint -> usedHint.getHintStage() >= 2)
+                .orElse(false);
+        if (sawAnswerHint) {
+            throw new BusinessException(HttpStatus.CONFLICT, "answer_hint_already_used");
+        }
+
+        // 5. 이 문제의 제출 횟수가 한도를 채웠으면 Judge0를 부르기 전에 429 (잠금 없는 빠른 차단)
         int usedBefore = codeSubmissionRepository.findSubmittedCount(userId, problemId).orElse(0);
         if (usedBefore >= CodeSubmission.MAX_SUBMISSION_COUNT) {
             throw limitExceeded(usedBefore);
         }
 
-        // 5. 채점에 쓸 테스트케이스와 이 언어의 실행 제한을 조회 (테스트케이스가 없으면 503 예외를 던짐)
+        // 6. 채점에 쓸 테스트케이스와 이 언어의 실행 제한을 조회 (테스트케이스가 없으면 503 예외를 던짐)
         List<TestCase> testCases = testCaseRepository.findByProblemIdOrderByDisplayOrder(problemId);
         if (testCases.isEmpty()) {
             log.error("채점할 테스트케이스가 없음: problemId={}", problemId);
@@ -66,17 +76,17 @@ public class CodeSubmissionService {
                 .findFirst()
                 .orElse(null);
 
-        // 6. Judge0에 채점 요청 (실패하면 예외가 던져져 여기서 끝나고 DB는 그대로 유지됨)
+        // 7. Judge0에 채점 요청 (실패하면 예외가 던져져 여기서 끝나고 DB는 그대로 유지됨)
         List<JudgingResult> verdicts = judge0Client.judge(lang, sourceCode, testCases, limit);
 
-        // 7. 통과 개수와 최종 결과를 계산 (앞 순서의 실패 종류가 결과, 모두 통과하면 CORRECT)
+        // 8. 통과 개수와 최종 결과를 계산 (앞 순서의 실패 종류가 결과, 모두 통과하면 CORRECT)
         int passed = (int) verdicts.stream().filter(verdict -> verdict == JudgingResult.CORRECT).count();
         JudgingResult result = verdicts.stream()
                 .filter(verdict -> verdict != JudgingResult.CORRECT)
                 .findFirst()
                 .orElse(JudgingResult.CORRECT);
 
-        // 8. 성공했을 때만 이 트랜잭션 안에서 잠근 채로 기존 제출을 갱신하거나 새로 저장
+        // 9. 성공했을 때만 이 트랜잭션 안에서 잠근 채로 기존 제출을 갱신하거나 새로 저장
         CodeSubmission submission = transactionTemplate.execute(status ->
                 codeSubmissionRepository.findForUpdateByUserIdAndProblemId(userId, problemId)
                         .map(existing -> {
@@ -93,7 +103,7 @@ public class CodeSubmissionService {
                         ))
         );
 
-        // 9. 테스트케이스별 판정도 같이 반환 (화면에서 테스트별 통과/실패 표시에 사용)
+        // 10. 테스트케이스별 판정도 같이 반환 (화면에서 테스트별 통과/실패 표시에 사용)
         return new CodeSubmissionResult(submission, verdicts);
     }
 

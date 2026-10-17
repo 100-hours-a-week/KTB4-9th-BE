@@ -14,6 +14,9 @@ public interface CodeSubmissionRepository extends JpaRepository<CodeSubmission, 
     @Query("select s.submittedCount from CodeSubmission s where s.userId = :userId and s.problemId = :problemId")
     Optional<Integer> findSubmittedCount(@Param("userId") Long userId, @Param("problemId") Long problemId);
 
+    // 사용자·문제별 제출 조회 (잠금 없음, 읽기 화면용)
+    Optional<CodeSubmission> findByUserIdAndProblemId(Long userId, Long problemId);
+
     // 사용자·문제별 기존 제출을 잠그고 조회 (트랜잭션 안에서만 호출 가능)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<CodeSubmission> findForUpdateByUserIdAndProblemId(Long userId, Long problemId);
