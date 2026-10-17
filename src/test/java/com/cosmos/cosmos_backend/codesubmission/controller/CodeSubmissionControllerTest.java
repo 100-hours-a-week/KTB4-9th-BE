@@ -199,4 +199,21 @@ class CodeSubmissionControllerTest {
                 .bodyJson()
                 .extractingPath("$.message").isEqualTo("problem_not_found");
     }
+
+    @Test
+    void submit_returns409_whenAnswerHintAlreadyUsed() {
+        // Given
+        loginAs("7");
+        when(codeSubmissionService.submit(any(), any(), any(), any()))
+                .thenThrow(new BusinessException(HttpStatus.CONFLICT, "answer_hint_already_used"));
+
+        // When & Then
+        mvc().post().uri("/problems/1/code-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"language\":\"PYTHON\",\"source_code\":\"a\"}")
+                .assertThat()
+                .hasStatus(HttpStatus.CONFLICT)
+                .bodyJson()
+                .extractingPath("$.message").isEqualTo("answer_hint_already_used");
+    }
 }
