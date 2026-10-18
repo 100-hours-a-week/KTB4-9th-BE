@@ -4,10 +4,20 @@ spring:
     username: cosmos
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  task:
+    scheduling:
+      pool:
+        size: 2
 
   jpa:
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+
+logging:
+  level:
+    org.springframework.security.web.FilterChainProxy: TRACE
 
 kakao:
   client-id: ${KAKAO_CLIENT_ID}
@@ -19,8 +29,42 @@ jwt:
   access-token-expiration: 1800
   refresh-token-expiration: 1209600
 
+frontend:
+  base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+
 cookie:
-  secure: true
+  secure: false
 
 ai:
-  root-url : ${AI_BASE_URL}
+  root-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
+  server:
+    base-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
+
+judge0:
+  base-url: ${JUDGE0_BASE_URL:http://localhost:2358}
+
+# 로컬 부하테스트에서 Tomcat HTTP 작업 스레드 풀 메트릭 노출
+# 스레드 수나 풀 크기는 변경하지 않고 Actuator/Micrometer 계측만 활성화
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        hikaricp.connections.acquire: true
+        hikaricp.connections.usage: true
+        jdbc.query: true
+
+jdbc:
+  datasource-proxy:
+    enabled: true
+  includes:
+    - QUERY

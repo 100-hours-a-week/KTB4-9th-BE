@@ -1,0 +1,7 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+sentry:
+  environment: ${SENTRY_ENVIRONMENT:stage}

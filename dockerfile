@@ -29,5 +29,8 @@ COPY --from=builder /app/extracted/application/ ./
 
 EXPOSE 8080
 
+# v1 EC2는 별도 프로필 주입 없이 dev를 사용하고, v2 ECS는 stage로 덮어쓴다.
+ENV SPRING_PROFILES_ACTIVE=dev
+
 # 최신 스프링 부트 런처 실행
 ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]

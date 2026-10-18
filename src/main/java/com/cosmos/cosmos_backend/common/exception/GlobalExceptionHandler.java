@@ -10,6 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /** 컨트롤러·서비스에서 던져진 예외를 받아 message + data 형식의 응답으로 변환 (스프링이 자동으로 호출). */
 @Slf4j
@@ -52,6 +53,15 @@ public class GlobalExceptionHandler {
         log.warn("DB 제약 위반: {}", e.getMessage());
         // 2. 400과 함께 message + data 형식으로 반환
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.of("invalid_request_data", null));
+    }
+
+    // 요청 파라미터 타입 변환 실패 처리 (예: level에 enum에 없는 값이 온 경우, 클라이언트 잘못이라 400)
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Object>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        // 1. 요청 형식 문제로 서버 로그에는 경고 수준으로만 남김
+        log.warn("잘못된 요청 파라미터: {}", e.getMessage());
+        // 2. 400과 함께 message + data 형식으로 반환
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.of("invalid_request_parameter", null));
     }
 
     // 위에서 처리하지 못한 모든 예외 처리

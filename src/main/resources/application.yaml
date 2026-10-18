@@ -1,15 +1,15 @@
 spring:
   application:
     name: cosmos-backend
+  jpa:
+    open-in-view: true
 
 ai:
   server:
-    base-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
     connect-timeout: ${AI_SERVER_CONNECT_TIMEOUT:3s}
     read-timeout: ${AI_SERVER_READ_TIMEOUT:30s}
 
 judge0:
-  base-url: ${JUDGE0_BASE_URL:http://localhost:2358}
   connect-timeout: ${JUDGE0_CONNECT_TIMEOUT:3s}
   read-timeout: ${JUDGE0_READ_TIMEOUT:10s}
   poll-interval: ${JUDGE0_POLL_INTERVAL:1s}
@@ -21,7 +21,6 @@ judge0:
     JAVASCRIPT: 63
     JAVA: 62
     CPP: 54
-
 
 sentry:
   dsn: ${SENTRY_DSN:}
@@ -44,3 +43,41 @@ management:
     tags:
       application: ${spring.application.name}
 
+---
+spring:
+  config:
+    activate:
+      on-profile: dev | stage
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+kakao:
+  client-id: ${KAKAO_CLIENT_ID}
+  client-secret: ${KAKAO_CLIENT_SECRET}
+  redirect-uri: ${KAKAO_REDIRECT_URI}
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${ACCESS_TOKEN_EXP:1800}
+  refresh-token-expiration: ${REFRESH_TOKEN_EXP:1209600}
+
+cookie:
+  secure: true
+
+ai:
+  root-url: ${AI_SERVER_BASE_URL}
+  server:
+    base-url: ${AI_SERVER_BASE_URL}
+
+judge0:
+  base-url: ${JUDGE0_BASE_URL}
+
+server:
+  servlet:
+    context-path: /api
+
+frontend:
+  base-url: ${FRONTEND_BASE_URL}
