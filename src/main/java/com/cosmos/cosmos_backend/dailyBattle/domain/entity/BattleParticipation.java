@@ -77,6 +77,11 @@ public class BattleParticipation {
         this.participationStatus = ParticipationStatus.GRADING_COMPLETED;
     }
 
+    // 채점 실패 처리
+    public void markGradingFailed(){
+        this.participationStatus = ParticipationStatus.GRADING_FAILED;
+    }
+
     // 중도 포기 처리
     public void markDropOut(){
         this.participationStatus = ParticipationStatus.DROPPED_OUT;

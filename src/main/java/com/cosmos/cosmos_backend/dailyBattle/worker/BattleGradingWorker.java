@@ -21,7 +21,17 @@ public class BattleGradingWorker {
         if(preemptParticipationId.isEmpty()){
             return;
         }
+
         // 선점 작업 있으면 채점으로 (트랜잭션 2)
-        battleGradingService.battleGrade(preemptParticipationId.get());
+        Long participationId = preemptParticipationId.get();
+
+        try {
+            battleGradingService.battleGrade(participationId);
+
+        } catch (Exception e) {
+
+            // 3. 채점 실패 상태 저장 (트랜잭션 3)
+            battleGradingService.markGradingFailed(participationId);
+        }
     }
 }

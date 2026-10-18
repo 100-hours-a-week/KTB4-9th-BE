@@ -105,4 +105,14 @@ public class BattleGradingService {
 
         battleParticipation.markEvaluatingComplete();
     }
+
+    // 채점 실패 처리
+    @Transactional
+    public void markGradingFailed(Long participationId) {
+        BattleParticipation battleParticipation = battleParticipationRepository.findById(participationId).orElseThrow(
+                () -> new BusinessException(HttpStatus.NOT_FOUND, "Battle_Participation_not_found")
+        );
+
+        battleParticipation.markGradingFailed();
+    }
 }
