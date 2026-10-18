@@ -5,6 +5,7 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
+import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import com.cosmos.cosmos_backend.dailyBattle.worker.BattleGradingWorker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,8 @@ import java.util.concurrent.ScheduledFuture;
 public class BattleWorkerScheduler {
 
     private final BattleResultService battleResultService;
+
+    private final DailyBattleService dailyBattleService;
 
     private final BattleParticipationRepository battleParticipationRepository;
 
@@ -109,6 +112,21 @@ public class BattleWorkerScheduler {
             recheckTask.cancel(false);
             recheckTask = null;
         }
+    }
+
+
+    // 매일 12:09:59에 미제출 참여자 타임아웃 처리
+    @Scheduled(cron = "59 9 12 * * *", zone = "Asia/Seoul")
+    public void timeoutBattle() {
+
+        LocalDate today = LocalDate.now(clock);
+
+        Long battleId = dailyBattleRepository.findIdByBattleDate(today)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND, "today_battle_not_exist"
+                ));
+
+        dailyBattleService.timeoutInProgress(battleId);
     }
 
 }

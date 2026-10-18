@@ -1,6 +1,5 @@
 package com.cosmos.cosmos_backend.dailyBattle.worker;
 
-import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleGradingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

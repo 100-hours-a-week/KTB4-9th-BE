@@ -314,4 +314,16 @@ public class DailyBattleService {
         }
     }
 
+    // 배틀 타임 아웃 처리
+    @Transactional
+    public void timeoutInProgress(Long battleId) {
+        // 1. 해당 배틀 참여중인 참여자 조회
+        List<BattleParticipation> inProgressParticipation = battleParticipationRepository.findAllByParticipationStatus(ParticipationStatus.IN_PROGRESS);
+
+        // 2. 참여 상태를 TIME_OVER로 변경
+        for (BattleParticipation participation : inProgressParticipation) {
+            participation.markTimeOut();
+        }
+    }
+
 }
