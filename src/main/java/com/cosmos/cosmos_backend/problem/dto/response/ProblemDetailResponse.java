@@ -35,6 +35,7 @@ public record ProblemDetailResponse(
             Problem problem,
             List<ProblemExample> examples,
             List<RunningLimit> runningLimits,
+            Category visibleCategory,
             int usedHintStage,
             boolean saved,
             MyApproachResponse myApproach,
@@ -44,7 +45,7 @@ public record ProblemDetailResponse(
                 // 1. 문제 기본 정보
                 problem.getId(),
                 problem.getDifficulty(),
-                problem.getCategory(),
+                visibleCategory,
                 problem.getTitle(),
                 problem.getContent(),
                 // 2. 입력/출력 형식(별도 컬럼)과 입력 제한(constraints JSON)
