@@ -45,7 +45,7 @@ public class DailyBattleService {
     @Transactional
     public Long createDailyBattle(AiBattleCreateRequestDto request){
 
-        LocalDate date = LocalDate.now(clock);
+        LocalDate date = LocalDate.now(clock).plusDays(1);;
 
         DailyBattle saving_problem = new DailyBattle(
                 date,
