@@ -3,6 +3,7 @@ package com.cosmos.cosmos_backend.dailyBattle.domain.entity;
 import com.cosmos.cosmos_backend.auth.domain.entity.User;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,6 +11,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.security.core.parameters.P;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -52,6 +54,10 @@ public class BattleParticipation {
     @JdbcTypeCode(SqlTypes.TIMESTAMP)
     @Column(name = "submitted_at")
     private Instant submittedAt;
+
+    @Max(3)
+    @Column(name = "retry_count", nullable = false)
+    private Integer retryCount = 0;
 
 
     public BattleParticipation(Long dailyBattleId, User user) {
@@ -102,6 +108,16 @@ public class BattleParticipation {
     public void isWrong(){
         this.allCorrect = false;
         this.participationStatus = ParticipationStatus.GRADING_COMPLETED;
+    }
+
+    // 재시도 횟수 증가 처리
+    public void increaseRetryCount(){
+        this.retryCount++;
+    }
+
+    // 다시 제출 처리로 되돌리기
+    public void markReSubmit(){
+        this.participationStatus = ParticipationStatus.SUBMITTED;
     }
 
 }
