@@ -43,8 +43,27 @@ jobs:
 
       - name: Verify Docker image build
         env:
-          IMAGE_TAG: ci-${{ github.sha }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build \
             --tag "cosmos-backend:${IMAGE_TAG}" \
             .
+
+      - name: Export deployment image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker save \
+            --output "${RUNNER_TEMP}/backend-image.tar" \
+            "cosmos-backend:${IMAGE_TAG}"
+
+      - name: Upload deployment image artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-image-${{ github.sha }}
+          path: ${{ runner.temp }}/backend-image.tar
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0

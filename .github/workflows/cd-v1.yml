@@ -11,6 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -81,7 +82,30 @@ jobs:
               --username "${{ secrets.DOCKERHUB_USERNAME }}" \
               --password-stdin
 
-      - name: Build backend image
+      - name: Download image artifact from CI
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-image-${{ github.event.workflow_run.head_sha }}
+          path: ${{ runner.temp }}/backend-image
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Load and tag CI image
+        if: github.event_name == 'workflow_run'
+        run: |
+          set -euo pipefail
+
+          docker load \
+            --input "${RUNNER_TEMP}/backend-image/backend-image.tar"
+
+          docker image inspect "cosmos-backend:${IMAGE_TAG}" >/dev/null
+          docker tag \
+            "cosmos-backend:${IMAGE_TAG}" \
+            "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+
+      - name: Build backend image for manual deployment
+        if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
 
