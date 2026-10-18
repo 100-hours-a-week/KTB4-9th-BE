@@ -32,7 +32,7 @@ public class BattleParticipation {
     @Column(name = "participation_id")
     private Long participationId;
 
-    @Column(name = "daily_battle_id")
+    @Column(name = "daily_battle_id", nullable = false)
     private Long dailyBattleId;
 
     @ManyToOne(fetch = FetchType.LAZY)
