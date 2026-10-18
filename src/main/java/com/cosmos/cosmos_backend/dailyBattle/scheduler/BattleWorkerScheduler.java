@@ -4,6 +4,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
+import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
 import com.cosmos.cosmos_backend.dailyBattle.worker.BattleGradingWorker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;
@@ -21,6 +23,8 @@ import java.util.concurrent.ScheduledFuture;
 @Component
 @RequiredArgsConstructor
 public class BattleWorkerScheduler {
+
+    private final BattleResultService battleResultService;
 
     private final BattleParticipationRepository battleParticipationRepository;
 
@@ -93,7 +97,12 @@ public class BattleWorkerScheduler {
             return;
         }
 
-        // 3.남은 채점 없으면 worker들 종료
+        // 3. 모든 채점 완료 → 결과 공개 상태 저장
+        LocalDateTime publishedAt = LocalDateTime.now(clock);
+
+        battleResultService.battleResultPublished(todayBattleId, publishedAt);
+
+        // 4. 남은 채점 없으면 worker들 종료
         stopGradingWorker();
 
         if(recheckTask != null){
@@ -102,13 +111,4 @@ public class BattleWorkerScheduler {
         }
     }
 
-    // 실행중인 worker가 있는지 확인하는 메소드
-    public Boolean existRunningWorker(){
-
-        if(workerTasks.isEmpty() && recheckTask == null){
-            return false;
-        }
-
-        return true;
-    }
 }
