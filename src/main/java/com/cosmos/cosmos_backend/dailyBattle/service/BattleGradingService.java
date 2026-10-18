@@ -52,7 +52,7 @@ public class BattleGradingService {
     public void battleGrade(Long participationId) {
 
         // 유저 제출 정보 가져오기
-        List<BattleSubmission> userSubmissions = battleSubmissionRepository.findByBattleParticipation_participationId(participationId);
+        List<BattleSubmission> userSubmissions = battleSubmissionRepository.findByParticipation_participationId(participationId);
 
         // 제출 정보에서 BattleCase id 리스트 추출
         List<Long> caseIds = new ArrayList<>();
@@ -104,5 +104,38 @@ public class BattleGradingService {
         }
 
         battleParticipation.markEvaluatingComplete();
+    }
+
+    // 채점 재시도 횟수 증가
+    @Transactional
+    public void checkGradingFailed(Long participationId) {
+
+        BattleParticipation battleParticipation = battleParticipationRepository.findById(participationId).orElseThrow(
+                () -> new BusinessException(HttpStatus.NOT_FOUND, "Battle_Participation_not_found")
+        );
+
+        // 재시도 횟수 증가
+        battleParticipation.increaseRetryCount();
+
+        Integer retryCount = battleParticipation.getRetryCount();
+
+        // 재시도 가능 여부 확인
+        if (retryCount < 3) {
+            // 제출 처리로 되돌리기 (다시 worker가 선점하도록)
+            battleParticipation.markReSubmit();
+        } else {
+            // 재시도 횟수 초과 시 채점 실패 처리
+            battleParticipation.markGradingFailed();
+        }
+    }
+
+    // 채점 실패 처리
+    @Transactional
+    public void markGradingFailed(Long participationId) {
+        BattleParticipation battleParticipation = battleParticipationRepository.findById(participationId).orElseThrow(
+                () -> new BusinessException(HttpStatus.NOT_FOUND, "Battle_Participation_not_found")
+        );
+
+        battleParticipation.markGradingFailed();
     }
 }
