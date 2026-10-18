@@ -3,6 +3,7 @@ package com.cosmos.cosmos_backend.dailyBattle.domain.entity;
 import com.cosmos.cosmos_backend.auth.domain.entity.User;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,6 +11,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.security.core.parameters.P;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -30,7 +32,7 @@ public class BattleParticipation {
     @Column(name = "participation_id")
     private Long participationId;
 
-    @Column(name = "daily_battle_id")
+    @Column(name = "daily_battle_id", nullable = false)
     private Long dailyBattleId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -53,6 +55,10 @@ public class BattleParticipation {
     @Column(name = "submitted_at")
     private Instant submittedAt;
 
+    @Max(3)
+    @Column(name = "retry_count", nullable = false)
+    private Integer retryCount = 0;
+
 
     public BattleParticipation(Long dailyBattleId, User user) {
         this.dailyBattleId = dailyBattleId;
@@ -62,36 +68,56 @@ public class BattleParticipation {
     }
 
     //제출 처리
-    public void submit(Instant submittedAt) {
+    public void markSubmit(Instant submittedAt) {
         this.submittedAt = submittedAt;
         this.participationStatus = ParticipationStatus.SUBMITTED;
     }
 
     // 채점 중으로 처리
-    public void grading(){
+    public void markGrading(){
         this.participationStatus = ParticipationStatus.GRADING;
+    }
+
+    // 채점 완료 처리
+    public void markEvaluatingComplete(){
+        this.participationStatus = ParticipationStatus.GRADING_COMPLETED;
+    }
+
+    // 채점 실패 처리
+    public void markGradingFailed(){
+        this.participationStatus = ParticipationStatus.GRADING_FAILED;
+    }
+
+    // 중도 포기 처리
+    public void markDropOut(){
+        this.participationStatus = ParticipationStatus.DROPPED_OUT;
+    }
+
+    // 타임아웃 처리
+    public void markTimeOut(){
+        this.participationStatus = ParticipationStatus.TIME_OVER;
     }
 
     // 정답처리
     public void isCorrect(){
         this.allCorrect = true;
-        this.participationStatus = ParticipationStatus.EVALUATING_COMPLETED;
+        this.participationStatus = ParticipationStatus.GRADING_COMPLETED;
     }
 
     // 오답처리
     public void isWrong(){
         this.allCorrect = false;
-        this.participationStatus = ParticipationStatus.EVALUATING_COMPLETED;
+        this.participationStatus = ParticipationStatus.GRADING_COMPLETED;
     }
 
-    // 중도 포기 처리
-    public void dropOut(){
-        this.participationStatus = ParticipationStatus.DROPPED_OUT;
+    // 재시도 횟수 증가 처리
+    public void increaseRetryCount(){
+        this.retryCount++;
     }
 
-    // 타임아웃 처리
-    public void timeOut(){
-        this.participationStatus = ParticipationStatus.TIME_OVER;
+    // 다시 제출 처리로 되돌리기
+    public void markReSubmit(){
+        this.participationStatus = ParticipationStatus.SUBMITTED;
     }
 
 }

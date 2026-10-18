@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 public class BattleSubmission {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "battle_submission_id")
     private Long battleSubmissionId;
 
@@ -40,5 +40,14 @@ public class BattleSubmission {
         this.submittedOutput = submittedOutput;
     }
 
+    // 정답 처리
+    public void answerCorrect(){
+        this.isCorrect = true;
+    }
+
+    // 오답 처리
+    public void answerIncorrect(){
+        this.isCorrect = false;
+    }
 
 }

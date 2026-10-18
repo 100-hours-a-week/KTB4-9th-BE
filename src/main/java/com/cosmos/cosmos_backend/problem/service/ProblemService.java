@@ -63,12 +63,16 @@ public class ProblemService {
                 .map(MyCodeResponse::from)
                 .orElse(null);
 
-        // 5. 예시, 실행 제한을 각각 조회
-        // 6. 조회한 값들을 응답 형태로 조립해서 반환
+        // 5. 접근 방식을 제출한 적이 없으면 정답 카테고리는 숨김 (내려주면 카테고리 맞추기가 의미가 없어짐)
+        Category visibleCategory = myApproach != null ? problem.getCategory() : null;
+
+        // 6. 예시, 실행 제한을 각각 조회
+        // 7. 조회한 값들을 응답 형태로 조립해서 반환
         return ProblemDetailResponse.of(
                 problem,
                 problemExampleRepository.findByProblemIdOrderByDisplayOrder(problemId),
                 runningLimitRepository.findByProblemId(problemId),
+                visibleCategory,
                 usedHintStage,
                 saved,
                 myApproach,

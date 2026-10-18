@@ -11,6 +11,7 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.DailyBattleSubmissionRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleCaseResponseDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleDropOutResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleSubmissionResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
@@ -44,7 +45,7 @@ public class DailyBattleService {
     @Transactional
     public Long createDailyBattle(AiBattleCreateRequestDto request){
 
-        LocalDate date = LocalDate.now(clock);
+        LocalDate date = LocalDate.now(clock).plusDays(1);;
 
         DailyBattle saving_problem = new DailyBattle(
                 date,
@@ -80,30 +81,22 @@ public class DailyBattleService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "User_Not_Found"));
 
-        // 이미 배틀에 참여중인지 확인
-        // TODO: 이미 참여중인 사용자의 참여 요청에 대한 응답
-        // 참여중이라면 새 엔티티 생성 없음
-        BattleParticipation participationInfo = battleParticipationCheck(battleId, user.getId());
+        // 배틀 정보 불러오기
+        DailyBattle battleInfo = battleValidCheck(battleId);
 
-        // 새 참여일경우에만 새 엔티티 생성
-        if(participationInfo == null){
-            BattleParticipation battleParticipation = new BattleParticipation(
-                    battleId,
-                    user
-            );
+        // 참여 가능 날짜, 시간 검증
+        battleTimeCheck(clock.instant());
+        battleDateCheck(clock.instant(), battleInfo.getBattleDate());
 
-            battleParticipationRepository.save(battleParticipation);
+        // 기존 참여 정보 조회
+        BattleParticipation participationInfo =
+                battleParticipationCheck(battleId, user.getId());
 
+        // 최초 참여라면 새 참여 기록 생성, 기존 참여 기록이 있다면 그대로 사용
+        if (participationInfo == null) {
+            participationInfo = new BattleParticipation(battleId, user);
+            participationInfo = battleParticipationRepository.save(participationInfo);
         }
-
-        // 이미 배틀 참여 완료 했으면 참여 불가
-        if(participationInfo.getParticipationStatus() != ParticipationStatus.IN_PROGRESS){
-            throw new BusinessException(HttpStatus.CONFLICT, "Battle_already_participated");
-        }
-
-        // 배틀 정보 불러오기 (제목, 본문)
-        DailyBattle battleInfo = dailyBattleRepository.findById(battleId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "Battle_Not_Found"));
 
         String title = battleInfo.getTitle();
         String content = battleInfo.getContent();
@@ -123,10 +116,10 @@ public class DailyBattleService {
         }
 
         // 남은 시간 계산 (마감이 KST 기준 시각이라 현재 시각도 KST로 계산)
+        LocalDateTime now = LocalDateTime.now(clock);
+
         LocalDateTime battleEndTime = battleInfo.getBattleDate()
                 .atTime(12, 10);
-
-        LocalDateTime now = LocalDateTime.now(clock);
 
         Long remainedTimeSecond = Math.max(
                 0L,
@@ -148,6 +141,46 @@ public class DailyBattleService {
 
         //반환
         return battleParticipationResponseDto;
+    }
+
+    // 중도 포기 메소드
+    @Transactional
+    public BattleDropOutResponseDto dropOutBattle(Long battleId, Long userId){
+
+        // 배틀 정보 조회
+        DailyBattle dailyBattleInfo = dailyBattleRepository.findById(battleId).orElseThrow(
+                () -> new BusinessException(HttpStatus.NOT_FOUND, "Battle_Not_Found")
+        );
+
+        // 중도 포기 가능 날짜, 시간 검증
+        Instant receivedAt = clock.instant();
+
+        battleDateCheck(receivedAt, dailyBattleInfo.getBattleDate());
+        battleTimeCheck(receivedAt);
+
+        // 참여 정보 조회
+        BattleParticipation battleParticipation = battleParticipationRepository.findByDailyBattleIdAndUser_Id(battleId, userId).orElseThrow(
+                () -> new BusinessException(HttpStatus.NOT_FOUND, "Participation_Not_Found")
+        );
+
+        // 중도 포기 처리
+        if (battleParticipation.getParticipationStatus() != ParticipationStatus.IN_PROGRESS) {
+            throw new BusinessException(
+                    HttpStatus.CONFLICT,
+                    "Battle_Cannot_Drop_Out"
+            );
+        }
+
+        battleParticipation.markDropOut();
+
+        // 응답 조립
+        BattleDropOutResponseDto battleDropOutResponse = new BattleDropOutResponseDto(
+                dailyBattleInfo.getBattleId(),
+                battleParticipation.getParticipationId(),
+                ParticipationStatus.DROPPED_OUT
+        );
+
+        return battleDropOutResponse;
     }
 
     // 배틀 제출 메소드
@@ -311,6 +344,20 @@ public class DailyBattleService {
             throw new BusinessException(
                     HttpStatus.BAD_REQUEST, "Not_Battle_Time"
             );
+        }
+    }
+
+    // 배틀 타임 아웃 처리
+    @Transactional
+    public void timeoutInProgress(Long battleId) {
+        // 1. 해당 배틀에서 아직 참여 중인 사용자만 조회
+        List<BattleParticipation> inProgressParticipation = battleParticipationRepository.findAllByDailyBattleIdAndParticipationStatus(
+                battleId,
+                ParticipationStatus.IN_PROGRESS);
+
+        // 2. 타임 아웃 상태로 변경
+        for (BattleParticipation participation : inProgressParticipation) {
+            participation.markTimeOut();
         }
     }
 

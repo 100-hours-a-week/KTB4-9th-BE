@@ -118,7 +118,8 @@ class ProblemSelectionServiceTest {
         // Then
         assertThat(response.problem().problemId()).isEqualTo(7L);
         assertThat(response.problem().level()).isEqualTo(3);
-        assertThat(response.problem().category()).isEqualTo(Category.DP);
+        // RANDOM으로 요청하면 정답 카테고리는 숨김
+        assertThat(response.problem().category()).isNull();
         assertThat(response.problem().title()).isEqualTo("계단 오르기");
         assertThat(response.problem().examples()).hasSize(1);
         assertThat(response.problem().examples().get(0).input()).isEqualTo("3");
@@ -213,6 +214,22 @@ class ProblemSelectionServiceTest {
 
         // Then
         verify(problemRepository).findRandomUnsolved("LV3", "DP", 10L, TODAY);
+    }
+
+    @Test
+    void select_returnsCategory_whenCategorySpecified() {
+        // Given
+        when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
+        when(problemRepository.findRandomUnsolved("LV3", "DP", 10L, TODAY)).thenReturn(Optional.of(problem()));
+        when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.empty());
+        when(dailyGeneratedCountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
+
+        // When
+        ProblemSelectionResponse response = service.select(10L, "3", "DP");
+
+        // Then
+        assertThat(response.problem().category()).isEqualTo(Category.DP);
     }
 
     @Test
