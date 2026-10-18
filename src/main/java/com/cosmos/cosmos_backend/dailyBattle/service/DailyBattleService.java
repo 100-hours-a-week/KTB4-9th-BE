@@ -11,6 +11,7 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.DailyBattleSubmissionRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleCaseResponseDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleDropOutResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleSubmissionResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
@@ -148,6 +149,33 @@ public class DailyBattleService {
 
         //반환
         return battleParticipationResponseDto;
+    }
+
+    // 중도 포기 메소드
+    @Transactional
+    public BattleDropOutResponseDto dropOutBattle(Long battleId, Long userId){
+
+        // 배틀 정보 조회
+        DailyBattle dailyBattleInfo = dailyBattleRepository.findById(battleId).orElseThrow(
+                () -> new BusinessException(HttpStatus.NOT_FOUND, "Battle_Not_Found")
+        );
+
+        // 참여 정보 조회
+        BattleParticipation battleParticipation = battleParticipationRepository.findByUser_Id(userId).orElseThrow(
+                () -> new BusinessException(HttpStatus.NOT_FOUND, "Participation_Not_Found")
+        );
+
+        // 중도 포기 처리
+        battleParticipation.markDropOut();
+
+        // 응답 조립
+        BattleDropOutResponseDto battleDropOutResponse = new BattleDropOutResponseDto(
+                dailyBattleInfo.getBattleId(),
+                battleParticipation.getParticipationId(),
+                ParticipationStatus.DROPPED_OUT
+        );
+
+        return battleDropOutResponse;
     }
 
     // 배틀 제출 메소드

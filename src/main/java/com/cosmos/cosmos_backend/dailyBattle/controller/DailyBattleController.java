@@ -3,6 +3,7 @@ package com.cosmos.cosmos_backend.dailyBattle.controller;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.DailyBattleSubmissionRequestDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleDropOutResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleResultResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleSubmissionResponseDto;
@@ -93,6 +94,24 @@ public class DailyBattleController {
                 "battle_submission_resumed",
                 battleSubmissionResponse).data()
 
+        );
+    }
+
+    // 배틀 중도 포기
+    @PatchMapping("/{battle_id}/participations")
+    public ResponseEntity<ApiResponse<BattleDropOutResponseDto>> dropOutBattle(
+            @AuthenticationPrincipal Jwt userInfo,
+            @PathVariable("battle_id") Long battleId
+    ) {
+        Long userId = Long.parseLong(userInfo.getSubject());
+
+        BattleDropOutResponseDto battleResultResponse = dailyBattleService.dropOutBattle(battleId, userId);
+
+        return ResponseEntity.ok(
+                ApiResponse.of(
+                        "battle_drop_out",
+                        battleResultResponse
+                )
         );
     }
 
