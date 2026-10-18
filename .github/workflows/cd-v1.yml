@@ -5,7 +5,7 @@ on:
     workflows:
       - ci-v1.yml
     branches:
-      - main
+      - dev
     types:
       - completed
   workflow_dispatch:
@@ -20,12 +20,12 @@ concurrency:
 jobs:
   deploy:
     name: Build, push and deploy
-    # 1. 수동 실행이거나, main에 푸시된 CI 성공 시 실행
+    # 수동 실행은 dev에서만 허용하고, 자동 배포는 dev push CI 성공 시 실행
     if: |
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev') ||
       (
         github.event.workflow_run.event == 'push' &&
-        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_branch == 'dev' &&
         github.event.workflow_run.conclusion == 'success'
       )
     runs-on: ubuntu-latest
