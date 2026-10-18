@@ -35,11 +35,11 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                         .requestMatchers("/daily-problems").permitAll()
-                        .requestMatchers("/daily-battles/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers(
                                 PathPatternRequestMatcher.pathPattern(HttpMethod.GET,"/problems/new"),
-                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/problems")).permitAll()
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/problems"),
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST,"/daily-battles/problem")).permitAll()
                         .anyRequest().authenticated()
                 )
 
