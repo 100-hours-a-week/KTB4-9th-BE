@@ -68,10 +68,11 @@ public class ProblemSelectionService {
         // 4. 문제를 확보했으니 이제 횟수를 +1 (여기만 트랜잭션)
         int usedCount = transactionTemplate.execute(status -> increaseCount(userId, today));
 
-        // 5. 예시를 조회해서 응답 조립
+        // 5. 예시를 조회해서 응답 조립 (카테고리를 RANDOM으로 요청했으면 정답이 드러나지 않게 비워서 보냄)
         return ProblemSelectionResponse.of(
                 problem,
                 problemExampleRepository.findByProblemIdOrderByDisplayOrder(problem.getId()),
+                category == null ? null : problem.getCategory(),
                 today,
                 usedCount,
                 DAILY_LIMIT

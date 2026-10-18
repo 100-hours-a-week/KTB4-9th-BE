@@ -99,7 +99,8 @@ class ProblemServiceTest {
         // Then
         assertThat(response.problemId()).isEqualTo(1L);
         assertThat(response.difficulty()).isEqualTo(Difficulty.LV1);
-        assertThat(response.category()).isEqualTo(Category.ARRAY);
+        // 접근 방식을 제출한 적이 없으면 정답 카테고리는 숨김
+        assertThat(response.category()).isNull();
         assertThat(response.inputFormat()).isEqualTo("정수 배열 nums와 목표값 target이 주어집니다.");
         assertThat(response.executionLimits()).hasSize(1);
         assertThat(response.executionLimits().get(0).memoryLimitKb()).isEqualTo(512000);
@@ -175,6 +176,8 @@ class ProblemServiceTest {
         ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
 
         // Then
+        // 접근 방식을 제출했으면 카테고리를 내려줌
+        assertThat(response.category()).isEqualTo(Category.ARRAY);
         assertThat(response.myApproach().naturalSolution()).isEqualTo("투 포인터로 푼다");
         assertThat(response.myApproach().selectedCategory()).isEqualTo(Category.ARRAY);
         assertThat(response.myCode().sourceCode()).isEqualTo("print(1)");
