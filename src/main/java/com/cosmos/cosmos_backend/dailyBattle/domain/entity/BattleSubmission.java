@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 public class BattleSubmission {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "battle_submission_id")
     private Long battleSubmissionId;
 

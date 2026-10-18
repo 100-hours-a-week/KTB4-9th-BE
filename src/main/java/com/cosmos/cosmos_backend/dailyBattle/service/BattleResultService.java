@@ -29,8 +29,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BattleResultService {
 
-    private final BattleWorkerScheduler battleWorkerScheduler;
-
     private final BattleParticipationRepository battleParticipationRepository;
 
     private final DailyBattleRepository dailyBattleRepository;
@@ -101,7 +99,7 @@ public class BattleResultService {
             }
 
             // 5-3. 내 제출 답안 조회
-            List<BattleSubmission> mySubmissions = battleSubmissionRepository.findByBattleParticipation_participationId(myParticipation.getParticipationId());
+            List<BattleSubmission> mySubmissions = battleSubmissionRepository.findByParticipation_participationId(myParticipation.getParticipationId());
 
             myAnswers = new ArrayList<>();
 

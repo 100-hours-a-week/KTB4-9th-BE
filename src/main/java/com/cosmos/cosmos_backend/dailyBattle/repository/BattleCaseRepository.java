@@ -14,7 +14,7 @@ public interface BattleCaseRepository extends JpaRepository<BattleCase, Integer>
     @Query("""
     SELECT bc
     FROM BattleCase bc
-    WHERE bc.battleCaseId IN :caseIds
+    WHERE bc.caseId IN :caseIds
     """)
     List<BattleCase> findAllByCaseIds(@Param("caseIds") List<Long> caseIds);
 }

@@ -52,7 +52,7 @@ public class BattleGradingService {
     public void battleGrade(Long participationId) {
 
         // 유저 제출 정보 가져오기
-        List<BattleSubmission> userSubmissions = battleSubmissionRepository.findByBattleParticipation_participationId(participationId);
+        List<BattleSubmission> userSubmissions = battleSubmissionRepository.findByParticipation_participationId(participationId);
 
         // 제출 정보에서 BattleCase id 리스트 추출
         List<Long> caseIds = new ArrayList<>();

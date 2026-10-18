@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface BattleSubmissionRepository extends JpaRepository<BattleSubmission,Long> {
 
-    List<BattleSubmission> findByBattleParticipation_participationId(Long participationId);
+    List<BattleSubmission> findByParticipation_participationId(Long participationId);
 }

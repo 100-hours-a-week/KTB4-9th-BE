@@ -128,8 +128,7 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
     );
 
     // 배틀 참여상태로 조회
-    List<BattleParticipation> findAllByParticipationStatus(ParticipationStatus participationStatus);
-
+    List<BattleParticipation> findAllByDailyBattleIdAndParticipationStatus(Long battleId, ParticipationStatus status);
 
 
 }
