@@ -161,7 +161,7 @@ public class DailyBattleService {
         );
 
         // 참여 정보 조회
-        BattleParticipation battleParticipation = battleParticipationRepository.findByUser_Id(userId).orElseThrow(
+        BattleParticipation battleParticipation = battleParticipationRepository.findByDailyBattleIdAndUser_Id(battleId, userId).orElseThrow(
                 () -> new BusinessException(HttpStatus.NOT_FOUND, "Participation_Not_Found")
         );
 
