@@ -9,7 +9,7 @@ import java.time.ZoneId;
 public final class BattleAlarmTimePolicy {
 
     private static final LocalTime OPEN_TIME = LocalTime.of(13, 30);
-    private static final LocalTime CLOSE_TIME = LocalTime.of(14, 30);
+    private static final LocalTime CLOSE_TIME = LocalTime.of(16, 00);
 
     private BattleAlarmTimePolicy() {
     }
