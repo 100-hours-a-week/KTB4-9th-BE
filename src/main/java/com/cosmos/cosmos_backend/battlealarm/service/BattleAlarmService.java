@@ -50,9 +50,12 @@ public class BattleAlarmService {
             return BattleAlarmStatusResponse.notOpen(now, closesAt);
         }
 
-        // 3. 12:10 이후면 DB를 보지 않고 CLOSED
+        // 3. 마감 이후에는 미참여자도 결과를 조회할 수 있도록 오늘의 배틀 ID를 함께 반환
         if (BattleAlarmTimePolicy.isClosed(time)) {
-            return BattleAlarmStatusResponse.closed(now, closesAt);
+            Long battleId = dailyBattleRepository.findByBattleDate(today)
+                    .map(DailyBattle::getBattleId)
+                    .orElse(null);
+            return BattleAlarmStatusResponse.closed(now, battleId, closesAt);
         }
 
         // 4. 열려 있어야 하는 시간이므로 오늘 배틀과 케이스가 준비됐는지 확인 (아니면 NO_BATTLE)
