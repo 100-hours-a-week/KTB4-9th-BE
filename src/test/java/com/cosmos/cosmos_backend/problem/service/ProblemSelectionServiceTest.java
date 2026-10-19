@@ -32,6 +32,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -95,9 +96,9 @@ class ProblemSelectionServiceTest {
 
     // 오늘 사용 횟수가 count인 행을 만든다.
     private DailyGeneratedCount countRow(LocalDate date, int count) {
-        DailyGeneratedCount row = new DailyGeneratedCount(10L, date);
+        DailyGeneratedCount row = new DailyGeneratedCount(10L, date, 100L);
         for (int i = 1; i < count; i++) {
-            row.increase();
+            row.increase(100L);
         }
         return row;
     }
@@ -214,6 +215,40 @@ class ProblemSelectionServiceTest {
 
         // Then
         verify(problemRepository).findRandomUnsolved("LV3", "DP", 10L, TODAY);
+    }
+
+    @Test
+    void select_recordsGeneratedProblemAsLast_whenFirstUseToday() {
+        // Given
+        when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.empty());
+        when(problemRepository.findRandomUnsolved("LV3", null, 10L, TODAY)).thenReturn(Optional.of(problem()));
+        when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.empty());
+        when(dailyGeneratedCountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
+
+        // When
+        service.select(10L, "3", "RANDOM");
+
+        // Then: 오늘 처음 받은 문제가 마지막 생성 문제로 저장됨
+        ArgumentCaptor<DailyGeneratedCount> captor = ArgumentCaptor.forClass(DailyGeneratedCount.class);
+        verify(dailyGeneratedCountRepository).save(captor.capture());
+        assertThat(captor.getValue().getLastProblemId()).isEqualTo(7L);
+    }
+
+    @Test
+    void select_replacesLastProblem_whenAlreadyUsedToday() {
+        // Given: 오늘 이미 1번 생성했고 그때 받은 문제는 100번
+        DailyGeneratedCount row = countRow(TODAY, 1);
+        when(dailyGeneratedCountRepository.findCount(10L, TODAY)).thenReturn(Optional.of(1));
+        when(problemRepository.findRandomUnsolved("LV3", null, 10L, TODAY)).thenReturn(Optional.of(problem()));
+        when(dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(10L, TODAY)).thenReturn(Optional.of(row));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(7L)).thenReturn(List.of());
+
+        // When
+        service.select(10L, "3", "RANDOM");
+
+        // Then: 마지막 생성 문제가 새 문제(7번)로 바뀜
+        assertThat(row.getLastProblemId()).isEqualTo(7L);
     }
 
     @Test
