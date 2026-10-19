@@ -70,7 +70,7 @@ public class BattleWorkerScheduler {
     }
 
     // 12:10 결과 공개 시점에 실행할 결과 확정 메소드
-    @Scheduled(cron = "00 00 14 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "00 30 14 * * *", zone = "Asia/Seoul")
     public void finalizeBattle() {
 
         LocalDate today = LocalDate.now(clock);
@@ -116,7 +116,7 @@ public class BattleWorkerScheduler {
 
 
     // 매일 12:09:59에 미제출 참여자 타임아웃 처리
-    @Scheduled(cron = "59 59 13 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "59 29 14 * * *", zone = "Asia/Seoul")
     public void timeoutBattle() {
 
         LocalDate today = LocalDate.now(clock);
