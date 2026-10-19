@@ -119,7 +119,7 @@ public class DailyBattleService {
         LocalDateTime now = LocalDateTime.now(clock);
 
         LocalDateTime battleEndTime = battleInfo.getBattleDate()
-                .atTime(16, 30);
+                .atTime(16, 50);
 
         Long remainedTimeSecond = Math.max(
                 0L,
@@ -337,7 +337,7 @@ public class DailyBattleService {
 
         // 배틀 시작, 마감 시각
         LocalTime start = LocalTime.of(13, 30);
-        LocalTime end = LocalTime.of(16, 29, 59);
+        LocalTime end = LocalTime.of(16, 49, 59);
 
         // 시간 유효한지 검증 (12:00:00.000 이상 ~ 12:09:59.000 미만에 접수된 요청만 유효)
         if (receivedTime.isBefore(start) || !receivedTime.isBefore(end)) {
