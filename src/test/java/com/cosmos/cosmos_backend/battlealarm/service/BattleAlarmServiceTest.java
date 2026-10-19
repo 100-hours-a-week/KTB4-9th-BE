@@ -90,9 +90,9 @@ class BattleAlarmServiceTest {
     }
 
     @Test
-    void getStatus_returnsNotOpen_andSkipsDb_before1200() {
+    void getStatus_returnsNotOpen_andSkipsDb_before1250() {
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T11:59:59+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:49:59+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.NOT_OPEN);
@@ -102,21 +102,21 @@ class BattleAlarmServiceTest {
 
     @Test
     void getStatus_returnsOpen_whenBattleReady_andNotParticipatedNorDismissed() {
-        // Given: 13:30:00 정각, 배틀과 케이스 3개가 준비됨
+        // Given: 12:50:00 정각, 배틀과 케이스 3개가 준비됨
         stubTodayBattleWithCases(3);
         when(battleParticipationRepository.findByDailyBattleIdAndUser_Id(3L, 7L)).thenReturn(Optional.empty());
         when(battleAlarmRepository.existsByUserIdAndBattleIdAndDismissedTrue(7L, 3L)).thenReturn(false);
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:30:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:50:00+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.OPEN);
         assertThat(response.battleId()).isEqualTo(3L);
         assertThat(response.participated()).isFalse();
         assertThat(response.dismissed()).isFalse();
-        assertThat(response.serverTime()).isEqualTo(OffsetDateTime.parse("2026-10-13T13:30:00+09:00"));
-        assertThat(response.closesAt()).isEqualTo(OffsetDateTime.parse("2026-10-13T16:50:00+09:00"));
+        assertThat(response.serverTime()).isEqualTo(OffsetDateTime.parse("2026-10-13T12:50:00+09:00"));
+        assertThat(response.closesAt()).isEqualTo(OffsetDateTime.parse("2026-10-13T13:00:00+09:00"));
     }
 
     @Test
@@ -129,7 +129,7 @@ class BattleAlarmServiceTest {
         when(battleAlarmRepository.existsByUserIdAndBattleIdAndDismissedTrue(7L, 3L)).thenReturn(false);
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:35:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:55:00+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.OPEN);
@@ -144,7 +144,7 @@ class BattleAlarmServiceTest {
         when(battleAlarmRepository.existsByUserIdAndBattleIdAndDismissedTrue(7L, 3L)).thenReturn(true);
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:35:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:55:00+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.OPEN);
@@ -157,7 +157,7 @@ class BattleAlarmServiceTest {
         when(dailyBattleRepository.findByBattleDate(TODAY)).thenReturn(Optional.empty());
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:35:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:55:00+09:00").getStatus(7L);
 
         // Then: NO_BATTLE이고 케이스, 참여, 닫음은 조회하지 않음
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.NO_BATTLE);
@@ -171,7 +171,7 @@ class BattleAlarmServiceTest {
         stubTodayBattleWithCases(2);
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:35:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:55:00+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.NO_BATTLE);
@@ -179,14 +179,14 @@ class BattleAlarmServiceTest {
     }
 
     @Test
-    void getStatus_returnsClosed_withBattleId_at1650() {
+    void getStatus_returnsClosed_withBattleId_at1300() {
         // Given
         DailyBattle battle = mock(DailyBattle.class);
         when(battle.getBattleId()).thenReturn(3L);
         when(dailyBattleRepository.findByBattleDate(TODAY)).thenReturn(Optional.of(battle));
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T16:50:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:00:00+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.CLOSED);
@@ -200,7 +200,7 @@ class BattleAlarmServiceTest {
         when(dailyBattleRepository.existsById(3L)).thenReturn(false);
 
         // When & Then
-        assertThatThrownBy(() -> serviceAt("2026-10-13T12:05:00+09:00").dismiss(7L, 3L))
+        assertThatThrownBy(() -> serviceAt("2026-10-13T12:55:00+09:00").dismiss(7L, 3L))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> {
                     BusinessException be = (BusinessException) e;
@@ -217,7 +217,7 @@ class BattleAlarmServiceTest {
         when(battleAlarmRepository.existsByUserIdAndBattleIdAndDismissedTrue(7L, 3L)).thenReturn(true);
 
         // When
-        serviceAt("2026-10-13T12:05:00+09:00").dismiss(7L, 3L);
+        serviceAt("2026-10-13T12:55:00+09:00").dismiss(7L, 3L);
 
         // Then: 저장하지 않음
         verifyNoInteractions(transactionTemplate);
@@ -233,7 +233,7 @@ class BattleAlarmServiceTest {
         runTransactionInline();
 
         // When
-        serviceAt("2026-10-13T12:05:00+09:00").dismiss(7L, 3L);
+        serviceAt("2026-10-13T12:55:00+09:00").dismiss(7L, 3L);
 
         // Then: 닫음 상태의 새 행이 저장됨
         ArgumentCaptor<BattleAlarm> captor = ArgumentCaptor.forClass(BattleAlarm.class);
@@ -253,7 +253,7 @@ class BattleAlarmServiceTest {
         runTransactionInline();
 
         // When
-        serviceAt("2026-10-13T12:05:00+09:00").dismiss(7L, 3L);
+        serviceAt("2026-10-13T12:55:00+09:00").dismiss(7L, 3L);
 
         // Then: 그 행이 닫음으로 바뀌어 저장됨
         assertThat(existing.isDismissed()).isTrue();
@@ -269,7 +269,7 @@ class BattleAlarmServiceTest {
                 .when(transactionTemplate).executeWithoutResult(any());
 
         // When & Then: 예외 없이 끝남
-        assertThatCode(() -> serviceAt("2026-10-13T12:05:00+09:00").dismiss(7L, 3L))
+        assertThatCode(() -> serviceAt("2026-10-13T12:55:00+09:00").dismiss(7L, 3L))
                 .doesNotThrowAnyException();
     }
 }
