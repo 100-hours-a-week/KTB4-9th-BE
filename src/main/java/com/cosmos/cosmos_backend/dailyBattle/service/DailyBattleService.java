@@ -339,7 +339,7 @@ public class DailyBattleService {
         LocalTime start = LocalTime.of(12, 50);
         LocalTime end = LocalTime.of(12, 59, 59);
 
-        // 시간 유효한지 검증 (12:00:00.000 이상 ~ 12:09:59.000 미만에 접수된 요청만 유효)
+        // 시간 유효한지 검증 (12:50:00.000 이상 ~ 12:59:59.000 미만에 접수된 요청만 유효)
         if (receivedTime.isBefore(start) || !receivedTime.isBefore(end)) {
             throw new BusinessException(
                     HttpStatus.BAD_REQUEST, "Not_Battle_Time"
