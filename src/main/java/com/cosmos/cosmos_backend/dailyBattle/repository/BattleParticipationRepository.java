@@ -118,7 +118,7 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
         FROM battle_participations bp
         WHERE bp.daily_battle_id = :battleId
           AND bp.all_correct = true
-          AND bp.participation_status = 'EVALUATING_COMPLETED'
+          AND bp.participation_status = 'GRADING_COMPLETED'
     ) ranked
 
     WHERE ranked.userId = :userId
