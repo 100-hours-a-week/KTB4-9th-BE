@@ -5,11 +5,11 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 
-/** 배틀 알림 모달의 표시 시간 기준. 한국 시각 12:00 이상 12:10 미만에만 열림. */
+/** 배틀 알림 모달의 표시 시간 기준. 한국 시각 12:50 이상 13:00 미만에만 열림. */
 public final class BattleAlarmTimePolicy {
 
-    private static final LocalTime OPEN_TIME = LocalTime.of(13, 30);
-    private static final LocalTime CLOSE_TIME = LocalTime.of(16, 50);
+    private static final LocalTime OPEN_TIME = LocalTime.of(12, 50);
+    private static final LocalTime CLOSE_TIME = LocalTime.of(13, 00);
 
     private BattleAlarmTimePolicy() {
     }
