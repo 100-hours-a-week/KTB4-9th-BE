@@ -43,8 +43,8 @@ public class BattleWorkerScheduler {
 
     private ScheduledFuture<?> recheckTask;
 
-    // 매일 12:00에 채점 워커 시작
-    @Scheduled(cron = "0 40 16 * * *", zone = "Asia/Seoul")
+    // 매일 12:50에 채점 워커 시작
+    @Scheduled(cron = "0 50 12 * * *", zone = "Asia/Seoul")
     public void startGradingWorker(){
 
         // worker 작업 2개 등록
@@ -69,8 +69,8 @@ public class BattleWorkerScheduler {
         workerTasks.clear();
     }
 
-    // 12:10 결과 공개 시점에 실행할 결과 확정 메소드
-    @Scheduled(cron = "00 50 16 * * *", zone = "Asia/Seoul")
+    // 13:00 결과 공개 시점에 실행할 결과 확정 메소드
+    @Scheduled(cron = "00 00 13 * * *", zone = "Asia/Seoul")
     public void finalizeBattle() {
 
         LocalDate today = LocalDate.now(clock);
@@ -115,8 +115,8 @@ public class BattleWorkerScheduler {
     }
 
 
-    // 매일 12:09:59에 미제출 참여자 타임아웃 처리
-    @Scheduled(cron = "59 49 16 * * *", zone = "Asia/Seoul")
+    // 매일 12:59:59에 미제출 참여자 타임아웃 처리
+    @Scheduled(cron = "59 59 12 * * *", zone = "Asia/Seoul")
     public void timeoutBattle() {
 
         LocalDate today = LocalDate.now(clock);
