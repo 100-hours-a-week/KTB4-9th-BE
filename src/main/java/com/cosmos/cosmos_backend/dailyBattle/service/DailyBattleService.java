@@ -10,10 +10,7 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.DailyBattleSubmissionRequestDto;
-import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleCaseResponseDto;
-import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleDropOutResponseDto;
-import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
-import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleSubmissionResponseDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.response.*;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
@@ -71,6 +68,41 @@ public class DailyBattleService {
         }
 
         return saving_problem.getBattleId();
+    }
+
+    // 오늘 배틀 정보 조회
+    @Transactional(readOnly = true)
+    public CurrentDailyBattleResponseDto getCurrentDailyBattle() {
+
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        LocalDate todayDate = now.toLocalDate();
+
+        Long yesterdayBattleId = null;
+        Long todayBattleId = null;
+
+        Optional<DailyBattle> yesterdayBattle =
+                dailyBattleRepository.findByBattleDate(todayDate.minusDays(1));
+
+        if (yesterdayBattle.isPresent()) {
+            yesterdayBattleId = yesterdayBattle.get().getBattleId();
+        }
+
+        Optional<DailyBattle> todayBattle =
+                dailyBattleRepository.findByBattleDate(todayDate);
+
+        if (todayBattle.isPresent()) {
+            todayBattleId = todayBattle.get().getBattleId();
+        }
+
+        CurrentDailyBattleResponseDto currentDailyBattleResponse =
+                new CurrentDailyBattleResponseDto(
+                        now,
+                        todayBattleId,
+                        yesterdayBattleId
+                );
+
+        return currentDailyBattleResponse;
     }
 
     @Transactional
