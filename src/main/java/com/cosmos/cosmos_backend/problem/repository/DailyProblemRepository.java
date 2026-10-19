@@ -21,5 +21,7 @@ public interface DailyProblemRepository extends JpaRepository<DailyProblem, Long
             @Param("date") LocalDate date
     );
 
+    // 데일리 문제로 등록된 적이 있는지 확인
+    boolean existsByProblemId(Long problemId);
 
 }

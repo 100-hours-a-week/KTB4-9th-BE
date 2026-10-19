@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -44,11 +45,13 @@ class SavedProblemServiceTest {
         when(savedProblemRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(false);
 
         // When
-        boolean created = service().save(7L, 1L);
+        boolean created = service().save(7L, 1L, true);
 
-        // Then: 새로 저장했다고 알려주고, 실제로 저장을 요청함
+        // Then: 새로 저장했다고 알려주고, 저장 당시 categoryKnown을 담아 저장을 요청함
         assertThat(created).isTrue();
-        verify(savedProblemRepository).save(any(SavedProblem.class));
+        ArgumentCaptor<SavedProblem> captor = ArgumentCaptor.forClass(SavedProblem.class);
+        verify(savedProblemRepository).save(captor.capture());
+        assertThat(captor.getValue().isCategoryKnown()).isTrue();
     }
 
     @Test
@@ -58,7 +61,7 @@ class SavedProblemServiceTest {
         when(savedProblemRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
 
         // When
-        boolean created = service().save(7L, 1L);
+        boolean created = service().save(7L, 1L, true);
 
         // Then: false를 돌려주고 저장은 하지 않음
         assertThat(created).isFalse();
@@ -71,7 +74,7 @@ class SavedProblemServiceTest {
         when(problemRepository.existsById(999L)).thenReturn(false);
 
         // When & Then
-        assertThatThrownBy(() -> service().save(7L, 999L))
+        assertThatThrownBy(() -> service().save(7L, 999L, false))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND))
                 .hasMessage("problem_not_found");
@@ -83,9 +86,9 @@ class SavedProblemServiceTest {
         // Given
         LocalDateTime savedAt = LocalDateTime.of(2026, 10, 8, 12, 0);
         when(savedProblemRepository.findSavedProblems(7L, null)).thenReturn(List.of(
-                new SavedProblemRow(1L, "미제출 문제", Difficulty.LV1, Category.ARRAY, savedAt, null, null),
-                new SavedProblemRow(2L, "풀이 중 문제", Difficulty.LV2, Category.DP, savedAt, false, "점화식으로 푼다"),
-                new SavedProblemRow(3L, "정답 문제", Difficulty.LV3, Category.ARRAY, savedAt, true, "투 포인터로 푼다")
+                new SavedProblemRow(1L, "미제출 문제", Difficulty.LV1, Category.ARRAY, savedAt, null, null, false, null, null),
+                new SavedProblemRow(2L, "풀이 중 문제", Difficulty.LV2, Category.DP, savedAt, false, "점화식으로 푼다", false, false, 1),
+                new SavedProblemRow(3L, "정답 문제", Difficulty.LV3, Category.ARRAY, savedAt, true, "투 포인터로 푼다", false, true, 1)
         ));
 
         // When
@@ -96,6 +99,26 @@ class SavedProblemServiceTest {
                 .containsExactly(SavedProblemStatus.NOT_SUBMITTED, SavedProblemStatus.IN_PROGRESS, SavedProblemStatus.CORRECT);
         assertThat(responses).extracting(SavedProblemResponse::solution)
                 .containsExactly(null, "점화식으로 푼다", "투 포인터로 푼다");
+    }
+
+    @Test
+    void getSavedProblems_hidesCategory_unlessKnownOrCorrectOrLimitReached() {
+        // Given: categoryKnown, categoryResult, submittedCount 조합별 저장 문제
+        LocalDateTime savedAt = LocalDateTime.of(2026, 10, 8, 12, 0);
+        when(savedProblemRepository.findSavedProblems(7L, null)).thenReturn(List.of(
+                new SavedProblemRow(1L, "카테고리를 알던 문제", Difficulty.LV1, Category.ARRAY, savedAt, null, null, true, null, null),
+                new SavedProblemRow(2L, "카테고리를 맞춘 랜덤 문제", Difficulty.LV1, Category.DP, savedAt, false, "풀이", false, true, 1),
+                new SavedProblemRow(3L, "한도를 다 쓴 랜덤 문제", Difficulty.LV1, Category.TREE, savedAt, false, "풀이", false, false, 5),
+                new SavedProblemRow(4L, "한도가 남은 랜덤 문제", Difficulty.LV1, Category.GRAPH, savedAt, false, "풀이", false, false, 4),
+                new SavedProblemRow(5L, "제출 안 한 랜덤 문제", Difficulty.LV1, Category.MATH, savedAt, null, null, false, null, null)
+        ));
+
+        // When
+        List<SavedProblemResponse> responses = service().getSavedProblems(7L, null);
+
+        // Then: 알던 문제, 맞춘 문제, 한도를 다 쓴 문제만 카테고리가 보임
+        assertThat(responses).extracting(SavedProblemResponse::category)
+                .containsExactly(Category.ARRAY, Category.DP, Category.TREE, null, null);
     }
 
     @Test

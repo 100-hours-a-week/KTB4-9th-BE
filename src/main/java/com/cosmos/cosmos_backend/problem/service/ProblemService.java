@@ -1,5 +1,6 @@
 package com.cosmos.cosmos_backend.problem.service;
 
+import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.codesubmission.repository.CodeSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
@@ -14,6 +15,7 @@ import com.cosmos.cosmos_backend.problem.dto.response.MyApproachResponse;
 import com.cosmos.cosmos_backend.problem.dto.response.MyCodeResponse;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.*;
+import com.cosmos.cosmos_backend.savedproblem.domain.SavedProblem;
 import com.cosmos.cosmos_backend.savedproblem.repository.SavedProblemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +38,7 @@ public class ProblemService {
     private final TestCaseRepository testCaseRepository;
     private final UsedHintRepository usedHintRepository;
     private final SavedProblemRepository savedProblemRepository;
+    private final DailyProblemRepository dailyProblemRepository;
     private final ApproachSubmissionRepository approachSubmissionRepository;
     private final CodeSubmissionRepository codeSubmissionRepository;
 
@@ -52,19 +56,28 @@ public class ProblemService {
                 .map(UsedHint::getHintStage)
                 .orElse(0);
 
-        // 3. 내가 저장한 문제인지 조회
-        boolean saved = savedProblemRepository.existsByUserIdAndProblemId(userId, problemId);
+        // 3. 내가 저장한 문제인지 조회 (저장할 때 기록한 categoryKnown을 쓰려고 행 자체를 가져옴)
+        Optional<SavedProblem> savedProblem = savedProblemRepository.findByUserIdAndProblemId(userId, problemId);
+        boolean saved = savedProblem.isPresent();
 
         // 4. 내가 이전에 제출한 접근 방식과 코드를 조회 (없으면 null)
-        MyApproachResponse myApproach = approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId)
-                .map(MyApproachResponse::from)
-                .orElse(null);
+        Optional<ApproachSubmission> approachSubmission =
+                approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId);
+        MyApproachResponse myApproach = approachSubmission.map(MyApproachResponse::from).orElse(null);
         MyCodeResponse myCode = codeSubmissionRepository.findByUserIdAndProblemId(userId, problemId)
                 .map(MyCodeResponse::from)
                 .orElse(null);
 
-        // 5. 접근 방식을 제출한 적이 없으면 정답 카테고리는 숨김 (내려주면 카테고리 맞추기가 의미가 없어짐)
-        Category visibleCategory = myApproach != null ? problem.getCategory() : null;
+        // 5. 카테고리 공개 여부를 정함 (숨기지 않으면 카테고리 맞추기가 의미가 없어짐)
+        //   - 카테고리를 알고 있던 문제: 저장했다면 저장 당시 값, 저장 안 했다면 데일리 문제일 때
+        //   - 카테고리를 맞춘 문제, 또는 제출 한도를 다 쓴 문제
+        boolean categoryKnown = savedProblem.map(SavedProblem::isCategoryKnown)
+                .orElseGet(() -> dailyProblemRepository.existsByProblemId(problemId));
+        boolean categoryRevealed = approachSubmission
+                .map(submission -> Boolean.TRUE.equals(submission.getCategoryResult())
+                        || submission.getSubmittedCount() >= ApproachSubmission.MAX_SUBMISSION_COUNT)
+                .orElse(false);
+        Category visibleCategory = (categoryKnown || categoryRevealed) ? problem.getCategory() : null;
 
         // 6. 예시, 실행 제한을 각각 조회
         // 7. 조회한 값들을 응답 형태로 조립해서 반환

@@ -21,6 +21,7 @@ import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.domain.entity.UsedHint;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.repository.*;
+import com.cosmos.cosmos_backend.savedproblem.domain.SavedProblem;
 import com.cosmos.cosmos_backend.savedproblem.repository.SavedProblemRepository;
 
 import java.time.LocalDateTime;
@@ -60,6 +61,9 @@ class ProblemServiceTest {
     private SavedProblemRepository savedProblemRepository;
 
     @Mock
+    private DailyProblemRepository dailyProblemRepository;
+
+    @Mock
     private ApproachSubmissionRepository approachSubmissionRepository;
 
     @Mock
@@ -69,7 +73,77 @@ class ProblemServiceTest {
     private AiProblemClient aiProblemClient;
 
     private ProblemService service() {
-        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, savedProblemRepository, approachSubmissionRepository, codeSubmissionRepository, aiProblemClient);
+        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, savedProblemRepository, dailyProblemRepository, approachSubmissionRepository, codeSubmissionRepository, aiProblemClient);
+    }
+
+    // 카테고리 공개 규칙 테스트용: 1번 문제(ARRAY)와 기본 조회 결과를 준비
+    private void stubProblemForCategoryRule() {
+        Problem problem = new Problem(
+                Difficulty.LV1, Category.ARRAY, "두 수의 합", "내용", "입력 형식", "출력 형식", List.of(), "배열"
+        );
+        setId(problem, 1L);
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem));
+        when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(1L)).thenReturn(List.of());
+        when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
+        when(usedHintRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.empty());
+    }
+
+    @Test
+    void getProblemDetail_showsCategory_whenUnsavedDailyProblem() {
+        // Given: 저장하지 않은 데일리 문제
+        stubProblemForCategoryRule();
+        when(dailyProblemRepository.existsByProblemId(1L)).thenReturn(true);
+
+        // When & Then
+        assertThat(service().getProblemDetail(7L, 1L).category()).isEqualTo(Category.ARRAY);
+    }
+
+    @Test
+    void getProblemDetail_showsCategory_whenSavedWithCategoryKnown() {
+        // Given: 카테고리를 알고 저장한 문제
+        stubProblemForCategoryRule();
+        when(savedProblemRepository.findByUserIdAndProblemId(7L, 1L))
+                .thenReturn(Optional.of(new SavedProblem(7L, 1L, true)));
+
+        // When & Then
+        assertThat(service().getProblemDetail(7L, 1L).category()).isEqualTo(Category.ARRAY);
+    }
+
+    @Test
+    void getProblemDetail_hidesCategory_whenSavedRandomProblemEvenIfDaily() {
+        // Given: 과거 데일리 문제를 랜덤으로 뽑아 저장한 경우 (저장 기록이 데일리 여부보다 우선)
+        stubProblemForCategoryRule();
+        when(savedProblemRepository.findByUserIdAndProblemId(7L, 1L))
+                .thenReturn(Optional.of(new SavedProblem(7L, 1L, false)));
+
+        // When & Then
+        assertThat(service().getProblemDetail(7L, 1L).category()).isNull();
+    }
+
+    @Test
+    void getProblemDetail_hidesCategory_whenWrongCategoryAndLimitRemains() {
+        // Given: 랜덤 문제에서 카테고리를 틀렸고 제출 한도가 남은 상태
+        stubProblemForCategoryRule();
+        when(approachSubmissionRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.of(
+                new ApproachSubmission(7L, 1L, Category.DP, "틀린 풀이", false, 30, "아쉬워요")
+        ));
+
+        // When & Then
+        assertThat(service().getProblemDetail(7L, 1L).category()).isNull();
+    }
+
+    @Test
+    void getProblemDetail_showsCategory_whenWrongCategoryButLimitReached() {
+        // Given: 카테고리를 계속 틀려서 제출 한도(5회)를 다 쓴 상태
+        stubProblemForCategoryRule();
+        ApproachSubmission approach = new ApproachSubmission(7L, 1L, Category.DP, "틀린 풀이", false, 30, "아쉬워요");
+        for (int i = 1; i < ApproachSubmission.MAX_SUBMISSION_COUNT; i++) {
+            approach.resubmit(Category.DP, "틀린 풀이", false, 30, "아쉬워요");
+        }
+        when(approachSubmissionRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.of(approach));
+
+        // When & Then
+        assertThat(service().getProblemDetail(7L, 1L).category()).isEqualTo(Category.ARRAY);
     }
 
     @Test
@@ -99,7 +173,7 @@ class ProblemServiceTest {
         // Then
         assertThat(response.problemId()).isEqualTo(1L);
         assertThat(response.difficulty()).isEqualTo(Difficulty.LV1);
-        // 접근 방식을 제출한 적이 없으면 정답 카테고리는 숨김
+        // 저장하지 않은 일반 문제이고 제출한 적도 없으면 정답 카테고리는 숨김
         assertThat(response.category()).isNull();
         assertThat(response.inputFormat()).isEqualTo("정수 배열 nums와 목표값 target이 주어집니다.");
         assertThat(response.executionLimits()).hasSize(1);
@@ -145,7 +219,8 @@ class ProblemServiceTest {
         when(problemExampleRepository.findByProblemIdOrderByDisplayOrder(1L)).thenReturn(List.of());
         when(runningLimitRepository.findByProblemId(1L)).thenReturn(List.of());
         when(usedHintRepository.findByUserIdAndProblemId(7L, 1L)).thenReturn(Optional.empty());
-        when(savedProblemRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+        when(savedProblemRepository.findByUserIdAndProblemId(7L, 1L))
+                .thenReturn(Optional.of(new SavedProblem(7L, 1L, false)));
 
         // When
         ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
@@ -176,7 +251,7 @@ class ProblemServiceTest {
         ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
 
         // Then
-        // 접근 방식을 제출했으면 카테고리를 내려줌
+        // 카테고리를 맞춰서 제출했으면 카테고리를 내려줌
         assertThat(response.category()).isEqualTo(Category.ARRAY);
         assertThat(response.myApproach().naturalSolution()).isEqualTo("투 포인터로 푼다");
         assertThat(response.myApproach().selectedCategory()).isEqualTo(Category.ARRAY);

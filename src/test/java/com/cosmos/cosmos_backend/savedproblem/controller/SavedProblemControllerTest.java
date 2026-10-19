@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -54,9 +55,9 @@ class SavedProblemControllerTest {
     void save_returns201_whenNewlySaved() {
         // Given
         loginAs("7");
-        when(savedProblemService.save(7L, 1L)).thenReturn(true);
+        when(savedProblemService.save(7L, 1L, false)).thenReturn(true);
 
-        // When & Then
+        // When & Then: 본문이 없으면 카테고리를 몰랐던 것으로 저장
         mvc().post().uri("/problems/1/saved")
                 .assertThat()
                 .hasStatus(HttpStatus.CREATED)
@@ -65,10 +66,25 @@ class SavedProblemControllerTest {
     }
 
     @Test
+    void save_passesCategoryKnown_whenBodyHasIt() {
+        // Given
+        loginAs("7");
+        when(savedProblemService.save(7L, 1L, true)).thenReturn(true);
+
+        // When & Then
+        mvc().post().uri("/problems/1/saved")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"categoryKnown\":true}")
+                .assertThat()
+                .hasStatus(HttpStatus.CREATED);
+        verify(savedProblemService).save(7L, 1L, true);
+    }
+
+    @Test
     void save_returns200_whenAlreadySaved() {
         // Given
         loginAs("7");
-        when(savedProblemService.save(7L, 1L)).thenReturn(false);
+        when(savedProblemService.save(7L, 1L, false)).thenReturn(false);
 
         // When & Then
         mvc().post().uri("/problems/1/saved")
@@ -80,7 +96,7 @@ class SavedProblemControllerTest {
     void save_returns404_whenProblemMissing() {
         // Given
         loginAs("7");
-        when(savedProblemService.save(7L, 999L))
+        when(savedProblemService.save(7L, 999L, false))
                 .thenThrow(new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
 
         // When & Then
