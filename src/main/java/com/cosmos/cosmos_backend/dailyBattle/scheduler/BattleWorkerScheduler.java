@@ -44,7 +44,7 @@ public class BattleWorkerScheduler {
     private ScheduledFuture<?> recheckTask;
 
     // 매일 12:00에 채점 워커 시작
-    @Scheduled(cron = "0 30 13 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 25 16 * * *", zone = "Asia/Seoul")
     public void startGradingWorker(){
 
         // worker 작업 2개 등록
