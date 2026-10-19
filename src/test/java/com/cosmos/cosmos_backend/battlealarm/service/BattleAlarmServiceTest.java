@@ -102,21 +102,21 @@ class BattleAlarmServiceTest {
 
     @Test
     void getStatus_returnsOpen_whenBattleReady_andNotParticipatedNorDismissed() {
-        // Given: 12:00:00 정각, 배틀과 케이스 3개가 준비됨
+        // Given: 13:30:00 정각, 배틀과 케이스 3개가 준비됨
         stubTodayBattleWithCases(3);
         when(battleParticipationRepository.findByDailyBattleIdAndUser_Id(3L, 7L)).thenReturn(Optional.empty());
         when(battleAlarmRepository.existsByUserIdAndBattleIdAndDismissedTrue(7L, 3L)).thenReturn(false);
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:00:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:30:00+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.OPEN);
         assertThat(response.battleId()).isEqualTo(3L);
         assertThat(response.participated()).isFalse();
         assertThat(response.dismissed()).isFalse();
-        assertThat(response.serverTime()).isEqualTo(OffsetDateTime.parse("2026-10-13T12:00:00+09:00"));
-        assertThat(response.closesAt()).isEqualTo(OffsetDateTime.parse("2026-10-13T12:10:00+09:00"));
+        assertThat(response.serverTime()).isEqualTo(OffsetDateTime.parse("2026-10-13T13:30:00+09:00"));
+        assertThat(response.closesAt()).isEqualTo(OffsetDateTime.parse("2026-10-13T16:50:00+09:00"));
     }
 
     @Test
@@ -129,7 +129,7 @@ class BattleAlarmServiceTest {
         when(battleAlarmRepository.existsByUserIdAndBattleIdAndDismissedTrue(7L, 3L)).thenReturn(false);
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:05:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:35:00+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.OPEN);
@@ -144,7 +144,7 @@ class BattleAlarmServiceTest {
         when(battleAlarmRepository.existsByUserIdAndBattleIdAndDismissedTrue(7L, 3L)).thenReturn(true);
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:05:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:35:00+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.OPEN);
@@ -157,7 +157,7 @@ class BattleAlarmServiceTest {
         when(dailyBattleRepository.findByBattleDate(TODAY)).thenReturn(Optional.empty());
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:05:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:35:00+09:00").getStatus(7L);
 
         // Then: NO_BATTLE이고 케이스, 참여, 닫음은 조회하지 않음
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.NO_BATTLE);
@@ -171,7 +171,7 @@ class BattleAlarmServiceTest {
         stubTodayBattleWithCases(2);
 
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:05:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T13:35:00+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.NO_BATTLE);
@@ -179,14 +179,19 @@ class BattleAlarmServiceTest {
     }
 
     @Test
-    void getStatus_returnsClosed_andSkipsDb_at1210() {
+    void getStatus_returnsClosed_withBattleId_at1650() {
+        // Given
+        DailyBattle battle = mock(DailyBattle.class);
+        when(battle.getBattleId()).thenReturn(3L);
+        when(dailyBattleRepository.findByBattleDate(TODAY)).thenReturn(Optional.of(battle));
+
         // When
-        BattleAlarmStatusResponse response = serviceAt("2026-10-13T12:10:00+09:00").getStatus(7L);
+        BattleAlarmStatusResponse response = serviceAt("2026-10-13T16:50:00+09:00").getStatus(7L);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.CLOSED);
-        verifyNoInteractions(dailyBattleRepository, battleCaseRepository,
-                battleParticipationRepository, battleAlarmRepository);
+        assertThat(response.battleId()).isEqualTo(3L);
+        verifyNoInteractions(battleCaseRepository, battleParticipationRepository, battleAlarmRepository);
     }
 
     @Test
