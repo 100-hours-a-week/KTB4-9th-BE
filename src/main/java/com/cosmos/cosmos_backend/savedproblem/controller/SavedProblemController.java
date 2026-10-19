@@ -3,6 +3,7 @@ package com.cosmos.cosmos_backend.savedproblem.controller;
 import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
+import com.cosmos.cosmos_backend.savedproblem.dto.request.SaveProblemRequest;
 import com.cosmos.cosmos_backend.savedproblem.dto.response.SavedProblemResponse;
 import com.cosmos.cosmos_backend.savedproblem.service.SavedProblemService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,14 +35,18 @@ public class SavedProblemController {
     @Operation(summary = "문제 저장", description = "문제를 내 저장 목록에 추가합니다. 이미 저장돼 있으면 200, 새로 저장하면 201을 반환합니다.")
     public ResponseEntity<ApiResponse<Void>> save(
             @Parameter(description = "문제 ID", required = true, example = "1") @PathVariable String problemId,
+            @RequestBody(required = false) SaveProblemRequest request,
             @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
     ) {
         // 1. JWT에서 사용자 id를 꺼내고, 경로의 problemId를 숫자로 변환
         Long userId = Long.valueOf(jwt.getSubject());
         Long id = parseProblemId(problemId);
 
-        // 2. 저장은 Service에게 맡기고, 새로 저장했는지에 따라 201 또는 200으로 반환
-        boolean created = savedProblemService.save(userId, id);
+        // 2. 본문이 없거나 값이 없으면 카테고리를 몰랐던 것으로 처리
+        boolean categoryKnown = request != null && Boolean.TRUE.equals(request.categoryKnown());
+
+        // 3. 저장은 Service에게 맡기고, 새로 저장했는지에 따라 201 또는 200으로 반환
+        boolean created = savedProblemService.save(userId, id, categoryKnown);
         HttpStatus status = created ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(ApiResponse.of("problem_save_success"));
     }
