@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test;
 
 class BattleAlarmStatusResponseTest {
 
-    private static final OffsetDateTime SERVER_TIME = OffsetDateTime.parse("2026-10-13T12:00:01+09:00");
-    private static final OffsetDateTime CLOSES_AT = OffsetDateTime.parse("2026-10-13T16:50:00+09:00");
+    private static final OffsetDateTime SERVER_TIME = OffsetDateTime.parse("2026-10-13T12:50:01+09:00");
+    private static final OffsetDateTime CLOSES_AT = OffsetDateTime.parse("2026-10-13T13:00:00+09:00");
 
     @Test
     void notOpen_hasNoBattleIdAndFalseFlags() {
