@@ -214,7 +214,7 @@ public class DailyBattleService {
                 participationInfo.getParticipationId(),
                 ParticipationStatus.IN_PROGRESS,
                 ParticipationStatus.SUBMITTED,
-                submittedTime
+                submittedAt
         );
 
         // 5. 상태 변경 실패 시 중복 제출 예외
