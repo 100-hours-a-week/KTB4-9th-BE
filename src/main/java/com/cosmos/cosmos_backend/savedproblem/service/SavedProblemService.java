@@ -21,7 +21,7 @@ public class SavedProblemService {
 
     /** 문제 저장. 새로 저장했으면 true, 이미 저장돼 있었으면 false. */
     @Transactional
-    public boolean save(Long userId, Long problemId) {
+    public boolean save(Long userId, Long problemId, boolean categoryKnown) {
         // 1. 문제가 있는지 확인 (없으면 404 예외를 던짐)
         if (!problemRepository.existsById(problemId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found");
@@ -33,7 +33,7 @@ public class SavedProblemService {
         }
 
         // 3. 새로 저장하고 true를 반환
-        savedProblemRepository.save(new SavedProblem(userId, problemId));
+        savedProblemRepository.save(new SavedProblem(userId, problemId, categoryKnown));
         return true;
     }
 

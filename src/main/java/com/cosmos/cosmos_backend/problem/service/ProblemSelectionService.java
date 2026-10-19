@@ -65,8 +65,9 @@ public class ProblemSelectionService {
             problem = generateProblem(difficulty, category);
         }
 
-        // 4. 문제를 확보했으니 이제 횟수를 +1 (여기만 트랜잭션)
-        int usedCount = transactionTemplate.execute(status -> increaseCount(userId, today));
+        // 4. 문제를 확보했으니 이제 횟수를 +1하고 받은 문제를 기록 (여기만 트랜잭션)
+        Long problemId = problem.getId();
+        int usedCount = transactionTemplate.execute(status -> increaseCount(userId, today, problemId));
 
         // 5. 예시를 조회해서 응답 조립 (카테고리를 RANDOM으로 요청했으면 정답이 드러나지 않게 비워서 보냄)
         return ProblemSelectionResponse.of(
@@ -94,20 +95,20 @@ public class ProblemSelectionService {
         }
     }
 
-    // 오늘 횟수를 잠근 채로 확인하고 +1 (트랜잭션 안에서 호출됨)
-    private int increaseCount(Long userId, LocalDate today) {
+    // 오늘 횟수를 잠근 채로 확인하고 +1, 받은 문제를 기록 (트랜잭션 안에서 호출됨)
+    private int increaseCount(Long userId, LocalDate today, Long problemId) {
         return dailyGeneratedCountRepository.findForUpdateByUserIdAndUsageDate(userId, today)
                 .map(count -> {
                     // 1. 잠근 뒤 다시 확인 (앞의 빠른 확인 이후 다른 요청이 올렸을 수 있음)
                     if (count.getGenerationCount() >= DAILY_LIMIT) {
                         throw limitExceeded(today, count.getGenerationCount());
                     }
-                    // 2. +1 (커밋 때 UPDATE가 나감)
-                    count.increase();
+                    // 2. +1하고 마지막으로 받은 문제를 바꿈 (커밋 때 UPDATE가 나감)
+                    count.increase(problemId);
                     return count.getGenerationCount();
                 })
-                // 3. 오늘 처음이면 횟수 1로 새로 저장
-                .orElseGet(() -> dailyGeneratedCountRepository.save(new DailyGeneratedCount(userId, today)).getGenerationCount());
+                // 3. 오늘 처음이면 횟수 1과 받은 문제로 새로 저장
+                .orElseGet(() -> dailyGeneratedCountRepository.save(new DailyGeneratedCount(userId, today, problemId)).getGenerationCount());
     }
 
     // 429 예외 생성 (data에 남은 횟수와 초기화 시각을 담음)

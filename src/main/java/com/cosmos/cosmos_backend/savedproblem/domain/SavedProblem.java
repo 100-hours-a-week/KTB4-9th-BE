@@ -35,9 +35,13 @@ public class SavedProblem {
     @Column(name = "saved_at", nullable = false)
     private LocalDateTime savedAt;
 
-    public SavedProblem(Long userId, Long problemId) {
+    @Column(name = "category_known", nullable = false)
+    private boolean categoryKnown;
+
+    public SavedProblem(Long userId, Long problemId, boolean categoryKnown) {
         this.userId = userId;
         this.problemId = problemId;
+        this.categoryKnown = categoryKnown;
         this.savedAt = LocalDateTime.now();
     }
 }

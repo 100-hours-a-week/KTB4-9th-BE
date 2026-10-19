@@ -45,7 +45,7 @@ public class DailyBattleService {
     @Transactional
     public Long createDailyBattle(AiBattleCreateRequestDto request){
 
-        LocalDate date = LocalDate.now(clock).plusDays(1);;
+        LocalDate date = LocalDate.now(clock).plusDays(1);
 
         DailyBattle saving_problem = new DailyBattle(
                 date,
@@ -119,7 +119,7 @@ public class DailyBattleService {
         LocalDateTime now = LocalDateTime.now(clock);
 
         LocalDateTime battleEndTime = battleInfo.getBattleDate()
-                .atTime(12, 10);
+                .atTime(13, 00);
 
         Long remainedTimeSecond = Math.max(
                 0L,
@@ -214,7 +214,7 @@ public class DailyBattleService {
                 participationInfo.getParticipationId(),
                 ParticipationStatus.IN_PROGRESS,
                 ParticipationStatus.SUBMITTED,
-                submittedTime
+                submittedAt
         );
 
         // 5. 상태 변경 실패 시 중복 제출 예외
@@ -336,8 +336,8 @@ public class DailyBattleService {
         LocalTime receivedTime = receivedAt.atZone(ZoneId.of("Asia/Seoul")).toLocalTime();
 
         // 배틀 시작, 마감 시각
-        LocalTime start = LocalTime.of(12, 0);
-        LocalTime end = LocalTime.of(12, 9, 59);
+        LocalTime start = LocalTime.of(12, 50);
+        LocalTime end = LocalTime.of(12, 59, 59);
 
         // 시간 유효한지 검증 (12:00:00.000 이상 ~ 12:09:59.000 미만에 접수된 요청만 유효)
         if (receivedTime.isBefore(start) || !receivedTime.isBefore(end)) {

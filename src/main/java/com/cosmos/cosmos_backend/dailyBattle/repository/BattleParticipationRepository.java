@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -33,7 +34,7 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
             @Param("participationId") Long participationId,
             @Param("expectedStatus") ParticipationStatus expectedStatus,
             @Param("submittedStatus") ParticipationStatus submittedStatus,
-            @Param("submittedAt") LocalDateTime submittedAt
+            @Param("submittedAt") Instant submittedAt
     );
 
     // 채점 worker의 작업 선점을 위한 메소드(제출 처리인 상태인 행 중에 제출 시각 빠른것, 락 가진건 건너 뛰기)
@@ -61,7 +62,7 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
     FROM (
         SELECT
             bp.user_id AS userId,
-            u.name AS userName,
+            u.username AS userName,
             u.profile_image_url AS profileImageUrl,
 
             TIMESTAMPDIFF(
@@ -83,7 +84,7 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
 
         WHERE bp.daily_battle_id = :battleId
           AND bp.all_correct = true
-          AND bp.participation_status = 'EVALUATING_COMPLETED'
+          AND bp.participation_status = 'GRADING_COMPLETED'
     ) ranked
 
     WHERE ranked.ranking <= 5
@@ -117,7 +118,7 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
         FROM battle_participations bp
         WHERE bp.daily_battle_id = :battleId
           AND bp.all_correct = true
-          AND bp.participation_status = 'EVALUATING_COMPLETED'
+          AND bp.participation_status = 'GRADING_COMPLETED'
     ) ranked
 
     WHERE ranked.userId = :userId
