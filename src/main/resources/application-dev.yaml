@@ -2,6 +2,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+  task:
+    scheduling:
+      pool:
+        size: 3
 
 ai:
   root-url: ${AI_SERVER_BASE_URL:http://ai-server:8000}
