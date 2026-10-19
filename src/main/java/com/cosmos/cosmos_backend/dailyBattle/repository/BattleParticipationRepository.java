@@ -62,7 +62,7 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
     FROM (
         SELECT
             bp.user_id AS userId,
-            u.name AS userName,
+            u.username AS userName,
             u.profile_image_url AS profileImageUrl,
 
             TIMESTAMPDIFF(
@@ -84,7 +84,7 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
 
         WHERE bp.daily_battle_id = :battleId
           AND bp.all_correct = true
-          AND bp.participation_status = 'EVALUATING_COMPLETED'
+          AND bp.participation_status = 'GRADING_COMPLETED'
     ) ranked
 
     WHERE ranked.ranking <= 5
