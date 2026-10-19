@@ -53,8 +53,8 @@ class BattleAlarmControllerTest {
         // Given
         loginAs("7");
         when(battleAlarmService.getStatus(7L)).thenReturn(BattleAlarmStatusResponse.open(
-                OffsetDateTime.parse("2026-10-13T12:00:01+09:00"), 3L, false, false,
-                OffsetDateTime.parse("2026-10-13T12:10:00+09:00")
+                OffsetDateTime.parse("2026-10-13T12:50:01+09:00"), 3L, false, false,
+                OffsetDateTime.parse("2026-10-13T13:00:00+09:00")
         ));
 
         // When & Then: 필드 이름이 snake_case이고 시각에 +09:00이 붙어서 나감
@@ -67,8 +67,8 @@ class BattleAlarmControllerTest {
         body.extractingPath("$.data.battle_id").isEqualTo(3);
         body.extractingPath("$.data.participated").isEqualTo(false);
         body.extractingPath("$.data.dismissed").isEqualTo(false);
-        body.extractingPath("$.data.server_time").asString().isEqualTo("2026-10-13T12:00:01+09:00");
-        body.extractingPath("$.data.closes_at").asString().isEqualTo("2026-10-13T12:10:00+09:00");
+        body.extractingPath("$.data.server_time").asString().isEqualTo("2026-10-13T12:50:01+09:00");
+        body.extractingPath("$.data.closes_at").asString().isEqualTo("2026-10-13T13:00:00+09:00");
     }
 
     @Test
