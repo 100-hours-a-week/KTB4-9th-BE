@@ -3,10 +3,7 @@ package com.cosmos.cosmos_backend.dailyBattle.controller;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.DailyBattleSubmissionRequestDto;
-import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleDropOutResponseDto;
-import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleParticipationResponseDto;
-import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleResultResponseDto;
-import com.cosmos.cosmos_backend.dailyBattle.dto.response.BattleSubmissionResponseDto;
+import com.cosmos.cosmos_backend.dailyBattle.dto.response.*;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleWorkerScheduler;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
@@ -51,6 +48,22 @@ public class DailyBattleController {
                 .body(ApiResponse.of(
                         "daily_battle_problem_creation_success"
                 ));
+    }
+
+    // 현재 기준 오늘 배틀 정보 조회
+    @GetMapping("/current")
+    public ResponseEntity<ApiResponse<CurrentDailyBattleResponseDto>> getCurrentDailyBattle(
+            @AuthenticationPrincipal Jwt userInfo
+    ){
+
+        CurrentDailyBattleResponseDto currentDailyBattleResponse = dailyBattleService.getCurrentDailyBattle();
+
+        return ResponseEntity.ok(
+                ApiResponse.of(
+                        "current_battle_information_retrieved",
+                        currentDailyBattleResponse
+                )
+        );
     }
 
     //배틀 참여
