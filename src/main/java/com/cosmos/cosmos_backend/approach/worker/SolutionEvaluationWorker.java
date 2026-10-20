@@ -1,8 +1,11 @@
 package com.cosmos.cosmos_backend.approach.worker;
 
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationClient;
+import com.cosmos.cosmos_backend.approach.client.AiEvaluationFailedException;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
+import com.cosmos.cosmos_backend.approach.domain.EvaluationFailureCode;
 import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationExecutionService;
+import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationExecutionService.ClaimedTask;
 import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationExecutionService.EvaluationInput;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import java.util.Optional;
@@ -29,39 +32,55 @@ public class SolutionEvaluationWorker {
     // 작업 하나를 처리하고, 처리한 작업이 있었으면 true
     private boolean processNext() {
         // 1. 작업 선점 (없으면 종료)
-        Optional<Long> claimed = executionService.claimNext();
+        Optional<ClaimedTask> claimed = executionService.claimNext();
         if (claimed.isEmpty()) {
             return false;
         }
-        Long taskId = claimed.get();
+        ClaimedTask task = claimed.get();
 
         try {
             // 2. AI 요청 준비
-            EvaluationInput input = executionService.prepare(taskId);
+            EvaluationInput input = executionService.prepare(task.taskId());
 
             // 3. AI 평가 호출 (트랜잭션 밖이라 DB 커넥션을 잡지 않음)
             AiEvaluationResult result = aiEvaluationClient.evaluate(input.request());
 
             // 4. 결과 저장
-            executionService.complete(taskId, input.keywords(), result);
+            executionService.complete(task.taskId(), task.attempt(), input.keywords(), result);
         } catch (Exception e) {
-            // 5. 어느 단계든 실패하면 작업을 실패 처리하고 다음 작업으로 넘어감
-            log.error("자연어 풀이 평가 실패: taskId={}", taskId, e);
-            markFailed(taskId, e);
+            // 5. 어느 단계든 실패하면 실패를 기록하고 다음 작업으로 넘어감
+            log.error("자연어 풀이 평가 실패: taskId={}, attempt={}", task.taskId(), task.attempt(), e);
+            recordFailure(task, e);
         }
         return true;
     }
 
-    // 실패 상태 저장 (이것마저 실패해도 워커는 멈추지 않음)
-    private void markFailed(Long taskId, Exception cause) {
-        // 우리가 던진 예외는 코드 이름(짧은 문구)을, 그 외는 예외 클래스 이름을 기록
-        boolean business = cause instanceof BusinessException;
-        String errorCode = business ? cause.getMessage() : "internal_error";
-        String errorMessage = business ? cause.getMessage() : cause.getClass().getSimpleName();
+    // 예외를 실패 코드와 재시도 여부로 바꿔 기록 (이것마저 실패해도 워커는 멈추지 않음)
+    private void recordFailure(ClaimedTask task, Exception cause) {
+        EvaluationFailureCode code;
+        boolean retryable;
+        String message;
+        if (cause instanceof AiEvaluationFailedException ai) {
+            // AI 오류는 클라이언트가 분류한 그대로 사용
+            code = ai.getFailureCode();
+            retryable = ai.isRetryable();
+            message = ai.getDetail() != null ? ai.getDetail() : ai.getMessage();
+        } else if (cause instanceof BusinessException business) {
+            // 우리 쪽 규칙 위반(한도 초과 등)은 다시 해도 같은 결과
+            code = EvaluationFailureCode.INTERNAL_ERROR;
+            retryable = false;
+            message = business.getMessage();
+        } else {
+            // 그 외 예기치 못한 오류(DB 일시 장애 등)는 재시도
+            code = EvaluationFailureCode.INTERNAL_ERROR;
+            retryable = true;
+            message = cause.getClass().getSimpleName();
+        }
+
         try {
-            executionService.fail(taskId, errorCode, errorMessage);
+            executionService.handleFailure(task.taskId(), task.attempt(), code, message, retryable);
         } catch (Exception e) {
-            log.error("평가 실패 상태 저장 실패: taskId={}", taskId, e);
+            log.error("평가 실패 상태 저장 실패: taskId={}", task.taskId(), e);
         }
     }
 }
