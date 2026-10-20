@@ -9,6 +9,11 @@ ai:
     connect-timeout: ${AI_SERVER_CONNECT_TIMEOUT:3s}
     read-timeout: ${AI_SERVER_READ_TIMEOUT:30s}
 
+evaluation:
+  worker:
+    enabled: ${EVALUATION_WORKER_ENABLED:false}
+    poll-interval: ${EVALUATION_WORKER_POLL_INTERVAL:3s}
+
 judge0:
   connect-timeout: ${JUDGE0_CONNECT_TIMEOUT:3s}
   read-timeout: ${JUDGE0_READ_TIMEOUT:10s}
