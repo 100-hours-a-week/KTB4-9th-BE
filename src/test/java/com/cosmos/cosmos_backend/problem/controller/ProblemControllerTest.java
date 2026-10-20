@@ -60,7 +60,7 @@ class ProblemControllerTest {
                 "입력 형식", "출력 형식", List.of(), List.of(), List.of(), 1,
                 true,
                 new MyApproachResponse(Category.ARRAY, "투 포인터로 푼다", "COMPLETED",
-                        new ApproachSubmitResponse.Result(true, 90, List.of(new ApproachSubmitResponse.KeywordJudgement("투 포인터", true)), "좋아요"),
+                        new ApproachSubmitResponse.Result(true, 90, List.of(new ApproachSubmitResponse.KeywordJudgement("투 포인터", true)), "좋아요", "ARRAY", "선정 배경"),
                         new ApproachSubmitResponse.SubmissionUsage(5, 1, 4)),
                 new MyCodeResponse(Language.PYTHON, "print(1)", JudgingResult.WRONG_ANSWER, 1, 3, 2)
         );
