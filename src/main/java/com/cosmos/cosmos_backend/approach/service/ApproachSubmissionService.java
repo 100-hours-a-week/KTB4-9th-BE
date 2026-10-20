@@ -9,6 +9,7 @@ import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
+import com.cosmos.cosmos_backend.approach.dto.response.CategoryAnswerResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
@@ -119,6 +120,28 @@ public class ApproachSubmissionService {
         });
 
 
+        // 9. 첫 정답이면 풀이 처리·잔디·포인트를 갱신
+        applyFirstSolveRewards(submission, alreadySolved, userId, difficulty, category);
+
+        return new ApproachSubmitResult(submission, mergedKeywords, problem);
+    }
+
+    // 제출한 적 있는 사용자에게 문제의 정답 카테고리와 선정 배경을 알려줌
+    public CategoryAnswerResponse getCategoryAnswer(Long userId, Long problemId) {
+        // 1. 이 사용자의 제출 기록이 없으면 403 (풀지 않고 정답만 받는 것을 막음)
+        approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.FORBIDDEN, "category_answer_not_available"));
+
+        // 2. 문제를 조회 (없으면 404 예외를 던짐)
+        Problem problem = problemRepository.findById(problemId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
+
+        // 3. 정답 카테고리와 선정 배경을 반환
+        return new CategoryAnswerResponse(problemId, problem.getCategory().name(), problem.getCategorySelectReason());
+    }
+
+    // 해당 문제를 처음 맞힌 경우에만 풀이 처리, 잔디, 포인트를 갱신 (오답이거나 이미 맞힌 문제면 아무것도 안 함)
+    void applyFirstSolveRewards(ApproachSubmission submission, boolean alreadySolved, Long userId, Difficulty difficulty, Category category) {
         // 이번 제출이 정답인지 확인
         Boolean correct = submission.getCategoryResult() && submission.getTotalScore() >= 85;
 
@@ -169,12 +192,10 @@ public class ApproachSubmissionService {
                     category
             );
         }
-
-        return new ApproachSubmitResult(submission, mergedKeywords);
     }
 
     // 제출 한도 초과 429 예외 생성 (data에 문제 번호와 사용 횟수를 담음)
-    private BusinessException limitExceeded(Long problemId, int usedCount) {
+    static BusinessException limitExceeded(Long problemId, int usedCount) {
         int limit = ApproachSubmission.MAX_SUBMISSION_COUNT;
         return new BusinessException(HttpStatus.TOO_MANY_REQUESTS, "solution_submission_limit_exceeded",
                 new ApproachSubmitResponse.SubmissionLimitExceededData(problemId, limit, usedCount, limit - usedCount));
@@ -192,7 +213,7 @@ public class ApproachSubmissionService {
     }
 
     // 문제·키워드·실행 제한을 AI 요청 형태로 조립
-    private AiEvaluationRequest buildAiRequest(Problem problem, String naturalSolution, List<Keyword> keywords, List<RunningLimit> runningLimits) {
+    static AiEvaluationRequest buildAiRequest(Problem problem, String naturalSolution, List<Keyword> keywords, List<RunningLimit> runningLimits) {
         // 1. 실행 제한을 AI 요청 형태로 변환 (enum은 이름 그대로 보냄)
         List<AiEvaluationRequest.ExecutionLimit> executionLimits = runningLimits.stream()
                 .map(limit -> new AiEvaluationRequest.ExecutionLimit(
@@ -225,7 +246,7 @@ public class ApproachSubmissionService {
     }
 
     // 우리 키워드 목록 순서를 기준으로 AI 판정을 병합 (AI가 언급 안 했으면 false, AI가 준 모르는 키워드는 버림)
-    private List<AiEvaluationResult.KeywordJudgement> mergeKeywordJudgements(List<Keyword> ourKeywords, List<AiEvaluationResult.KeywordJudgement> aiKeywords) {
+    static List<AiEvaluationResult.KeywordJudgement> mergeKeywordJudgements(List<Keyword> ourKeywords, List<AiEvaluationResult.KeywordJudgement> aiKeywords) {
         // 1. AI 응답을 키워드 → 포함 여부 맵으로 변환
         Map<String, Boolean> aiJudgements = aiKeywords.stream()
                 .collect(Collectors.toMap(AiEvaluationResult.KeywordJudgement::keyword, AiEvaluationResult.KeywordJudgement::included, (a, b) -> b));

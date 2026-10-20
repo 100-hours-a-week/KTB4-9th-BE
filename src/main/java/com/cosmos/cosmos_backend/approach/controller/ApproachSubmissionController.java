@@ -3,6 +3,7 @@ package com.cosmos.cosmos_backend.approach.controller;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.request.ApproachSubmitRequest;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
+import com.cosmos.cosmos_backend.approach.dto.response.CategoryAnswerResponse;
 import com.cosmos.cosmos_backend.approach.service.ApproachSubmissionService;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -49,6 +51,22 @@ public class ApproachSubmissionController {
 
         // 4. 제출 결과를 message + data 형식으로 감싸서 200으로 반환
         return ResponseEntity.ok(ApiResponse.of("solution_submission_success", ApproachSubmitResponse.of(result)));
+    }
+
+    @GetMapping("/category-answer")
+    @Operation(summary = "카테고리 정답 조회", description = "풀이를 제출한 적 있는 문제의 정답 카테고리와 선정 배경을 반환합니다. 제출 기록이 없으면 403입니다.")
+    public ResponseEntity<ApiResponse<CategoryAnswerResponse>> getCategoryAnswer(
+            @Parameter(description = "문제 ID", required = true, example = "1") @PathVariable String problemId,
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
+    ) {
+        // 1. 경로의 problemId를 숫자로 변환
+        Long id = parseProblemId(problemId);
+
+        // 2. Spring Security가 검증한 JWT에서 로그인한 사용자 id(sub)를 꺼냄
+        Long userId = Long.valueOf(jwt.getSubject());
+
+        // 3. 조회는 Service에게 맡기고 message + data 형식으로 감싸서 200으로 반환
+        return ResponseEntity.ok(ApiResponse.of("category_answer_success", approachSubmissionService.getCategoryAnswer(userId, id)));
     }
 
     // problemId 문자열을 숫자로 변환
