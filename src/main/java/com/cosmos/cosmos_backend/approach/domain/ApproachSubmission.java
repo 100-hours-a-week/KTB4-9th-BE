@@ -80,15 +80,20 @@ public class ApproachSubmission {
     @Column(name = "evaluated_at")
     private LocalDateTime evaluatedAt;
 
-    /** AI 평가가 성공했을 때만 호출됨. 생성과 동시에 COMPLETED로 채움. */
+    /** AI 평가가 성공했을 때만 호출됨. 생성과 동시에 COMPLETED로 채움. 제출 시각은 지금으로 채움. */
     public ApproachSubmission(Long userId, Long problemId, Category selectedCategory, String naturalSolution, boolean categoryResult, int score, String feedback) {
+        this(userId, problemId, selectedCategory, naturalSolution, categoryResult, score, feedback, LocalDateTime.now(ZoneOffset.UTC));
+    }
+
+    /** 평가 작업의 접수 시각을 제출 시각으로 지정해 생성 (비동기 평가 워커가 사용). */
+    public ApproachSubmission(Long userId, Long problemId, Category selectedCategory, String naturalSolution, boolean categoryResult, int score, String feedback, LocalDateTime submittedAt) {
         this.userId = userId;
         this.problemId = problemId;
         this.selectedCategory = selectedCategory;
         this.naturalSolution = naturalSolution;
         this.categoryResult = categoryResult;
         this.submittedCount = 1;
-        this.submittedAt = LocalDateTime.now(ZoneOffset.UTC);
+        this.submittedAt = submittedAt;
         this.totalScore = score;
         this.aiFeedback = feedback;
         this.evaluationStatus = EvaluationStatus.COMPLETED;
@@ -97,11 +102,16 @@ public class ApproachSubmission {
 
     /** 재제출 처리. AI 평가가 성공했을 때만 호출됨. 이전 결과를 새 결과로 덮어씀. */
     public void resubmit(Category selectedCategory, String naturalSolution, boolean categoryResult, int score, String feedback) {
+        resubmit(selectedCategory, naturalSolution, categoryResult, score, feedback, LocalDateTime.now(ZoneOffset.UTC));
+    }
+
+    /** 평가 작업의 접수 시각을 제출 시각으로 지정해 재제출 처리 (비동기 평가 워커가 사용). */
+    public void resubmit(Category selectedCategory, String naturalSolution, boolean categoryResult, int score, String feedback, LocalDateTime submittedAt) {
         this.selectedCategory = selectedCategory;
         this.naturalSolution = naturalSolution;
         this.categoryResult = categoryResult;
         this.submittedCount += 1;
-        this.submittedAt = LocalDateTime.now(ZoneOffset.UTC);
+        this.submittedAt = submittedAt;
         this.totalScore = score;
         this.aiFeedback = feedback;
         this.evaluationStatus = EvaluationStatus.COMPLETED;
@@ -111,6 +121,11 @@ public class ApproachSubmission {
     /** 이번 제출의 AI 키워드 판정을 저장. 이전 값은 새 값으로 교체됨. */
     public void updateKeywordResults(List<KeywordResult> keywordResults) {
         this.keywordResults = keywordResults;
+    }
+
+    /** 카테고리 정답 공개 여부. 카테고리를 맞혔거나 제출 한도를 다 썼을 때 공개함. */
+    public boolean isCategoryRevealable() {
+        return categoryResult || submittedCount >= MAX_SUBMISSION_COUNT;
     }
 
     public void markAsSolved() {

@@ -7,6 +7,10 @@ import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
+import com.cosmos.cosmos_backend.approach.dto.response.CategoryAnswerResponse;
+import com.cosmos.cosmos_backend.common.Difficulty;
+import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
+import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.approach.service.ApproachSubmissionService;
 import com.cosmos.cosmos_backend.common.Category;
@@ -56,7 +60,7 @@ class ApproachSubmissionControllerTest {
         // Given
         loginAs("42");
         ApproachSubmission submission = new ApproachSubmission(42L, 1L, Category.ARRAY, "풀이", true, 85, "좋은 접근이에요");
-        ApproachSubmitResult result = new ApproachSubmitResult(submission, List.of(new AiEvaluationResult.KeywordJudgement("정렬", true)));
+        ApproachSubmitResult result = new ApproachSubmitResult(submission, List.of(new AiEvaluationResult.KeywordJudgement("정렬", true)), problem());
         when(approachSubmissionService.submit(42L, 1L, "ARRAY", "풀이")).thenReturn(result);
 
         // When & Then
@@ -76,8 +80,88 @@ class ApproachSubmissionControllerTest {
         body.extractingPath("$.data.submissionUsage.limit").isEqualTo(5);
         body.extractingPath("$.data.submissionUsage.usedCount").isEqualTo(1);
         body.extractingPath("$.data.submissionUsage.remainingCount").isEqualTo(4);
+        body.extractingPath("$.data.result.correctCategory").isEqualTo("ARRAY");
+        body.extractingPath("$.data.result.categorySelectReason").isEqualTo("선정 배경");
 
         verify(approachSubmissionService).submit(42L, 1L, "ARRAY", "풀이");
+    }
+
+    @Test
+    void submit_hidesCorrectCategory_whenWrongAndLimitRemains() {
+        // Given
+        loginAs("42");
+        ApproachSubmission submission = new ApproachSubmission(42L, 1L, Category.DP, "풀이", false, 40, "아쉬워요");
+        when(approachSubmissionService.submit(42L, 1L, "DP", "풀이")).thenReturn(new ApproachSubmitResult(submission, List.of(), problem()));
+
+        // When & Then
+        var body = mvc().post().uri("/problems/1/solution-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"selectedCategory\":\"DP\",\"natural_solution\":\"풀이\"}")
+                .assertThat()
+                .hasStatusOk()
+                .bodyJson();
+
+        body.extractingPath("$.data.result.correctCategory").isNull();
+        body.extractingPath("$.data.result.categorySelectReason").isNull();
+    }
+
+    @Test
+    void submit_revealsCorrectCategory_whenWrongButLimitReached() {
+        // Given
+        loginAs("42");
+        ApproachSubmission submission = new ApproachSubmission(42L, 1L, Category.DP, "풀이", false, 40, "아쉬워요");
+        for (int i = 1; i < ApproachSubmission.MAX_SUBMISSION_COUNT; i++) {
+            submission.resubmit(Category.DP, "풀이", false, 40, "아쉬워요");
+        }
+        when(approachSubmissionService.submit(42L, 1L, "DP", "풀이")).thenReturn(new ApproachSubmitResult(submission, List.of(), problem()));
+
+        // When & Then
+        var body = mvc().post().uri("/problems/1/solution-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"selectedCategory\":\"DP\",\"natural_solution\":\"풀이\"}")
+                .assertThat()
+                .hasStatusOk()
+                .bodyJson();
+
+        body.extractingPath("$.data.result.correctCategory").isEqualTo("ARRAY");
+        body.extractingPath("$.data.result.categorySelectReason").isEqualTo("선정 배경");
+    }
+
+    @Test
+    void getCategoryAnswer_returns200() {
+        // Given
+        loginAs("42");
+        when(approachSubmissionService.getCategoryAnswer(42L, 1L)).thenReturn(new CategoryAnswerResponse(1L, "ARRAY", "선정 배경"));
+
+        // When & Then
+        var body = mvc().get().uri("/problems/1/solution-submissions/category-answer")
+                .assertThat()
+                .hasStatusOk()
+                .bodyJson();
+
+        body.extractingPath("$.message").isEqualTo("category_answer_success");
+        body.extractingPath("$.data.problemId").isEqualTo(1);
+        body.extractingPath("$.data.correctCategory").isEqualTo("ARRAY");
+        body.extractingPath("$.data.categorySelectReason").isEqualTo("선정 배경");
+    }
+
+    @Test
+    void getCategoryAnswer_returns403_whenNeverSubmitted() {
+        // Given
+        loginAs("42");
+        when(approachSubmissionService.getCategoryAnswer(42L, 1L))
+                .thenThrow(new BusinessException(HttpStatus.FORBIDDEN, "category_answer_not_available"));
+
+        // When & Then
+        mvc().get().uri("/problems/1/solution-submissions/category-answer")
+                .assertThat()
+                .hasStatus(HttpStatus.FORBIDDEN)
+                .bodyJson()
+                .extractingPath("$.message").isEqualTo("category_answer_not_available");
+    }
+
+    private Problem problem() {
+        return new Problem(Difficulty.LV1, Category.ARRAY, "제목", "내용", "입력 형식", "출력 형식", List.<AiProblemsCreateRequestDto.InputConstraints>of(), "선정 배경");
     }
 
     @Test

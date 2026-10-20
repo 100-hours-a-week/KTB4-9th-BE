@@ -16,6 +16,7 @@ import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
+import com.cosmos.cosmos_backend.approach.dto.response.CategoryAnswerResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
@@ -369,5 +370,33 @@ class ApproachSubmissionServiceTest {
                 .hasMessage("invalid_selected_category");
 
         verify(approachSubmissionRepository, never()).findSubmittedCount(any(), any());
+    }
+
+    @Test
+    void getCategoryAnswer_returnsAnswer_whenUserHasSubmitted() {
+        // Given
+        ApproachSubmission submission = new ApproachSubmission(10L, 1L, Category.DP, "풀이", false, 40, "아쉬워요");
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(submission));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+
+        // When
+        CategoryAnswerResponse response = service.getCategoryAnswer(10L, 1L);
+
+        // Then
+        assertThat(response.problemId()).isEqualTo(1L);
+        assertThat(response.correctCategory()).isEqualTo("ARRAY");
+        assertThat(response.categorySelectReason()).isEqualTo("선정 배경");
+    }
+
+    @Test
+    void getCategoryAnswer_throws403_whenNeverSubmitted() {
+        // Given
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> service.getCategoryAnswer(10L, 1L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("category_answer_not_available");
+        verifyNoInteractions(problemRepository);
     }
 }
