@@ -2,7 +2,10 @@ package com.cosmos.cosmos_backend.approach.service;
 
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
+import com.cosmos.cosmos_backend.approach.config.EvaluationWorkerProperties;
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
+import com.cosmos.cosmos_backend.approach.domain.EvaluationFailureCode;
+import com.cosmos.cosmos_backend.approach.domain.EvaluationTaskStatus;
 import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
 import com.cosmos.cosmos_backend.approach.domain.SolutionEvaluationTask;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
@@ -33,27 +36,32 @@ public class SolutionEvaluationExecutionService {
     public record EvaluationInput(AiEvaluationRequest request, List<Keyword> keywords) {
     }
 
+    /** 선점한 작업과 이번 시도 번호. */
+    public record ClaimedTask(Long taskId, int attempt) {
+    }
+
     private final SolutionEvaluationTaskRepository taskRepository;
     private final ProblemRepository problemRepository;
     private final KeywordRepository keywordRepository;
     private final RunningLimitRepository runningLimitRepository;
     private final ApproachSubmissionRepository approachSubmissionRepository;
     private final ApproachSubmissionService approachSubmissionService;
+    private final EvaluationWorkerProperties properties;
     private final Clock clock;
 
-    /** 작업을 선점해 PROCESSING으로 바꾸고 작업 id를 반환. 처리할 작업이 없으면 빈 값. */
+    /** 작업을 선점해 PROCESSING으로 바꾸고 작업 id와 시도 번호를 반환. 처리할 작업이 없으면 빈 값. */
     @Transactional
-    public Optional<Long> claimNext() {
-        // 1. 대기 중인 작업을 잠그고 조회
-        Optional<SolutionEvaluationTask> next = taskRepository.findNextForUpdate();
+    public Optional<ClaimedTask> claimNext() {
+        // 1. 대기 중이거나 재시도 시각이 지난 작업을 잠그고 조회
+        Optional<SolutionEvaluationTask> next = taskRepository.findNextForUpdate(now());
         if (next.isEmpty()) {
             return Optional.empty();
         }
 
-        // 2. 처리 중으로 바꿈 (커밋 때 UPDATE가 나가고 잠금이 풀림)
+        // 2. 처리 중으로 바꿈 (시도 횟수가 1 늘고, 커밋 때 UPDATE가 나가면서 잠금이 풀림)
         SolutionEvaluationTask task = next.get();
         task.startProcessing(now());
-        return Optional.of(task.getId());
+        return Optional.of(new ClaimedTask(task.getId(), task.getWorkerAttemptCount()));
     }
 
     /** AI 호출 전 준비. 문제·키워드·실행 제한을 조회해 AI 요청을 조립. */
@@ -72,9 +80,14 @@ public class SolutionEvaluationExecutionService {
 
     /** AI 결과를 제출 행에 반영하고 작업을 SUCCEEDED로 바꿈. 모두 한 트랜잭션. */
     @Transactional
-    public void complete(Long taskId, List<Keyword> keywords, AiEvaluationResult result) {
-        // 1. 작업과 문제를 조회
-        SolutionEvaluationTask task = findTask(taskId);
+    public void complete(Long taskId, int attempt, List<Keyword> keywords, AiEvaluationResult result) {
+        // 0. 작업을 잠그고, 그 사이 복구되어 다른 시도로 넘어갔다면 이 결과는 버림
+        SolutionEvaluationTask task = lockTask(taskId);
+        if (!isCurrentAttempt(task, attempt)) {
+            throw new IllegalStateException("stale evaluation result: taskId=" + taskId + ", attempt=" + attempt);
+        }
+
+        // 1. 문제를 조회
         Problem problem = findProblem(task.getProblemId());
         Long userId = task.getUserId();
         Long problemId = task.getProblemId();
@@ -120,10 +133,47 @@ public class SolutionEvaluationExecutionService {
         task.markSucceeded(submission.getId(), now());
     }
 
-    /** 작업을 최종 실패 처리. 제출 행은 건드리지 않음. */
+    /** 실패를 기록. 재시도할 수 있고 횟수가 남았으면 RETRY_WAIT, 아니면 FAILED. */
     @Transactional
-    public void fail(Long taskId, String errorCode, String errorMessage) {
-        findTask(taskId).markFailed(errorCode, errorMessage, now());
+    public void handleFailure(Long taskId, int attempt, EvaluationFailureCode code, String message, boolean retryable) {
+        // 1. 작업을 잠그고, 이미 다른 경로가 처리했으면 아무것도 하지 않음
+        SolutionEvaluationTask task = lockTask(taskId);
+        if (!isCurrentAttempt(task, attempt)) {
+            return;
+        }
+
+        // 2. 재시도 가능하고 횟수가 남았으면 일정 시간 뒤로 미루고, 아니면 최종 실패 처리
+        LocalDateTime now = now();
+        if (retryable && task.getWorkerAttemptCount() < properties.maxAttempts()) {
+            task.scheduleRetry(now.plus(properties.retryDelay()), code.name(), message, now);
+        } else {
+            task.markFailed(code.name(), message, now);
+        }
+    }
+
+    /** 오래 PROCESSING으로 남아 있는 작업의 id 목록. */
+    @Transactional(readOnly = true)
+    public List<Long> findStuckTaskIds() {
+        return taskRepository.findStuckIds(now().minus(properties.stuckAfter()));
+    }
+
+    /** 멈춘 작업 1건을 복구. 작업마다 별도 트랜잭션. */
+    @Transactional
+    public void recoverStuck(Long taskId) {
+        // 1. 작업을 잠그고, 그 사이 처리되었거나 아직 기준 시간 안이면 건드리지 않음
+        SolutionEvaluationTask task = lockTask(taskId);
+        LocalDateTime now = now();
+        if (task.getStatus() != EvaluationTaskStatus.PROCESSING
+                || !task.getStartedAt().isBefore(now.minus(properties.stuckAfter()))) {
+            return;
+        }
+
+        // 2. 횟수가 남았으면 바로 재시도할 수 있게 돌려놓고, 없으면 최종 실패 처리
+        if (task.getWorkerAttemptCount() < properties.maxAttempts()) {
+            task.scheduleRetry(now, EvaluationFailureCode.WORKER_TIMEOUT.name(), "worker_timeout", now);
+        } else {
+            task.markFailed(EvaluationFailureCode.WORKER_TIMEOUT.name(), "worker_timeout", now);
+        }
     }
 
     // 작업 조회 (없으면 404 예외를 던짐)
@@ -132,10 +182,21 @@ public class SolutionEvaluationExecutionService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "solution_evaluation_not_found"));
     }
 
+    // 작업을 잠그고 조회 (없으면 404 예외를 던짐)
+    private SolutionEvaluationTask lockTask(Long taskId) {
+        return taskRepository.findForUpdateById(taskId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "solution_evaluation_not_found"));
+    }
+
     // 문제 조회 (없으면 404 예외를 던짐)
     private Problem findProblem(Long problemId) {
         return problemRepository.findById(problemId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
+    }
+
+    // 지금 처리 중인 시도가 맞는지 확인
+    private boolean isCurrentAttempt(SolutionEvaluationTask task, int attempt) {
+        return task.getStatus() == EvaluationTaskStatus.PROCESSING && task.getWorkerAttemptCount() == attempt;
     }
 
     // 현재 시각 (UTC)

@@ -107,7 +107,7 @@ class SolutionEvaluationTaskRepositoryTest {
         em.clear();
 
         // When
-        var next = repository.findNextForUpdate();
+        var next = repository.findNextForUpdate(NOW);
 
         // Then
         assertThat(next).map(SolutionEvaluationTask::getId).contains(older.getId());
@@ -126,12 +126,95 @@ class SolutionEvaluationTaskRepositoryTest {
         em.clear();
 
         // When & Then
-        assertThat(repository.findNextForUpdate()).isEmpty();
+        assertThat(repository.findNextForUpdate(NOW)).isEmpty();
     }
 
     @Test
     void findNextForUpdate_returnsEmpty_whenNoTasks() {
         // When & Then
-        assertThat(repository.findNextForUpdate()).isEmpty();
+        assertThat(repository.findNextForUpdate(NOW)).isEmpty();
+    }
+
+    // 재시도 대기 상태로 저장한 작업을 만듦
+    private SolutionEvaluationTask retryWaitTask(Long userId, LocalDateTime createdAt, LocalDateTime nextRetryAt) {
+        SolutionEvaluationTask task = repository.saveAndFlush(new SolutionEvaluationTask(userId, 10L, Category.ARRAY, "풀이", createdAt));
+        task.startProcessing(createdAt);
+        task.scheduleRetry(nextRetryAt, "AI_SERVER_UNAVAILABLE", "ai_server_unavailable", createdAt);
+        return repository.saveAndFlush(task);
+    }
+
+    @Test
+    void findNextForUpdate_returnsRetryWaitTask_whenRetryTimeHasPassed() {
+        // Given
+        SolutionEvaluationTask due = retryWaitTask(1L, NOW.minusMinutes(1), NOW.minusSeconds(1));
+        em.clear();
+
+        // When
+        var next = repository.findNextForUpdate(NOW);
+
+        // Then
+        assertThat(next).map(SolutionEvaluationTask::getId).contains(due.getId());
+    }
+
+    @Test
+    void findNextForUpdate_ignoresRetryWaitTask_whenRetryTimeHasNotPassed() {
+        // Given
+        retryWaitTask(1L, NOW.minusMinutes(1), NOW.plusSeconds(10));
+        em.clear();
+
+        // When & Then
+        assertThat(repository.findNextForUpdate(NOW)).isEmpty();
+    }
+
+    @Test
+    void findNextForUpdate_picksOldestAmongPendingAndDueRetry() {
+        // Given
+        retryWaitTask(1L, NOW.minusMinutes(5), NOW.minusSeconds(1));
+        repository.saveAndFlush(new SolutionEvaluationTask(2L, 10L, Category.ARRAY, "더 늦게 접수", NOW.minusMinutes(1)));
+        em.clear();
+
+        // When
+        var next = repository.findNextForUpdate(NOW);
+
+        // Then
+        assertThat(next).map(SolutionEvaluationTask::getUserId).contains(1L);
+    }
+
+    @Test
+    void findForUpdateById_returnsTask() {
+        // Given
+        SolutionEvaluationTask saved = repository.saveAndFlush(task(1L, 10L));
+        em.clear();
+
+        // When & Then
+        assertThat(repository.findForUpdateById(saved.getId())).map(SolutionEvaluationTask::getId).contains(saved.getId());
+        assertThat(repository.findForUpdateById(-1L)).isEmpty();
+    }
+
+    @Test
+    void findStuckIds_returnsOnlyProcessingTasksStartedBeforeThreshold() {
+        // Given
+        SolutionEvaluationTask stuck = repository.saveAndFlush(task(1L, 10L));
+        stuck.startProcessing(NOW.minusMinutes(5));
+        repository.saveAndFlush(stuck);
+
+        SolutionEvaluationTask recent = repository.saveAndFlush(task(2L, 10L));
+        recent.startProcessing(NOW.minusSeconds(30));
+        repository.saveAndFlush(recent);
+
+        SolutionEvaluationTask pending = repository.saveAndFlush(task(3L, 10L));
+
+        SolutionEvaluationTask finished = repository.saveAndFlush(task(4L, 10L));
+        finished.startProcessing(NOW.minusMinutes(5));
+        finished.markSucceeded(501L, NOW.minusMinutes(4));
+        repository.saveAndFlush(finished);
+        em.clear();
+
+        // When
+        var ids = repository.findStuckIds(NOW.minusMinutes(2));
+
+        // Then
+        assertThat(ids).containsExactly(stuck.getId());
+        assertThat(ids).doesNotContain(recent.getId(), pending.getId(), finished.getId());
     }
 }

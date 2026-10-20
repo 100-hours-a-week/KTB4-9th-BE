@@ -1,8 +1,12 @@
 package com.cosmos.cosmos_backend.approach.repository;
 
 import com.cosmos.cosmos_backend.approach.domain.SolutionEvaluationTask;
+import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -12,14 +16,23 @@ public interface SolutionEvaluationTaskRepository extends JpaRepository<Solution
     @Query("select t from SolutionEvaluationTask t where t.userId = :userId and t.problemId = :problemId and t.activeSlot = 1")
     Optional<SolutionEvaluationTask> findActive(@Param("userId") Long userId, @Param("problemId") Long problemId);
 
-    // 워커의 작업 선점: 대기 중인 작업 중 가장 오래된 1건을 잠가서 조회 (다른 워커가 잠근 행은 건너뜀)
+    // 워커의 작업 선점: 대기 중이거나 재시도 시각이 지난 작업 중 가장 오래된 1건을 잠가서 조회 (다른 워커가 잠근 행은 건너뜀)
     @Query(value = """
             SELECT *
             FROM solution_evaluation_tasks
             WHERE status = 'PENDING'
+               OR (status = 'RETRY_WAIT' AND next_retry_at <= :now)
             ORDER BY created_at ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
-    Optional<SolutionEvaluationTask> findNextForUpdate();
+    Optional<SolutionEvaluationTask> findNextForUpdate(@Param("now") LocalDateTime now);
+
+    // 작업을 잠그고 조회 (결과 저장·실패 처리·복구가 같은 작업을 동시에 바꾸지 않도록, 트랜잭션 안에서만 호출 가능)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<SolutionEvaluationTask> findForUpdateById(Long id);
+
+    // 기준 시각 이전에 시작했는데 아직 PROCESSING인 작업의 id 조회
+    @Query("select t.id from SolutionEvaluationTask t where t.status = com.cosmos.cosmos_backend.approach.domain.EvaluationTaskStatus.PROCESSING and t.startedAt < :threshold")
+    List<Long> findStuckIds(@Param("threshold") LocalDateTime threshold);
 }
