@@ -9,6 +9,7 @@ import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
 import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
+import com.cosmos.cosmos_backend.approach.dto.response.CategoryAnswerResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
@@ -122,7 +123,21 @@ public class ApproachSubmissionService {
         // 9. 첫 정답이면 풀이 처리·잔디·포인트를 갱신
         applyFirstSolveRewards(submission, alreadySolved, userId, difficulty, category);
 
-        return new ApproachSubmitResult(submission, mergedKeywords);
+        return new ApproachSubmitResult(submission, mergedKeywords, problem);
+    }
+
+    // 제출한 적 있는 사용자에게 문제의 정답 카테고리와 선정 배경을 알려줌
+    public CategoryAnswerResponse getCategoryAnswer(Long userId, Long problemId) {
+        // 1. 이 사용자의 제출 기록이 없으면 403 (풀지 않고 정답만 받는 것을 막음)
+        approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.FORBIDDEN, "category_answer_not_available"));
+
+        // 2. 문제를 조회 (없으면 404 예외를 던짐)
+        Problem problem = problemRepository.findById(problemId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
+
+        // 3. 정답 카테고리와 선정 배경을 반환
+        return new CategoryAnswerResponse(problemId, problem.getCategory().name(), problem.getCategorySelectReason());
     }
 
     // 해당 문제를 처음 맞힌 경우에만 풀이 처리, 잔디, 포인트를 갱신 (오답이거나 이미 맞힌 문제면 아무것도 안 함)

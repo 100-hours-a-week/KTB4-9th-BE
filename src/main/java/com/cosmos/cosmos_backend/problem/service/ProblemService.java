@@ -77,7 +77,7 @@ public class ProblemService {
         // 5. 내가 이전에 제출한 접근 방식과 코드를 조회 (없으면 null)
         Optional<ApproachSubmission> approachSubmission =
                 approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId);
-        MyApproachResponse myApproach = approachSubmission.map(MyApproachResponse::from).orElse(null);
+        MyApproachResponse myApproach = approachSubmission.map(submission -> MyApproachResponse.from(submission, problem)).orElse(null);
         MyCodeResponse myCode = codeSubmissionRepository.findByUserIdAndProblemId(userId, problemId)
                 .map(MyCodeResponse::from)
                 .orElse(null);

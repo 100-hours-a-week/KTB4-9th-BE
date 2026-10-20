@@ -123,6 +123,11 @@ public class ApproachSubmission {
         this.keywordResults = keywordResults;
     }
 
+    /** 카테고리 정답 공개 여부. 카테고리를 맞혔거나 제출 한도를 다 썼을 때 공개함. */
+    public boolean isCategoryRevealable() {
+        return categoryResult || submittedCount >= MAX_SUBMISSION_COUNT;
+    }
+
     public void markAsSolved() {
         this.isSolved = true;
     }

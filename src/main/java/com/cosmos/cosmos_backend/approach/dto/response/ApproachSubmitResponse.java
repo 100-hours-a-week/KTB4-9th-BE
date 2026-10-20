@@ -13,7 +13,9 @@ public record ApproachSubmitResponse(
         SubmissionUsage submissionUsage
 ) {
 
-    public record Result(Boolean isCorrect, Integer approachScore, List<KeywordJudgement> keywords, String aiFeedback) {
+    /** correctCategory·categorySelectReason은 카테고리 정답이거나 제출 한도를 다 썼을 때만 채워짐 (아니면 null). */
+    public record Result(Boolean isCorrect, Integer approachScore, List<KeywordJudgement> keywords, String aiFeedback,
+                         String correctCategory, String categorySelectReason) {
     }
 
     public record KeywordJudgement(String keyword, Boolean isIncluded) {
@@ -31,6 +33,11 @@ public record ApproachSubmitResponse(
         var submission = result.submission();
         int limit = ApproachSubmission.MAX_SUBMISSION_COUNT;
         int usedCount = submission.getSubmittedCount();
+
+        // 정답이거나 제출 한도를 다 썼을 때만 정답 카테고리와 선정 배경을 공개
+        boolean reveal = submission.isCategoryRevealable();
+        String correctCategory = reveal ? result.problem().getCategory().name() : null;
+        String categorySelectReason = reveal ? result.problem().getCategorySelectReason() : null;
         return new ApproachSubmitResponse(
                 submission.getId(),
                 submission.getProblemId(),
@@ -41,7 +48,9 @@ public record ApproachSubmitResponse(
                         result.keywords().stream()
                                 .map(keyword -> new KeywordJudgement(keyword.keyword(), keyword.included()))
                                 .toList(),
-                        submission.getAiFeedback()
+                        submission.getAiFeedback(),
+                        correctCategory,
+                        categorySelectReason
                 ),
                 new SubmissionUsage(limit, usedCount, limit - usedCount)
         );
