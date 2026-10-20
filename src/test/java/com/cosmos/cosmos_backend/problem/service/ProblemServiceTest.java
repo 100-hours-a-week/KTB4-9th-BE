@@ -6,8 +6,10 @@ import static org.mockito.Mockito.when;
 
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
+import com.cosmos.cosmos_backend.approach.domain.SolutionEvaluationTask;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
+import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepository;
 import com.cosmos.cosmos_backend.codesubmission.domain.CodeSubmission;
 import com.cosmos.cosmos_backend.codesubmission.domain.JudgingResult;
 import com.cosmos.cosmos_backend.codesubmission.repository.CodeSubmissionRepository;
@@ -81,10 +83,46 @@ class ProblemServiceTest {
     private CodeSubmissionRepository codeSubmissionRepository;
 
     @Mock
+    private SolutionEvaluationTaskRepository solutionEvaluationTaskRepository;
+
+    @Mock
     private AiProblemClient aiProblemClient;
 
     private ProblemService service() {
-        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, savedProblemRepository, dailyProblemRepository, dailyGeneratedCountRepository, approachSubmissionRepository, codeSubmissionRepository, aiProblemClient, CLOCK);
+        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, savedProblemRepository, dailyProblemRepository, dailyGeneratedCountRepository, approachSubmissionRepository, codeSubmissionRepository, solutionEvaluationTaskRepository, aiProblemClient, CLOCK);
+    }
+
+    @Test
+    void getProblemDetail_returnsActiveEvaluation_whenEvaluationIsInProgress() {
+        // Given: 평가가 진행 중인 사용자
+        stubProblemForCategoryRule();
+        givenLastGenerated(1L);
+        SolutionEvaluationTask task = new SolutionEvaluationTask(7L, 1L, Category.BINARY_SEARCH, "중간값을 확인합니다", LocalDateTime.of(2026, 10, 19, 3, 30, 0));
+        task.startProcessing(LocalDateTime.of(2026, 10, 19, 3, 30, 1));
+        when(solutionEvaluationTaskRepository.findActive(7L, 1L)).thenReturn(Optional.of(task));
+
+        // When
+        ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
+
+        // Then
+        assertThat(response.activeEvaluation()).isNotNull();
+        assertThat(response.activeEvaluation().status()).isEqualTo("PROCESSING");
+        assertThat(response.activeEvaluation().selectedCategory()).isEqualTo("BINARY_SEARCH");
+        assertThat(response.activeEvaluation().naturalSolution()).isEqualTo("중간값을 확인합니다");
+        assertThat(response.activeEvaluation().createdAt()).isEqualTo(Instant.parse("2026-10-19T03:30:00Z"));
+        assertThat(response.activeEvaluation().startedAt()).isEqualTo(Instant.parse("2026-10-19T03:30:01Z"));
+        assertThat(response.activeEvaluation().nextRetryAt()).isNull();
+    }
+
+    @Test
+    void getProblemDetail_returnsNullActiveEvaluation_whenNothingIsInProgress() {
+        // Given
+        stubProblemForCategoryRule();
+        givenLastGenerated(1L);
+        when(solutionEvaluationTaskRepository.findActive(7L, 1L)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThat(service().getProblemDetail(7L, 1L).activeEvaluation()).isNull();
     }
 
     // 오늘 마지막으로 생성한 문제가 problemId인 상태를 만든다. (접근 확인을 통과시키려고)

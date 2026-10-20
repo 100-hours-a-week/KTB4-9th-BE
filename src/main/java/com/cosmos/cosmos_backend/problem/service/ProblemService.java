@@ -1,7 +1,9 @@
 package com.cosmos.cosmos_backend.problem.service;
 
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
+import com.cosmos.cosmos_backend.approach.dto.response.ActiveEvaluationResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
+import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepository;
 import com.cosmos.cosmos_backend.codesubmission.repository.CodeSubmissionRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
@@ -44,6 +46,7 @@ public class ProblemService {
     private final DailyGeneratedCountRepository dailyGeneratedCountRepository;
     private final ApproachSubmissionRepository approachSubmissionRepository;
     private final CodeSubmissionRepository codeSubmissionRepository;
+    private final SolutionEvaluationTaskRepository solutionEvaluationTaskRepository;
 
     private final AiProblemClient aiProblemClient;
     private final Clock clock;
@@ -82,6 +85,11 @@ public class ProblemService {
                 .map(MyCodeResponse::from)
                 .orElse(null);
 
+        // 5-1. 지금 진행 중인 자연어 풀이 평가 작업을 조회 (없으면 null)
+        ActiveEvaluationResponse activeEvaluation = solutionEvaluationTaskRepository.findActive(userId, problemId)
+                .map(ActiveEvaluationResponse::from)
+                .orElse(null);
+
         // 6. 카테고리 공개 여부를 정함 (숨기지 않으면 카테고리 맞추기가 의미가 없어짐)
         //   - 카테고리를 알고 있던 문제: 저장했다면 저장 당시 값, 저장 안 했다면 오늘의 문제일 때
         //   - 카테고리를 맞춘 문제, 또는 제출 한도를 다 쓴 문제
@@ -103,7 +111,8 @@ public class ProblemService {
                 usedHintStage,
                 saved,
                 myApproach,
-                myCode
+                myCode,
+                activeEvaluation
         );
     }
 

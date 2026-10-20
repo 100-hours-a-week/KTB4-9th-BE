@@ -2,12 +2,9 @@ package com.cosmos.cosmos_backend.approach.service;
 
 import com.cosmos.cosmos_backend.activityRecord.domain.entity.ActivityRecord;
 import com.cosmos.cosmos_backend.activityRecord.repository.ActivityRecordRepository;
-import com.cosmos.cosmos_backend.approach.client.AiEvaluationClient;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
-import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
-import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.dto.response.CategoryAnswerResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
@@ -17,9 +14,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.entity.Keyword;
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
 import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
-import com.cosmos.cosmos_backend.problem.repository.KeywordRepository;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
-import com.cosmos.cosmos_backend.problem.repository.RunningLimitRepository;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -32,18 +27,13 @@ import com.cosmos.cosmos_backend.ranking.service.UserPointService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
 public class ApproachSubmissionService {
 
     private final ProblemRepository problemRepository;
-    private final KeywordRepository keywordRepository;
-    private final RunningLimitRepository runningLimitRepository;
     private final ApproachSubmissionRepository approachSubmissionRepository;
-    private final AiEvaluationClient aiEvaluationClient;
-    private final TransactionTemplate transactionTemplate;
 
     private final ActivityRecordRepository activityRecordRepository;
 
@@ -51,80 +41,6 @@ public class ApproachSubmissionService {
     private final UserPointService userPointService;
 
     private final Clock clock;
-
-    public ApproachSubmitResult submit(Long userId, Long problemId, String selectedCategory, String naturalSolution) {
-        // 1. problemId로 문제를 조회 (없으면 404 예외를 던짐)
-        Problem problem = problemRepository.findById(problemId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
-
-        // 2. 선택한 카테고리를 enum으로 변환 (없는 값이면 400 예외를 던짐)
-        Category category = parseCategory(selectedCategory);
-
-        // 난이도 반환
-        Difficulty difficulty = problem.getDifficulty();
-
-        // 3. 이 문제의 제출 횟수가 한도를 채웠으면 AI를 부르기 전에 429 (잠금 없는 빠른 차단)
-        int usedBefore = approachSubmissionRepository.findSubmittedCount(userId, problemId).orElse(0);
-        if (usedBefore >= ApproachSubmission.MAX_SUBMISSION_COUNT) {
-            throw limitExceeded(problemId, usedBefore);
-        }
-
-        // 4. 선택한 카테고리와 문제의 정답 카테고리를 비교해 정답 여부를 계산 (오답이어도 계속 진행)
-        boolean categoryResult = category.equals(problem.getCategory());
-
-        // 5. AI 평가에 필요한 키워드·실행 제한을 조회하고 요청을 조립
-        List<Keyword> keywords = keywordRepository.findByProblemIdOrderById(problemId);
-        AiEvaluationRequest request = buildAiRequest(problem, naturalSolution, keywords, runningLimitRepository.findByProblemId(problemId));
-
-        // 6. AI 서버에 평가 요청 (실패하면 예외가 던져져 여기서 끝나고 DB는 그대로 유지됨)
-        AiEvaluationResult result = aiEvaluationClient.evaluate(request);
-
-        // 7. AI 판정을 우리 키워드 목록 기준으로 병합
-        List<AiEvaluationResult.KeywordJudgement> mergedKeywords = mergeKeywordJudgements(keywords, result.keywords());
-
-        // 저장용 형태로 변환
-        List<KeywordResult> keywordResults = mergedKeywords.stream()
-                .map(keyword -> new KeywordResult(keyword.keyword(), keyword.included()))
-                .toList();
-
-        // 이미 정답을 맞춘적이 있는지 확인
-        Optional<ApproachSubmission> beforeSubmission = approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId);
-
-        Boolean alreadySolved = beforeSubmission.isPresent() && beforeSubmission.get().getIsSolved();
-
-        // 8. 성공했을 때만 이 트랜잭션 안에서 기존 제출을 갱신하거나 새로 저장
-        ApproachSubmission submission = transactionTemplate.execute(status -> {
-            // 1. 락 없이 기존 제출이 있는지 확인
-            boolean exists = approachSubmissionRepository.findByUserIdAndProblemId(userId, problemId).isPresent();
-
-            // 2. 최초 제출이면 락 없이 새로 저장
-            if (!exists) {
-                ApproachSubmission created = new ApproachSubmission(userId, problemId, category, naturalSolution, categoryResult, result.score(), result.feedback());
-                created.updateKeywordResults(keywordResults);
-                return approachSubmissionRepository.save(created);
-            }
-
-            // 3. 재제출이면 그 행을 잠그고 조회
-            ApproachSubmission existing = approachSubmissionRepository
-                    .findForUpdateByUserIdAndProblemId(userId, problemId).orElseThrow();
-
-            // 4. 잠근 뒤 다시 확인 (앞의 빠른 확인 이후 다른 요청이 올렸을 수 있음)
-            if (existing.getSubmittedCount() >= ApproachSubmission.MAX_SUBMISSION_COUNT) {
-                throw limitExceeded(problemId, existing.getSubmittedCount());
-            }
-
-            // 5. 재제출 처리 (커밋 때 UPDATE가 나감)
-            existing.resubmit(category, naturalSolution, categoryResult, result.score(), result.feedback());
-            existing.updateKeywordResults(keywordResults);
-            return existing;
-        });
-
-
-        // 9. 첫 정답이면 풀이 처리·잔디·포인트를 갱신
-        applyFirstSolveRewards(submission, alreadySolved, userId, difficulty, category);
-
-        return new ApproachSubmitResult(submission, mergedKeywords, problem);
-    }
 
     // 제출한 적 있는 사용자에게 문제의 정답 카테고리와 선정 배경을 알려줌
     public CategoryAnswerResponse getCategoryAnswer(Long userId, Long problemId) {
@@ -194,22 +110,10 @@ public class ApproachSubmissionService {
         }
     }
 
-    // 제출 한도 초과 429 예외 생성 (data에 문제 번호와 사용 횟수를 담음)
+    // 제출 한도 초과 429 예외 생성 (data에 문제 번호와 사용 현황을 담음)
     static BusinessException limitExceeded(Long problemId, int usedCount) {
-        int limit = ApproachSubmission.MAX_SUBMISSION_COUNT;
         return new BusinessException(HttpStatus.TOO_MANY_REQUESTS, "solution_submission_limit_exceeded",
-                new ApproachSubmitResponse.SubmissionLimitExceededData(problemId, limit, usedCount, limit - usedCount));
-    }
-
-    // 카테고리 문자열을 Category enum으로 변환
-    private Category parseCategory(String value) {
-        try {
-            // 1. 문자열을 enum으로 변환
-            return Category.valueOf(value);
-        } catch (IllegalArgumentException e) {
-            // 2. 없는 값이면 400 예외를 던짐
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "invalid_selected_category");
-        }
+                new ApproachSubmitResponse.SubmissionLimitExceededData(problemId, ApproachSubmitResponse.SubmissionUsage.of(usedCount)));
     }
 
     // 문제·키워드·실행 제한을 AI 요청 형태로 조립

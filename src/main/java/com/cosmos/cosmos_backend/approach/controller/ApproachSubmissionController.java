@@ -1,10 +1,10 @@
 package com.cosmos.cosmos_backend.approach.controller;
 
-import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.request.ApproachSubmitRequest;
-import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.dto.response.CategoryAnswerResponse;
+import com.cosmos.cosmos_backend.approach.dto.response.EvaluationAcceptedResponse;
 import com.cosmos.cosmos_backend.approach.service.ApproachSubmissionService;
+import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationTaskService;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,10 +30,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ApproachSubmissionController {
 
     private final ApproachSubmissionService approachSubmissionService;
+    private final SolutionEvaluationTaskService solutionEvaluationTaskService;
 
     @PostMapping
-    @Operation(summary = "자연어 풀이 제출", description = "선택한 알고리즘 분류와 자연어 풀이를 제출하고 AI 평가 결과를 반환합니다.")
-    public ResponseEntity<ApiResponse<ApproachSubmitResponse>> submit(
+    @Operation(summary = "자연어 풀이 제출", description = "선택한 알고리즘 분류와 자연어 풀이로 AI 평가를 접수하고 202를 반환합니다. 평가 결과는 평가 작업 조회 API로 확인합니다.")
+    public ResponseEntity<ApiResponse<EvaluationAcceptedResponse>> submit(
             @Parameter(description = "문제 ID", required = true, example = "1") @PathVariable String problemId,
             @Valid @RequestBody ApproachSubmitRequest request,
             @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
@@ -44,13 +45,13 @@ public class ApproachSubmissionController {
         // 2. Spring Security가 검증한 JWT에서 로그인한 사용자 id(sub)를 꺼냄
         Long userId = Long.valueOf(jwt.getSubject());
 
-        // 3. 제출 처리는 Service에게 맡김 (AI 평가까지 끝난 뒤에 반환됨)
-        ApproachSubmitResult result = approachSubmissionService.submit(
+        // 3. 평가 작업 접수는 Service에게 맡김 (AI 평가는 기다리지 않고 바로 반환됨)
+        EvaluationAcceptedResponse response = solutionEvaluationTaskService.accept(
                 userId, id, request.selectedCategory(), request.naturalSolution()
         );
 
-        // 4. 제출 결과를 message + data 형식으로 감싸서 200으로 반환
-        return ResponseEntity.ok(ApiResponse.of("solution_submission_success", ApproachSubmitResponse.of(result)));
+        // 4. 접수 결과를 message + data 형식으로 감싸서 202로 반환
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.of("solution_evaluation_accepted", response));
     }
 
     @GetMapping("/category-answer")
