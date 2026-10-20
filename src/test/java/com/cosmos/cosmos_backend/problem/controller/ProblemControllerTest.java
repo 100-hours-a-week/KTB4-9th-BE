@@ -2,6 +2,7 @@ package com.cosmos.cosmos_backend.problem.controller;
 
 import static org.mockito.Mockito.when;
 
+import com.cosmos.cosmos_backend.approach.dto.response.ActiveEvaluationResponse;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.codesubmission.domain.JudgingResult;
 import com.cosmos.cosmos_backend.common.Category;
@@ -13,6 +14,7 @@ import com.cosmos.cosmos_backend.problem.dto.response.MyApproachResponse;
 import com.cosmos.cosmos_backend.problem.dto.response.MyCodeResponse;
 import com.cosmos.cosmos_backend.problem.dto.response.ProblemDetailResponse;
 import com.cosmos.cosmos_backend.problem.service.ProblemService;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -62,7 +64,9 @@ class ProblemControllerTest {
                 new MyApproachResponse(Category.ARRAY, "투 포인터로 푼다", "COMPLETED",
                         new ApproachSubmitResponse.Result(true, 90, List.of(new ApproachSubmitResponse.KeywordJudgement("투 포인터", true)), "좋아요", "ARRAY", "선정 배경"),
                         new ApproachSubmitResponse.SubmissionUsage(5, 1, 4)),
-                new MyCodeResponse(Language.PYTHON, "print(1)", JudgingResult.WRONG_ANSWER, 1, 3, 2)
+                new MyCodeResponse(Language.PYTHON, "print(1)", JudgingResult.WRONG_ANSWER, 1, 3, 2),
+                new ActiveEvaluationResponse(9001L, "PROCESSING", "BINARY_SEARCH", "중간값을 확인합니다",
+                        Instant.parse("2026-10-19T03:30:00Z"), Instant.parse("2026-10-19T03:30:01Z"), null)
         );
         loginAs("7");
         when(problemService.getProblemDetail(7L, 1L)).thenReturn(response);
@@ -86,6 +90,32 @@ class ProblemControllerTest {
         body.extractingPath("$.data.problem.myApproach.submissionUsage.usedCount").isEqualTo(1);
         body.extractingPath("$.data.problem.myCode.passedTestCount").isEqualTo(1);
         body.extractingPath("$.data.problem.myCode.submittedCount").isEqualTo(2);
+        // 진행 중인 평가 작업이 기존 필드는 그대로 둔 채 추가됨
+        body.extractingPath("$.data.problem.activeEvaluation.evaluationTaskId").isEqualTo(9001);
+        body.extractingPath("$.data.problem.activeEvaluation.status").isEqualTo("PROCESSING");
+        body.extractingPath("$.data.problem.activeEvaluation.selectedCategory").isEqualTo("BINARY_SEARCH");
+        body.extractingPath("$.data.problem.activeEvaluation.createdAt").isEqualTo("2026-10-19T03:30:00Z");
+        body.extractingPath("$.data.problem.activeEvaluation.startedAt").isEqualTo("2026-10-19T03:30:01Z");
+        body.extractingPath("$.data.problem.activeEvaluation.nextRetryAt").isNull();
+    }
+
+    @Test
+    void getProblemDetail_returnsNullActiveEvaluation_whenNothingIsInProgress() {
+        // Given
+        ProblemDetailResponse response = new ProblemDetailResponse(
+                1L, Difficulty.LV1, Category.ARRAY, "두 수의 합", "내용",
+                "입력 형식", "출력 형식", List.of(), List.of(), List.of(), 0,
+                false, null, null, null
+        );
+        loginAs("7");
+        when(problemService.getProblemDetail(7L, 1L)).thenReturn(response);
+
+        // When & Then
+        mvc().get().uri("/problems/1")
+                .assertThat()
+                .hasStatusOk()
+                .bodyJson()
+                .extractingPath("$.data.problem.activeEvaluation").isNull();
     }
 
     @Test
