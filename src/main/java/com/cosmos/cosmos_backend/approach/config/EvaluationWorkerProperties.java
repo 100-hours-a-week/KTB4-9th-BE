@@ -7,8 +7,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 /** 자연어 풀이 평가 워커 설정 (application.yaml의 evaluation.worker.*). */
 @ConfigurationProperties(prefix = "evaluation.worker")
 public record EvaluationWorkerProperties(
-        // 워커를 켤지 여부 (기본은 꺼짐)
-        @DefaultValue("false") boolean enabled,
+        // 워커를 켤지 여부 (기본은 켜짐, 평가 작업을 접수하는 API가 있어서 꺼두면 작업이 처리되지 않음)
+        @DefaultValue("true") boolean enabled,
         // 처리할 작업이 없을 때 다시 확인하기까지의 간격
         @DefaultValue("3s") Duration pollInterval,
         // 워커 개수 (AI 서버에 동시에 보내는 평가 요청 수)

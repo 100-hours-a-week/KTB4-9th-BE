@@ -3,19 +3,14 @@ package com.cosmos.cosmos_backend.approach.controller;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
-import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
-import com.cosmos.cosmos_backend.approach.dto.ApproachSubmitResult;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.dto.response.CategoryAnswerResponse;
-import com.cosmos.cosmos_backend.common.Difficulty;
-import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
-import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
-import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.approach.dto.response.EvaluationAcceptedResponse;
 import com.cosmos.cosmos_backend.approach.service.ApproachSubmissionService;
-import com.cosmos.cosmos_backend.common.Category;
+import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationTaskService;
+import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.common.exception.GlobalExceptionHandler;
-import java.util.List;
+import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,8 +31,11 @@ class ApproachSubmissionControllerTest {
     @Mock
     private ApproachSubmissionService approachSubmissionService;
 
+    @Mock
+    private SolutionEvaluationTaskService solutionEvaluationTaskService;
+
     private MockMvcTester mvc() {
-        ApproachSubmissionController controller = new ApproachSubmissionController(approachSubmissionService);
+        ApproachSubmissionController controller = new ApproachSubmissionController(approachSubmissionService, solutionEvaluationTaskService);
         return MockMvcTester.create(MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
@@ -56,75 +54,107 @@ class ApproachSubmissionControllerTest {
     }
 
     @Test
-    void submit_returns200AndPassesTokenUserIdToService() {
+    void submit_returns202_andPassesTokenUserIdToService() {
         // Given
         loginAs("42");
-        ApproachSubmission submission = new ApproachSubmission(42L, 1L, Category.ARRAY, "풀이", true, 85, "좋은 접근이에요");
-        ApproachSubmitResult result = new ApproachSubmitResult(submission, List.of(new AiEvaluationResult.KeywordJudgement("정렬", true)), problem());
-        when(approachSubmissionService.submit(42L, 1L, "ARRAY", "풀이")).thenReturn(result);
+        when(solutionEvaluationTaskService.accept(42L, 1L, "ARRAY", "풀이")).thenReturn(new EvaluationAcceptedResponse(
+                9001L, 1L, "PENDING", Instant.parse("2026-10-19T03:30:00Z"), ApproachSubmitResponse.SubmissionUsage.of(2)));
 
         // When & Then
         var body = mvc().post().uri("/problems/1/solution-submissions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"selectedCategory\":\"ARRAY\",\"natural_solution\":\"풀이\"}")
                 .assertThat()
-                .hasStatusOk()
+                .hasStatus(HttpStatus.ACCEPTED)
                 .bodyJson();
 
-        body.extractingPath("$.data.evaluationStatus").isEqualTo("COMPLETED");
-        body.extractingPath("$.data.result.isCorrect").isEqualTo(true);
-        body.extractingPath("$.data.result.approachScore").isEqualTo(85);
-        body.extractingPath("$.data.result.aiFeedback").isEqualTo("좋은 접근이에요");
-        body.extractingPath("$.data.result.keywords[0].keyword").isEqualTo("정렬");
-        body.extractingPath("$.data.result.keywords[0].isIncluded").isEqualTo(true);
+        body.extractingPath("$.message").isEqualTo("solution_evaluation_accepted");
+        body.extractingPath("$.data.evaluationTaskId").isEqualTo(9001);
+        body.extractingPath("$.data.problemId").isEqualTo(1);
+        body.extractingPath("$.data.status").isEqualTo("PENDING");
+        body.extractingPath("$.data.createdAt").isEqualTo("2026-10-19T03:30:00Z");
         body.extractingPath("$.data.submissionUsage.limit").isEqualTo(5);
-        body.extractingPath("$.data.submissionUsage.usedCount").isEqualTo(1);
-        body.extractingPath("$.data.submissionUsage.remainingCount").isEqualTo(4);
-        body.extractingPath("$.data.result.correctCategory").isEqualTo("ARRAY");
-        body.extractingPath("$.data.result.categorySelectReason").isEqualTo("선정 배경");
+        body.extractingPath("$.data.submissionUsage.usedCount").isEqualTo(2);
+        body.extractingPath("$.data.submissionUsage.remainingCount").isEqualTo(3);
 
-        verify(approachSubmissionService).submit(42L, 1L, "ARRAY", "풀이");
+        verify(solutionEvaluationTaskService).accept(42L, 1L, "ARRAY", "풀이");
     }
 
     @Test
-    void submit_hidesCorrectCategory_whenWrongAndLimitRemains() {
+    void submit_returns409WithTaskInfo_whenEvaluationAlreadyInProgress() {
         // Given
         loginAs("42");
-        ApproachSubmission submission = new ApproachSubmission(42L, 1L, Category.DP, "풀이", false, 40, "아쉬워요");
-        when(approachSubmissionService.submit(42L, 1L, "DP", "풀이")).thenReturn(new ApproachSubmitResult(submission, List.of(), problem()));
+        when(solutionEvaluationTaskService.accept(42L, 1L, "ARRAY", "풀이")).thenThrow(new BusinessException(
+                HttpStatus.CONFLICT, "solution_evaluation_already_in_progress", new EvaluationAcceptedResponse.InProgressData(9001L, "PROCESSING")));
 
         // When & Then
         var body = mvc().post().uri("/problems/1/solution-submissions")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"selectedCategory\":\"DP\",\"natural_solution\":\"풀이\"}")
+                .content("{\"selectedCategory\":\"ARRAY\",\"natural_solution\":\"풀이\"}")
                 .assertThat()
-                .hasStatusOk()
+                .hasStatus(HttpStatus.CONFLICT)
                 .bodyJson();
 
-        body.extractingPath("$.data.result.correctCategory").isNull();
-        body.extractingPath("$.data.result.categorySelectReason").isNull();
+        body.extractingPath("$.message").isEqualTo("solution_evaluation_already_in_progress");
+        body.extractingPath("$.data.evaluationTaskId").isEqualTo(9001);
+        body.extractingPath("$.data.status").isEqualTo("PROCESSING");
     }
 
     @Test
-    void submit_revealsCorrectCategory_whenWrongButLimitReached() {
+    void submit_returns429WithNestedUsage_whenLimitExceeded() {
         // Given
         loginAs("42");
-        ApproachSubmission submission = new ApproachSubmission(42L, 1L, Category.DP, "풀이", false, 40, "아쉬워요");
-        for (int i = 1; i < ApproachSubmission.MAX_SUBMISSION_COUNT; i++) {
-            submission.resubmit(Category.DP, "풀이", false, 40, "아쉬워요");
-        }
-        when(approachSubmissionService.submit(42L, 1L, "DP", "풀이")).thenReturn(new ApproachSubmitResult(submission, List.of(), problem()));
+        when(solutionEvaluationTaskService.accept(42L, 1L, "ARRAY", "풀이")).thenThrow(new BusinessException(
+                HttpStatus.TOO_MANY_REQUESTS, "solution_submission_limit_exceeded",
+                new ApproachSubmitResponse.SubmissionLimitExceededData(1L, ApproachSubmitResponse.SubmissionUsage.of(5))));
 
         // When & Then
         var body = mvc().post().uri("/problems/1/solution-submissions")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"selectedCategory\":\"DP\",\"natural_solution\":\"풀이\"}")
+                .content("{\"selectedCategory\":\"ARRAY\",\"natural_solution\":\"풀이\"}")
                 .assertThat()
-                .hasStatusOk()
+                .hasStatus(HttpStatus.TOO_MANY_REQUESTS)
                 .bodyJson();
 
-        body.extractingPath("$.data.result.correctCategory").isEqualTo("ARRAY");
-        body.extractingPath("$.data.result.categorySelectReason").isEqualTo("선정 배경");
+        body.extractingPath("$.message").isEqualTo("solution_submission_limit_exceeded");
+        body.extractingPath("$.data.problemId").isEqualTo(1);
+        body.extractingPath("$.data.submissionUsage.limit").isEqualTo(5);
+        body.extractingPath("$.data.submissionUsage.usedCount").isEqualTo(5);
+        body.extractingPath("$.data.submissionUsage.remainingCount").isEqualTo(0);
+    }
+
+    @Test
+    void submit_returns404_whenProblemNotFound() {
+        // Given
+        loginAs("42");
+        when(solutionEvaluationTaskService.accept(42L, 1L, "ARRAY", "풀이"))
+                .thenThrow(new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
+
+        // When & Then
+        mvc().post().uri("/problems/1/solution-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"selectedCategory\":\"ARRAY\",\"natural_solution\":\"풀이\"}")
+                .assertThat()
+                .hasStatus(HttpStatus.NOT_FOUND)
+                .bodyJson()
+                .extractingPath("$.message").isEqualTo("problem_not_found");
+    }
+
+    @Test
+    void submit_returns400_whenSelectedCategoryIsInvalid() {
+        // Given
+        loginAs("42");
+        when(solutionEvaluationTaskService.accept(42L, 1L, "NOT_A_CATEGORY", "풀이"))
+                .thenThrow(new BusinessException(HttpStatus.BAD_REQUEST, "invalid_selected_category"));
+
+        // When & Then
+        mvc().post().uri("/problems/1/solution-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"selectedCategory\":\"NOT_A_CATEGORY\",\"natural_solution\":\"풀이\"}")
+                .assertThat()
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson()
+                .extractingPath("$.message").isEqualTo("invalid_selected_category");
     }
 
     @Test
@@ -160,10 +190,6 @@ class ApproachSubmissionControllerTest {
                 .extractingPath("$.message").isEqualTo("category_answer_not_available");
     }
 
-    private Problem problem() {
-        return new Problem(Difficulty.LV1, Category.ARRAY, "제목", "내용", "입력 형식", "출력 형식", List.<AiProblemsCreateRequestDto.InputConstraints>of(), "선정 배경");
-    }
-
     @Test
     void submit_returns400_whenProblemIdNotNumeric() {
         loginAs("42");
@@ -175,6 +201,19 @@ class ApproachSubmissionControllerTest {
                 .hasStatus(HttpStatus.BAD_REQUEST)
                 .bodyJson()
                 .extractingPath("$.message").isEqualTo("invalid_problem_id");
+    }
+
+    @Test
+    void submit_returns400_whenSelectedCategoryBlank() {
+        loginAs("42");
+
+        mvc().post().uri("/problems/1/solution-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"selectedCategory\":\"\",\"natural_solution\":\"풀이\"}")
+                .assertThat()
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson()
+                .extractingPath("$.message").isEqualTo("selected_category_is_required");
     }
 
     @Test
@@ -201,28 +240,5 @@ class ApproachSubmissionControllerTest {
                 .hasStatus(HttpStatus.BAD_REQUEST)
                 .bodyJson()
                 .extractingPath("$.message").isEqualTo("approach_is_required");
-    }
-
-    @Test
-    void submit_returns429WithUsageData_whenSubmissionLimitExceeded() {
-        // Given
-        loginAs("42");
-        when(approachSubmissionService.submit(42L, 1L, "ARRAY", "풀이"))
-                .thenThrow(new BusinessException(HttpStatus.TOO_MANY_REQUESTS, "solution_submission_limit_exceeded",
-                        new ApproachSubmitResponse.SubmissionLimitExceededData(1L, 5, 5, 0)));
-
-        // When & Then
-        var body = mvc().post().uri("/problems/1/solution-submissions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"selectedCategory\":\"ARRAY\",\"natural_solution\":\"풀이\"}")
-                .assertThat()
-                .hasStatus(HttpStatus.TOO_MANY_REQUESTS)
-                .bodyJson();
-
-        body.extractingPath("$.message").isEqualTo("solution_submission_limit_exceeded");
-        body.extractingPath("$.data.problemId").isEqualTo(1);
-        body.extractingPath("$.data.limit").isEqualTo(5);
-        body.extractingPath("$.data.usedCount").isEqualTo(5);
-        body.extractingPath("$.data.remainingCount").isEqualTo(0);
     }
 }

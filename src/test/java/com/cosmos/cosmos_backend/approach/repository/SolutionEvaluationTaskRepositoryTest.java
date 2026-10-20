@@ -100,6 +100,38 @@ class SolutionEvaluationTaskRepositoryTest {
     }
 
     @Test
+    void findByIdAndUserId_returnsTask_onlyForItsOwner() {
+        // Given
+        SolutionEvaluationTask saved = repository.saveAndFlush(task(1L, 10L));
+        em.clear();
+
+        // When & Then
+        assertThat(repository.findByIdAndUserId(saved.getId(), 1L)).map(SolutionEvaluationTask::getId).contains(saved.getId());
+        assertThat(repository.findByIdAndUserId(saved.getId(), 2L)).isEmpty();
+        assertThat(repository.findByIdAndUserId(-1L, 1L)).isEmpty();
+    }
+
+    @Test
+    void findFirstByUserIdAndProblemIdOrderByIdDesc_returnsMostRecentTask() {
+        // Given: 같은 사용자·문제에서 이전 작업이 끝난 뒤 새 작업이 접수됨
+        SolutionEvaluationTask first = repository.saveAndFlush(task(1L, 10L));
+        first.startProcessing(NOW);
+        first.markSucceeded(501L, NOW);
+        repository.saveAndFlush(first);
+        SolutionEvaluationTask second = repository.saveAndFlush(task(1L, 10L));
+        repository.saveAndFlush(task(1L, 11L));
+        repository.saveAndFlush(task(2L, 10L));
+        em.clear();
+
+        // When
+        var latest = repository.findFirstByUserIdAndProblemIdOrderByIdDesc(1L, 10L);
+
+        // Then
+        assertThat(latest).map(SolutionEvaluationTask::getId).contains(second.getId());
+        assertThat(repository.findFirstByUserIdAndProblemIdOrderByIdDesc(9L, 10L)).isEmpty();
+    }
+
+    @Test
     void findNextForUpdate_returnsOldestPendingTask() {
         // Given
         repository.saveAndFlush(new SolutionEvaluationTask(1L, 10L, Category.ARRAY, "나중에 접수", NOW.plusSeconds(10)));
