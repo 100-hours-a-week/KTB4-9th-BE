@@ -98,4 +98,40 @@ class SolutionEvaluationTaskRepositoryTest {
         repository.saveAndFlush(saved);
         assertThat(repository.findActive(1L, 10L)).isEmpty();
     }
+
+    @Test
+    void findNextForUpdate_returnsOldestPendingTask() {
+        // Given
+        repository.saveAndFlush(new SolutionEvaluationTask(1L, 10L, Category.ARRAY, "나중에 접수", NOW.plusSeconds(10)));
+        SolutionEvaluationTask older = repository.saveAndFlush(new SolutionEvaluationTask(2L, 10L, Category.ARRAY, "먼저 접수", NOW));
+        em.clear();
+
+        // When
+        var next = repository.findNextForUpdate();
+
+        // Then
+        assertThat(next).map(SolutionEvaluationTask::getId).contains(older.getId());
+    }
+
+    @Test
+    void findNextForUpdate_ignoresTasksThatAreNotPending() {
+        // Given
+        SolutionEvaluationTask processing = repository.saveAndFlush(task(1L, 10L));
+        processing.startProcessing(NOW);
+        repository.saveAndFlush(processing);
+        SolutionEvaluationTask failed = repository.saveAndFlush(task(2L, 10L));
+        failed.startProcessing(NOW);
+        failed.markFailed("AI_SERVER_UNAVAILABLE", "최종 실패", NOW);
+        repository.saveAndFlush(failed);
+        em.clear();
+
+        // When & Then
+        assertThat(repository.findNextForUpdate()).isEmpty();
+    }
+
+    @Test
+    void findNextForUpdate_returnsEmpty_whenNoTasks() {
+        // When & Then
+        assertThat(repository.findNextForUpdate()).isEmpty();
+    }
 }

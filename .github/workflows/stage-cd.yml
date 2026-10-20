@@ -67,10 +67,56 @@ jobs:
             "${IMAGE_TAG}" \
             "${AWS_REGION}"
 
-      - name: Smoke check staging API
+      - name: Verify ECS deployment and ALB target health
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent \
-            --retry 10 --retry-all-errors --retry-delay 10 \
-            --max-time 15 \
-            https://stage-be.cosmoscode.site/api/actuator/health
+
+          cluster="cosmos-v2-stage-cluster"
+          service="cosmos-v2-stage-spring"
+
+          rollout_state="$(aws ecs describe-services \
+            --cluster "${cluster}" \
+            --services "${service}" \
+            --region "${AWS_REGION}" \
+            --query 'services[0].deployments[?status==`PRIMARY`].rolloutState | [0]' \
+            --output text)"
+
+          if [[ "${rollout_state}" != "COMPLETED" ]]; then
+            echo "::error::ECS deployment did not complete: ${rollout_state}"
+            aws ecs describe-services \
+              --cluster "${cluster}" \
+              --services "${service}" \
+              --region "${AWS_REGION}" \
+              --query 'services[0].{desiredCount:desiredCount,runningCount:runningCount,pendingCount:pendingCount,deployments:deployments,events:events[0:10]}' \
+              --output json
+            exit 1
+          fi
+
+          target_group_arn="$(aws ecs describe-services \
+            --cluster "${cluster}" \
+            --services "${service}" \
+            --region "${AWS_REGION}" \
+            --query 'services[0].loadBalancers[?containerName==`spring`].targetGroupArn | [0]' \
+            --output text)"
+
+          if [[ -z "${target_group_arn}" || "${target_group_arn}" == "None" ]]; then
+            echo "::error::Spring target group could not be resolved from the ECS service."
+            exit 1
+          fi
+
+          target_states="$(aws elbv2 describe-target-health \
+            --target-group-arn "${target_group_arn}" \
+            --region "${AWS_REGION}" \
+            --query 'TargetHealthDescriptions[].TargetHealth.State' \
+            --output text)"
+
+          if [[ -z "${target_states}" || " ${target_states} " == *" unhealthy "* || " ${target_states} " == *" initial "* || " ${target_states} " == *" draining "* || " ${target_states} " == *" unused "* || " ${target_states} " == *" unavailable "* ]]; then
+            echo "::error::Spring ALB targets are not all healthy: ${target_states:-none}"
+            aws elbv2 describe-target-health \
+              --target-group-arn "${target_group_arn}" \
+              --region "${AWS_REGION}" \
+              --output json
+            exit 1
+          fi
+
+          echo "ECS deployment completed and ALB targets are healthy: ${target_states}"
