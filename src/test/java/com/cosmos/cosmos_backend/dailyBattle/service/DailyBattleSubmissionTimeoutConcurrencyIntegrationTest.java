@@ -21,6 +21,7 @@ import com.cosmos.cosmos_backend.global.config.JpaConfig;
 import com.cosmos.cosmos_backend.global.config.TimeConfig;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -71,8 +72,11 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
     private static final Logger log = LoggerFactory.getLogger(
             DailyBattleSubmissionTimeoutConcurrencyIntegrationTest.class);
 
-    // 배틀 참여 가능 시간인 한국 시각 12:55로 제출 시각 고정
-    private static final Instant SUBMITTED_AT = Instant.parse("2026-10-21T03:55:00Z");
+    // 두 테스트가 같은 DB에서 실행돼도 데이터가 겹치지 않도록 기준 날짜만 공유
+    private static final LocalDate BASE_BATTLE_DATE = LocalDate.of(2026, 10, 21);
+
+    // 각 배틀 날짜의 참여 가능 시간인 한국 시각 12:55를 제출 시각으로 사용
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     // 동시성 테스트가 교착 상태로 무한 대기하지 않도록 최대 대기 시간 제한
     private static final int WAIT_SECONDS = 10;
@@ -112,9 +116,56 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
     }
 
     @Test
-    void submissionCommittedAfterTimeoutReadIsOverwrittenByTimeoutDirtyChecking() throws Exception {
+    void timeoutReadsFirst_thenSubmissionCommits_thenTimeoutDirtyCheckingOverwritesIt() throws Exception {
+        // 이전 시나리오: 제출 트랜잭션이 시작되기 전에 타임아웃 워커가 대상을 먼저 읽는다.
+        Fixture fixture = createFixture(0);
+
+        // 타임아웃 조회 완료와 제출 커밋 완료를 전달할 래치 준비
+        CountDownLatch timeoutReadCompleted = new CountDownLatch(1);
+        CountDownLatch submissionCommitted = new CountDownLatch(1);
+
+        // 1. 타임아웃 트랜잭션을 먼저 시작해 IN_PROGRESS 참여자를 조회
+        Future<?> timeout = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+            List<BattleParticipation> loaded = battleParticipationRepository
+                    .findAllByDailyBattleIdAndParticipationStatus(fixture.battleId(), IN_PROGRESS);
+            assertThat(loaded).hasSize(1);
+
+            // 제출 스레드가 시작할 수 있도록 타임아웃 조회 완료 신호 전달
+            timeoutReadCompleted.countDown();
+
+            // 제출의 상태 변경, 답안 저장, 트랜잭션 커밋이 모두 끝날 때까지 대기
+            await(submissionCommitted, "submission transaction did not commit");
+
+            // 먼저 조회한 stale 엔티티를 TIME_OVER로 변경 후 Dirty Checking 커밋
+            loaded.forEach(BattleParticipation::markTimeOut);
+        }));
+
+        // 2. 타임아웃 조회가 끝난 뒤 실제 제출 서비스 트랜잭션 시작
+        Future<BattleSubmissionResponseDto> submission = executor.submit(() -> {
+            await(timeoutReadCompleted, "timeout transaction did not finish its IN_PROGRESS query");
+
+            BattleSubmissionResponseDto response = dailyBattleService.battleSubmission(
+                    submissionRequest(fixture.battleId()),
+                    fixture.battleId(),
+                    fixture.userId(),
+                    fixture.submittedAt());
+
+            // 서비스 호출 반환 시 @Transactional 커밋 완료, 타임아웃 스레드 재개
+            submissionCommitted.countDown();
+            return response;
+        });
+
+        // 3. 제출 커밋 완료 후 타임아웃 Dirty Checking 커밋까지 대기
+        BattleSubmissionResponseDto response = get(submission);
+        get(timeout);
+
+        assertRaceWasReproduced("타임아웃 선조회 후 제출 시작", fixture, response);
+    }
+
+    @Test
+    void timeoutReadsImmediatelyBeforeConditionalUpdate_thenDirtyCheckingOverwritesSubmission() throws Exception {
         // Given: IN_PROGRESS 참여자 1명과 제출할 배틀 문제 3개 생성
-        Fixture fixture = createFixture();
+        Fixture fixture = createFixture(1);
 
         // 조건부 UPDATE 도달, 타임아웃 조회 완료, 제출 커밋 완료를 전달할 래치 준비
         CountDownLatch conditionalUpdateReached = new CountDownLatch(1);
@@ -132,7 +183,7 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
                     submissionRequest(fixture.battleId()),
                     fixture.battleId(),
                     fixture.userId(),
-                    SUBMITTED_AT);
+                    fixture.submittedAt());
 
             // 서비스 호출 반환 시 @Transactional 커밋 완료, 타임아웃 스레드 재개
             submissionCommitted.countDown();
@@ -164,12 +215,22 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
         BattleSubmissionResponseDto response = get(submission);
         get(timeout);
 
+        assertRaceWasReproduced("조건부 UPDATE 직전 타임아웃 조회", fixture, response);
+    }
+
+    private void assertRaceWasReproduced(
+            String scenario,
+            Fixture fixture,
+            BattleSubmissionResponseDto response) {
         // Then: 모든 트랜잭션이 끝난 뒤 별도 조회로 DB 최종 상태 확인
         BattleParticipation persisted = battleParticipationRepository
                 .findById(fixture.participationId())
                 .orElseThrow();
 
-        long savedSubmissionCount = battleSubmissionRepository.count();
+        // 다른 테스트 데이터와 섞이지 않도록 현재 참여자의 제출 답안만 집계
+        int savedSubmissionCount = battleSubmissionRepository
+                .findByParticipation_participationId(fixture.participationId())
+                .size();
 
         // 제출 API는 성공했고 답안도 모두 저장됐는지 확인
         assertThat(response.participationStatus()).isEqualTo(SUBMITTED);
@@ -183,26 +244,31 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
         log.info("""
 
                 ==================== 동시성 테스트 결과 ====================
+                시나리오              : {}
                 1. 제출 API 응답 상태 : {}
                 2. 제출 답안 저장     : {}건
                 3. DB 최종 참여 상태  : {}
                 4. DB 최종 제출 시각  : {}
                 ===========================================================
                 """,
+                scenario,
                 response.participationStatus(),
                 savedSubmissionCount,
                 persisted.getParticipationStatus(),
                 persisted.getSubmittedAt());
     }
 
-    private Fixture createFixture() {
+    private Fixture createFixture(int dayOffset) {
         // 작업 스레드가 조회할 수 있도록 테스트 데이터는 별도 트랜잭션으로 먼저 커밋
         return transactionTemplate.execute(status -> {
-            User user = userRepository.save(new User("concurrency-user", null));
+            LocalDate battleDate = BASE_BATTLE_DATE.plusDays(dayOffset);
+            Instant submittedAt = battleDate.atTime(12, 55).atZone(KOREA_ZONE).toInstant();
+
+            User user = userRepository.save(new User("concurrency-user-" + dayOffset, null));
             DailyBattle battle = dailyBattleRepository.save(new DailyBattle(
-                    LocalDate.of(2026, 10, 21),
+                    battleDate,
                     Category.ARRAY,
-                    "concurrency battle",
+                    "concurrency battle " + dayOffset,
                     "reproduce submission and timeout race"));
 
             for (int caseNumber = 1; caseNumber <= 3; caseNumber++) {
@@ -215,7 +281,11 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
 
             BattleParticipation participation = battleParticipationRepository.save(
                     new BattleParticipation(battle.getBattleId(), user));
-            return new Fixture(battle.getBattleId(), user.getId(), participation.getParticipationId());
+            return new Fixture(
+                    battle.getBattleId(),
+                    user.getId(),
+                    participation.getParticipationId(),
+                    submittedAt);
         });
     }
 
@@ -252,7 +322,7 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
         }
     }
 
-    private record Fixture(Long battleId, Long userId, Long participationId) {
+    private record Fixture(Long battleId, Long userId, Long participationId, Instant submittedAt) {
     }
 
     /**
