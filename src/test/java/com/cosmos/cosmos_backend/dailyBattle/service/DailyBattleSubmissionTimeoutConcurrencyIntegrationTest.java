@@ -4,10 +4,12 @@ import static com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus.I
 import static com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus.SUBMITTED;
 import static com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus.TIME_OVER;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.cosmos.cosmos_backend.auth.domain.entity.User;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.common.Category;
+import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
@@ -216,6 +218,82 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
         get(timeout);
 
         assertRaceWasReproduced("조건부 UPDATE 직전 타임아웃 조회", fixture, response);
+    }
+
+    @Test
+    void preDeadlineRequestStartsAfterTimeoutCommit_isRejectedByCurrentConditionalUpdate() throws Exception {
+        // 반대 순서 시나리오: 요청은 마감 전에 도착했지만 제출 트랜잭션 시작이 늦어진다.
+        Fixture fixture = createFixture(2);
+
+        // 요청 도착과 타임아웃 커밋 완료를 작업 스레드 사이에 전달할 래치 준비
+        CountDownLatch requestReceived = new CountDownLatch(1);
+        CountDownLatch timeoutCommitted = new CountDownLatch(1);
+
+        // 1. 제출 요청은 유효한 시각에 먼저 도착했지만 서비스 호출 직전에 대기
+        Future<BattleSubmissionResponseDto> submission = executor.submit(() -> {
+            requestReceived.countDown();
+            await(timeoutCommitted, "timeout transaction did not commit");
+
+            // 전달하는 submittedAt은 마감 전이지만 실제 제출 트랜잭션은 지금 시작된다.
+            return dailyBattleService.battleSubmission(
+                    submissionRequest(fixture.battleId()),
+                    fixture.battleId(),
+                    fixture.userId(),
+                    fixture.submittedAt());
+        });
+
+        // 2. 요청 도착 후 제출 트랜잭션보다 타임아웃 트랜잭션을 먼저 커밋
+        Future<?> timeout = executor.submit(() -> {
+            await(requestReceived, "submission request did not arrive");
+
+            transactionTemplate.executeWithoutResult(status -> {
+                List<BattleParticipation> loaded = battleParticipationRepository
+                        .findAllByDailyBattleIdAndParticipationStatus(fixture.battleId(), IN_PROGRESS);
+                assertThat(loaded).hasSize(1);
+
+                // TIME_OVER 변경은 transactionTemplate 반환 시점에 Dirty Checking으로 커밋된다.
+                loaded.forEach(BattleParticipation::markTimeOut);
+            });
+
+            // 커밋이 끝난 뒤에만 제출 서비스가 실행되도록 신호 전달
+            timeoutCommitted.countDown();
+        });
+
+        // 3. 타임아웃 커밋을 확인한 뒤 지연된 제출의 실패 결과 확인
+        get(timeout);
+        Throwable submissionFailure = catchThrowable(() -> get(submission));
+
+        BattleParticipation persisted = battleParticipationRepository
+                .findById(fixture.participationId())
+                .orElseThrow();
+        int savedSubmissionCount = battleSubmissionRepository
+                .findByParticipation_participationId(fixture.participationId())
+                .size();
+
+        // 현재 제출 조건은 IN_PROGRESS만 허용하므로 이미 TIME_OVER이면 충돌 예외 발생
+        assertThat(submissionFailure)
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Battle_already_participated");
+        assertThat(savedSubmissionCount).isZero();
+        assertThat(persisted.getParticipationStatus()).isEqualTo(TIME_OVER);
+        assertThat(persisted.getSubmittedAt()).isNull();
+
+        // 마감 전 접수였어도 실행이 늦으면 제출이 유실되는 현재 동작을 콘솔에 출력
+        log.info("""
+
+                ==================== 동시성 테스트 결과 ====================
+                시나리오              : 타임아웃 선커밋 후 마감 전 접수 요청 실행
+                1. 제출 API 실행 결과 : {} ({})
+                2. 제출 답안 저장     : {}건
+                3. DB 최종 참여 상태  : {}
+                4. DB 최종 제출 시각  : {}
+                ===========================================================
+                """,
+                submissionFailure.getClass().getSimpleName(),
+                submissionFailure.getMessage(),
+                savedSubmissionCount,
+                persisted.getParticipationStatus(),
+                persisted.getSubmittedAt());
     }
 
     private void assertRaceWasReproduced(
