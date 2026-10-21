@@ -1,6 +1,6 @@
 package com.cosmos.cosmos_backend.approach.client;
 
-import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.approach.domain.EvaluationFailureCode;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;
 import java.util.List;
@@ -21,6 +21,7 @@ public class AiEvaluationClient {
 
     private static final String EVALUATION_PATH = "/api/llm/evaluation";
     private static final int MAX_LOG_BODY_LENGTH = 300;
+    private static final int MAX_ERROR_CODE_LENGTH = 100;
 
     private final RestClient aiRestClient;
 
@@ -48,9 +49,9 @@ public class AiEvaluationClient {
             log.error("AI 서버 연결 실패", e);
             throw unavailable();
         } catch (RestClientResponseException e) {
-            // 3. AI 서버가 오류 응답을 준 경우 (503 예외를 던짐)
+            // 3. AI 서버가 오류 응답을 준 경우 (503 예외를 던짐, 4xx는 요청 문제라 재시도 대상에서 뺌)
             log.error("AI 서버 오류 응답: status={}, body={}", e.getStatusCode(), truncate(e.getResponseBodyAsString()));
-            throw unavailable();
+            throw responseError(e);
         } catch (RestClientException e) {
             // 4. 응답을 읽지 못한 경우 (503 예외를 던짐)
             log.error("AI 서버 응답 변환 실패", e);
@@ -112,11 +113,34 @@ public class AiEvaluationClient {
         return body.substring(0, MAX_LOG_BODY_LENGTH) + "...";
     }
 
-    private BusinessException unavailable() {
-        return new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "ai_server_unavailable");
+    private AiEvaluationFailedException unavailable() {
+        return new AiEvaluationFailedException(HttpStatus.SERVICE_UNAVAILABLE, "ai_server_unavailable",
+                EvaluationFailureCode.AI_SERVER_UNAVAILABLE, true, null);
     }
 
-    private BusinessException timeout() {
-        return new BusinessException(HttpStatus.GATEWAY_TIMEOUT, "evaluation_timeout");
+    private AiEvaluationFailedException timeout() {
+        return new AiEvaluationFailedException(HttpStatus.GATEWAY_TIMEOUT, "evaluation_timeout",
+                EvaluationFailureCode.AI_SERVER_TIMEOUT, true, null);
+    }
+
+    // AI의 오류 응답을 분류 (400, 422 같은 4xx는 요청 자체가 잘못되어 재시도해도 같은 결과, 429는 잠시 뒤 성공할 수 있어 재시도)
+    private AiEvaluationFailedException responseError(RestClientResponseException e) {
+        boolean rejected = e.getStatusCode().is4xxClientError() && e.getStatusCode().value() != 429;
+        if (!rejected) {
+            return unavailable();
+        }
+        return new AiEvaluationFailedException(HttpStatus.SERVICE_UNAVAILABLE, "ai_server_unavailable",
+                EvaluationFailureCode.AI_REQUEST_REJECTED, false, readAiErrorCode(e));
+    }
+
+    // 오류 본문의 errorCode를 읽음 (읽지 못하거나 너무 길면 null)
+    private String readAiErrorCode(RestClientResponseException e) {
+        try {
+            AiErrorResponse body = e.getResponseBodyAs(AiErrorResponse.class);
+            String code = body == null ? null : body.errorCode();
+            return code != null && code.length() <= MAX_ERROR_CODE_LENGTH ? code : null;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }

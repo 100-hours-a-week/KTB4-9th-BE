@@ -1,5 +1,6 @@
 package com.cosmos.cosmos_backend.problem.dto.response;
 
+import com.cosmos.cosmos_backend.approach.dto.response.ActiveEvaluationResponse;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
@@ -26,7 +27,9 @@ public record ProblemDetailResponse(
         boolean saved,
         // 내가 마지막으로 제출한 접근 방식과 코드 (제출한 적이 없으면 null)
         MyApproachResponse myApproach,
-        MyCodeResponse myCode
+        MyCodeResponse myCode,
+        // 지금 진행 중인 자연어 풀이 평가 작업 (대기·처리 중·재시도 대기, 없으면 null)
+        ActiveEvaluationResponse activeEvaluation
 ) {
 
 
@@ -39,7 +42,8 @@ public record ProblemDetailResponse(
             int usedHintStage,
             boolean saved,
             MyApproachResponse myApproach,
-            MyCodeResponse myCode
+            MyCodeResponse myCode,
+            ActiveEvaluationResponse activeEvaluation
     ) {
         return new ProblemDetailResponse(
                 // 1. 문제 기본 정보
@@ -68,7 +72,8 @@ public record ProblemDetailResponse(
                 usedHintStage,
                 saved,
                 myApproach,
-                myCode
+                myCode,
+                activeEvaluation
         );
     }
 }

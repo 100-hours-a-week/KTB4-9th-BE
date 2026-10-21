@@ -2,7 +2,8 @@ package com.cosmos.cosmos_backend.approach.worker;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -11,9 +12,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationClient;
+import com.cosmos.cosmos_backend.approach.client.AiEvaluationFailedException;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationRequest;
 import com.cosmos.cosmos_backend.approach.client.AiEvaluationResult;
+import com.cosmos.cosmos_backend.approach.domain.EvaluationFailureCode;
 import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationExecutionService;
+import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationExecutionService.ClaimedTask;
 import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationExecutionService.EvaluationInput;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.entity.Keyword;
@@ -46,6 +50,10 @@ class SolutionEvaluationWorkerTest {
         worker = new SolutionEvaluationWorker(executionService, aiEvaluationClient);
     }
 
+    private void stubPrepare() {
+        when(executionService.prepare(any())).thenReturn(new EvaluationInput(request, keywords));
+    }
+
     @Test
     void runUntilEmpty_doesNothing_whenNoTask() {
         // Given
@@ -62,57 +70,91 @@ class SolutionEvaluationWorkerTest {
     @Test
     void runUntilEmpty_evaluatesAndCompletes_whenAiSucceeds() {
         // Given
-        when(executionService.claimNext()).thenReturn(Optional.of(5L), Optional.empty());
-        when(executionService.prepare(5L)).thenReturn(new EvaluationInput(request, keywords));
+        when(executionService.claimNext()).thenReturn(Optional.of(new ClaimedTask(5L, 1)), Optional.empty());
+        stubPrepare();
         when(aiEvaluationClient.evaluate(request)).thenReturn(result);
 
         // When
         worker.runUntilEmpty();
 
         // Then
-        verify(executionService).complete(5L, keywords, result);
-        verify(executionService, never()).fail(any(), any(), any());
+        verify(executionService).complete(5L, 1, keywords, result);
+        verify(executionService, never()).handleFailure(any(), anyInt(), any(), any(), anyBoolean());
     }
 
     @Test
-    void runUntilEmpty_marksFailedWithErrorCode_whenAiFails() {
+    void runUntilEmpty_reportsRetryableFailure_whenAiTimesOut() {
         // Given
-        when(executionService.claimNext()).thenReturn(Optional.of(5L), Optional.empty());
-        when(executionService.prepare(5L)).thenReturn(new EvaluationInput(request, keywords));
-        when(aiEvaluationClient.evaluate(request))
-                .thenThrow(new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "ai_server_unavailable"));
+        when(executionService.claimNext()).thenReturn(Optional.of(new ClaimedTask(5L, 2)), Optional.empty());
+        stubPrepare();
+        when(aiEvaluationClient.evaluate(request)).thenThrow(new AiEvaluationFailedException(
+                HttpStatus.GATEWAY_TIMEOUT, "evaluation_timeout", EvaluationFailureCode.AI_SERVER_TIMEOUT, true, null));
 
         // When
         worker.runUntilEmpty();
 
         // Then
-        verify(executionService).fail(5L, "ai_server_unavailable", "ai_server_unavailable");
-        verify(executionService, never()).complete(any(), any(), any());
+        verify(executionService).handleFailure(5L, 2, EvaluationFailureCode.AI_SERVER_TIMEOUT, "evaluation_timeout", true);
+        verify(executionService, never()).complete(any(), anyInt(), any(), any());
     }
 
     @Test
-    void runUntilEmpty_marksFailedWithInternalError_whenUnexpectedExceptionIsThrown() {
+    void runUntilEmpty_reportsNotRetryableFailure_withAiErrorCode_whenAiRejectsRequest() {
         // Given
-        when(executionService.claimNext()).thenReturn(Optional.of(5L), Optional.empty());
-        when(executionService.prepare(5L)).thenReturn(new EvaluationInput(request, keywords));
+        when(executionService.claimNext()).thenReturn(Optional.of(new ClaimedTask(5L, 1)), Optional.empty());
+        stubPrepare();
+        when(aiEvaluationClient.evaluate(request)).thenThrow(new AiEvaluationFailedException(
+                HttpStatus.SERVICE_UNAVAILABLE, "ai_server_unavailable", EvaluationFailureCode.AI_REQUEST_REJECTED, false, "INVALID_CATEGORY"));
+
+        // When
+        worker.runUntilEmpty();
+
+        // Then
+        verify(executionService).handleFailure(5L, 1, EvaluationFailureCode.AI_REQUEST_REJECTED, "INVALID_CATEGORY", false);
+    }
+
+    @Test
+    void runUntilEmpty_doesNotRetry_whenBusinessRuleIsViolated() {
+        // Given
+        when(executionService.claimNext()).thenReturn(Optional.of(new ClaimedTask(5L, 1)), Optional.empty());
+        stubPrepare();
         when(aiEvaluationClient.evaluate(request)).thenReturn(result);
-        doThrow(new IllegalStateException("저장 오류")).when(executionService).complete(5L, keywords, result);
+        doThrow(new BusinessException(HttpStatus.TOO_MANY_REQUESTS, "solution_submission_limit_exceeded"))
+                .when(executionService).complete(5L, 1, keywords, result);
 
         // When
         worker.runUntilEmpty();
 
         // Then
-        verify(executionService).fail(5L, "internal_error", "IllegalStateException");
+        verify(executionService).handleFailure(5L, 1, EvaluationFailureCode.INTERNAL_ERROR, "solution_submission_limit_exceeded", false);
+    }
+
+    @Test
+    void runUntilEmpty_retries_whenUnexpectedExceptionIsThrown() {
+        // Given
+        when(executionService.claimNext()).thenReturn(Optional.of(new ClaimedTask(5L, 1)), Optional.empty());
+        stubPrepare();
+        when(aiEvaluationClient.evaluate(request)).thenReturn(result);
+        doThrow(new IllegalStateException("저장 오류")).when(executionService).complete(5L, 1, keywords, result);
+
+        // When
+        worker.runUntilEmpty();
+
+        // Then
+        verify(executionService).handleFailure(5L, 1, EvaluationFailureCode.INTERNAL_ERROR, "IllegalStateException", true);
     }
 
     @Test
     void runUntilEmpty_processesAllTasks_andContinuesAfterOneFails() {
         // Given
-        when(executionService.claimNext()).thenReturn(Optional.of(1L), Optional.of(2L), Optional.of(3L), Optional.empty());
-        when(executionService.prepare(any())).thenReturn(new EvaluationInput(request, keywords));
+        when(executionService.claimNext()).thenReturn(
+                Optional.of(new ClaimedTask(1L, 1)), Optional.of(new ClaimedTask(2L, 1)),
+                Optional.of(new ClaimedTask(3L, 1)), Optional.empty());
+        stubPrepare();
         when(aiEvaluationClient.evaluate(request))
                 .thenReturn(result)
-                .thenThrow(new BusinessException(HttpStatus.GATEWAY_TIMEOUT, "evaluation_timeout"))
+                .thenThrow(new AiEvaluationFailedException(
+                        HttpStatus.GATEWAY_TIMEOUT, "evaluation_timeout", EvaluationFailureCode.AI_SERVER_TIMEOUT, true, null))
                 .thenReturn(result);
 
         // When
@@ -120,19 +162,19 @@ class SolutionEvaluationWorkerTest {
 
         // Then
         verify(aiEvaluationClient, times(3)).evaluate(request);
-        verify(executionService).complete(1L, keywords, result);
-        verify(executionService).fail(2L, "evaluation_timeout", "evaluation_timeout");
-        verify(executionService).complete(3L, keywords, result);
+        verify(executionService).complete(1L, 1, keywords, result);
+        verify(executionService).handleFailure(2L, 1, EvaluationFailureCode.AI_SERVER_TIMEOUT, "evaluation_timeout", true);
+        verify(executionService).complete(3L, 1, keywords, result);
     }
 
     @Test
-    void runUntilEmpty_doesNotThrow_whenSavingFailureAlsoFails() {
+    void runUntilEmpty_doesNotThrow_whenRecordingFailureAlsoFails() {
         // Given
-        when(executionService.claimNext()).thenReturn(Optional.of(5L), Optional.empty());
-        when(executionService.prepare(5L)).thenReturn(new EvaluationInput(request, keywords));
-        when(aiEvaluationClient.evaluate(request))
-                .thenThrow(new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "ai_server_unavailable"));
-        doThrow(new IllegalStateException("DB 오류")).when(executionService).fail(eq(5L), any(), any());
+        when(executionService.claimNext()).thenReturn(Optional.of(new ClaimedTask(5L, 1)), Optional.empty());
+        stubPrepare();
+        when(aiEvaluationClient.evaluate(request)).thenThrow(new AiEvaluationFailedException(
+                HttpStatus.SERVICE_UNAVAILABLE, "ai_server_unavailable", EvaluationFailureCode.AI_SERVER_UNAVAILABLE, true, null));
+        doThrow(new IllegalStateException("DB 오류")).when(executionService).handleFailure(any(), anyInt(), any(), any(), anyBoolean());
 
         // When & Then
         assertThatCode(() -> worker.runUntilEmpty()).doesNotThrowAnyException();

@@ -6,8 +6,10 @@ import static org.mockito.Mockito.when;
 
 import com.cosmos.cosmos_backend.approach.domain.ApproachSubmission;
 import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
+import com.cosmos.cosmos_backend.approach.domain.SolutionEvaluationTask;
 import com.cosmos.cosmos_backend.approach.dto.response.ApproachSubmitResponse;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
+import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepository;
 import com.cosmos.cosmos_backend.codesubmission.domain.CodeSubmission;
 import com.cosmos.cosmos_backend.codesubmission.domain.JudgingResult;
 import com.cosmos.cosmos_backend.codesubmission.repository.CodeSubmissionRepository;
@@ -81,10 +83,46 @@ class ProblemServiceTest {
     private CodeSubmissionRepository codeSubmissionRepository;
 
     @Mock
+    private SolutionEvaluationTaskRepository solutionEvaluationTaskRepository;
+
+    @Mock
     private AiProblemClient aiProblemClient;
 
     private ProblemService service() {
-        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, savedProblemRepository, dailyProblemRepository, dailyGeneratedCountRepository, approachSubmissionRepository, codeSubmissionRepository, aiProblemClient, CLOCK);
+        return new ProblemService(problemRepository, problemExampleRepository, runningLimitRepository, hintRepository, keywordRepository, testCaseRepository, usedHintRepository, savedProblemRepository, dailyProblemRepository, dailyGeneratedCountRepository, approachSubmissionRepository, codeSubmissionRepository, solutionEvaluationTaskRepository, aiProblemClient, CLOCK);
+    }
+
+    @Test
+    void getProblemDetail_returnsActiveEvaluation_whenEvaluationIsInProgress() {
+        // Given: 평가가 진행 중인 사용자
+        stubProblemForCategoryRule();
+        givenLastGenerated(1L);
+        SolutionEvaluationTask task = new SolutionEvaluationTask(7L, 1L, Category.BINARY_SEARCH, "중간값을 확인합니다", LocalDateTime.of(2026, 10, 19, 3, 30, 0));
+        task.startProcessing(LocalDateTime.of(2026, 10, 19, 3, 30, 1));
+        when(solutionEvaluationTaskRepository.findActive(7L, 1L)).thenReturn(Optional.of(task));
+
+        // When
+        ProblemDetailResponse response = service().getProblemDetail(7L, 1L);
+
+        // Then
+        assertThat(response.activeEvaluation()).isNotNull();
+        assertThat(response.activeEvaluation().status()).isEqualTo("PROCESSING");
+        assertThat(response.activeEvaluation().selectedCategory()).isEqualTo("BINARY_SEARCH");
+        assertThat(response.activeEvaluation().naturalSolution()).isEqualTo("중간값을 확인합니다");
+        assertThat(response.activeEvaluation().createdAt()).isEqualTo(Instant.parse("2026-10-19T03:30:00Z"));
+        assertThat(response.activeEvaluation().startedAt()).isEqualTo(Instant.parse("2026-10-19T03:30:01Z"));
+        assertThat(response.activeEvaluation().nextRetryAt()).isNull();
+    }
+
+    @Test
+    void getProblemDetail_returnsNullActiveEvaluation_whenNothingIsInProgress() {
+        // Given
+        stubProblemForCategoryRule();
+        givenLastGenerated(1L);
+        when(solutionEvaluationTaskRepository.findActive(7L, 1L)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThat(service().getProblemDetail(7L, 1L).activeEvaluation()).isNull();
     }
 
     // 오늘 마지막으로 생성한 문제가 problemId인 상태를 만든다. (접근 확인을 통과시키려고)
@@ -333,6 +371,71 @@ class ProblemServiceTest {
 
         // When & Then: 열리고, 카테고리는 숨김
         assertThat(service().getProblemDetail(7L, 1L).category()).isNull();
+    }
+
+    @Test
+    void getProblemDetail_opens_whenUserSubmittedApproachBefore() {
+        // Given: 저장도 오늘의 문제도 마지막 생성도 아니지만 내가 풀이를 제출한 적이 있는 문제 (알림에서 나중에 열 때)
+        stubProblemForCategoryRule();
+        when(approachSubmissionRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+
+        // When & Then: 열리고, 카테고리는 숨김
+        assertThat(service().getProblemDetail(7L, 1L).category()).isNull();
+    }
+
+    @Test
+    void getProblemDetail_opens_whenOnlyEvaluationTaskExists() {
+        // Given: 평가가 실패해서 제출 행은 없고 평가 작업만 있는 문제
+        stubProblemForCategoryRule();
+        when(solutionEvaluationTaskRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+
+        // When & Then
+        assertThat(service().getProblemDetail(7L, 1L).category()).isNull();
+    }
+
+    @Test
+    void canOpen_returnsTrue_whenProblemIsTodayDaily() {
+        // Given
+        when(dailyProblemRepository.existsByProblemIdAndRecommendDate(1L, TODAY)).thenReturn(true);
+
+        // When & Then
+        assertThat(service().canOpen(7L, 1L)).isTrue();
+    }
+
+    @Test
+    void canOpen_returnsTrue_whenUserSubmittedApproachBefore() {
+        // Given
+        when(approachSubmissionRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+
+        // When & Then
+        assertThat(service().canOpen(7L, 1L)).isTrue();
+    }
+
+    @Test
+    void canOpen_returnsTrue_whenOnlyEvaluationTaskExists() {
+        // Given
+        when(solutionEvaluationTaskRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+
+        // When & Then
+        assertThat(service().canOpen(7L, 1L)).isTrue();
+    }
+
+    @Test
+    void canOpen_returnsTrue_whenLastGeneratedToday() {
+        // Given
+        givenLastGenerated(1L);
+
+        // When & Then
+        assertThat(service().canOpen(7L, 1L)).isTrue();
+    }
+
+    @Test
+    void canOpen_returnsFalse_whenNoReasonToOpen() {
+        // Given: 저장도, 오늘의 문제도, 제출 이력도, 마지막 생성도 아닌 문제 (다른 문제를 마지막으로 생성)
+        givenLastGenerated(2L);
+
+        // When & Then
+        assertThat(service().canOpen(7L, 1L)).isFalse();
     }
 
     @Test
