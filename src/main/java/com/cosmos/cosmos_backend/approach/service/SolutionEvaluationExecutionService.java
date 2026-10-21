@@ -12,6 +12,8 @@ import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepositor
 import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.notification.domain.NotificationType;
+import com.cosmos.cosmos_backend.notification.service.NotificationService;
 import com.cosmos.cosmos_backend.problem.domain.entity.Keyword;
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
 import com.cosmos.cosmos_backend.problem.repository.KeywordRepository;
@@ -46,6 +48,7 @@ public class SolutionEvaluationExecutionService {
     private final RunningLimitRepository runningLimitRepository;
     private final ApproachSubmissionRepository approachSubmissionRepository;
     private final ApproachSubmissionService approachSubmissionService;
+    private final NotificationService notificationService;
     private final EvaluationWorkerProperties properties;
     private final Clock clock;
 
@@ -131,6 +134,10 @@ public class SolutionEvaluationExecutionService {
 
         // 6. 작업을 성공 처리 (제출 id 저장, 활성 상태 해제)
         task.markSucceeded(submission.getId(), now());
+
+        // 7. 완료 알림을 만듦 (같은 트랜잭션)
+        notificationService.createEvaluationNotification(
+                userId, problemId, taskId, NotificationType.NL_EVALUATION_DONE, problem.getTitle());
     }
 
     /** 실패를 기록. 재시도할 수 있고 횟수가 남았으면 RETRY_WAIT, 아니면 FAILED. */
@@ -148,6 +155,7 @@ public class SolutionEvaluationExecutionService {
             task.scheduleRetry(now.plus(properties.retryDelay()), code.name(), message, now);
         } else {
             task.markFailed(code.name(), message, now);
+            notifyFailed(task);
         }
     }
 
@@ -173,7 +181,16 @@ public class SolutionEvaluationExecutionService {
             task.scheduleRetry(now, EvaluationFailureCode.WORKER_TIMEOUT.name(), "worker_timeout", now);
         } else {
             task.markFailed(EvaluationFailureCode.WORKER_TIMEOUT.name(), "worker_timeout", now);
+            notifyFailed(task);
         }
+    }
+
+    // 최종 실패 알림을 만듦 (문제 제목을 조회해 문구에 넣음)
+    private void notifyFailed(SolutionEvaluationTask task) {
+        Problem problem = findProblem(task.getProblemId());
+        notificationService.createEvaluationNotification(
+                task.getUserId(), task.getProblemId(), task.getId(),
+                NotificationType.NL_EVALUATION_FAILED, problem.getTitle());
     }
 
     // 작업 조회 (없으면 404 예외를 던짐)

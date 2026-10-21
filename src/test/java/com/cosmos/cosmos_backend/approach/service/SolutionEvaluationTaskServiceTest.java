@@ -22,6 +22,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
+import com.cosmos.cosmos_backend.problem.service.ProblemService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -52,12 +53,15 @@ class SolutionEvaluationTaskServiceTest {
     @Mock
     private ApproachSubmissionRepository approachSubmissionRepository;
 
+    @Mock
+    private ProblemService problemService;
+
     private SolutionEvaluationTaskService service;
 
     @BeforeEach
     void setUp() {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-10-19T03:30:00Z"), ZoneId.of("Asia/Seoul"));
-        service = new SolutionEvaluationTaskService(taskRepository, problemRepository, approachSubmissionRepository, fixedClock);
+        service = new SolutionEvaluationTaskService(taskRepository, problemRepository, approachSubmissionRepository, problemService, fixedClock);
     }
 
     private Problem problem(String category) {
@@ -100,6 +104,7 @@ class SolutionEvaluationTaskServiceTest {
     void accept_savesPendingTask_andReturnsUsageWithoutIncreasingCount() {
         // Given
         when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(problemService.canOpen(10L, 1L)).thenReturn(true);
         when(approachSubmissionRepository.findSubmittedCount(10L, 1L)).thenReturn(Optional.of(2));
         when(taskRepository.findActive(10L, 1L)).thenReturn(Optional.empty());
         when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> {
@@ -131,6 +136,7 @@ class SolutionEvaluationTaskServiceTest {
     void accept_acceptsFifthSubmission_whenFourSucceededBefore() {
         // Given
         when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(problemService.canOpen(10L, 1L)).thenReturn(true);
         when(approachSubmissionRepository.findSubmittedCount(10L, 1L)).thenReturn(Optional.of(4));
         when(taskRepository.findActive(10L, 1L)).thenReturn(Optional.empty());
         when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -153,9 +159,22 @@ class SolutionEvaluationTaskServiceTest {
     }
 
     @Test
+    void accept_throwsNotFound_andSavesNothing_whenProblemCannotBeOpenedByUser() {
+        // Given: 문제는 있지만 이 사용자가 열 수 없는 문제
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(problemService.canOpen(10L, 1L)).thenReturn(false);
+
+        // When & Then
+        assertBusiness(() -> service.accept(10L, 1L, "ARRAY", "풀이"), HttpStatus.NOT_FOUND, "problem_not_found");
+        verify(approachSubmissionRepository, never()).findSubmittedCount(any(), any());
+        verify(taskRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void accept_throwsBadRequest_andSavesNothing_whenSelectedCategoryInvalid() {
         // Given
         when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(problemService.canOpen(10L, 1L)).thenReturn(true);
 
         // When & Then
         assertBusiness(() -> service.accept(10L, 1L, "NOT_A_CATEGORY", "풀이"), HttpStatus.BAD_REQUEST, "invalid_selected_category");
@@ -167,6 +186,7 @@ class SolutionEvaluationTaskServiceTest {
     void accept_throws429WithNestedUsage_andSavesNothing_whenLimitAlreadyReached() {
         // Given
         when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(problemService.canOpen(10L, 1L)).thenReturn(true);
         when(approachSubmissionRepository.findSubmittedCount(10L, 1L)).thenReturn(Optional.of(5));
 
         // When & Then
@@ -186,6 +206,7 @@ class SolutionEvaluationTaskServiceTest {
     void accept_throws409WithActiveTask_andSavesNothing_whenEvaluationAlreadyInProgress() {
         // Given
         when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(problemService.canOpen(10L, 1L)).thenReturn(true);
         when(approachSubmissionRepository.findSubmittedCount(10L, 1L)).thenReturn(Optional.empty());
         when(taskRepository.findActive(10L, 1L)).thenReturn(Optional.of(processing(9001L)));
 
@@ -206,6 +227,7 @@ class SolutionEvaluationTaskServiceTest {
         // Given: 확인 시점엔 없었는데 저장하는 순간 다른 요청이 먼저 저장해서 DB 제약에 걸림
         SolutionEvaluationTask winner = task(9001L, 10L, 1L);
         when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(problemService.canOpen(10L, 1L)).thenReturn(true);
         when(approachSubmissionRepository.findSubmittedCount(10L, 1L)).thenReturn(Optional.empty());
         when(taskRepository.findActive(10L, 1L)).thenReturn(Optional.empty(), Optional.of(winner));
         when(taskRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("Duplicate entry"));
@@ -224,6 +246,7 @@ class SolutionEvaluationTaskServiceTest {
     void accept_rethrowsOriginalError_whenConstraintFailsButNoActiveTaskExists() {
         // Given: 활성 작업 때문이 아닌 다른 제약 오류
         when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(problemService.canOpen(10L, 1L)).thenReturn(true);
         when(approachSubmissionRepository.findSubmittedCount(10L, 1L)).thenReturn(Optional.empty());
         when(taskRepository.findActive(10L, 1L)).thenReturn(Optional.empty(), Optional.empty());
         when(taskRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("other constraint"));

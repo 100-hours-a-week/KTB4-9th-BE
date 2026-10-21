@@ -22,6 +22,9 @@ public interface SolutionEvaluationTaskRepository extends JpaRepository<Solution
     // 같은 사용자·문제의 가장 최근 작업 (id가 가장 큰 것)
     Optional<SolutionEvaluationTask> findFirstByUserIdAndProblemIdOrderByIdDesc(Long userId, Long problemId);
 
+    // 사용자가 해당 문제에 접수한 평가 작업이 있는지 (진행 중, 실패, 성공 모두)
+    boolean existsByUserIdAndProblemId(Long userId, Long problemId);
+
     // 워커의 작업 선점: 대기 중이거나 재시도 시각이 지난 작업 중 가장 오래된 1건을 잠가서 조회 (다른 워커가 잠근 행은 건너뜀)
     @Query(value = """
             SELECT *

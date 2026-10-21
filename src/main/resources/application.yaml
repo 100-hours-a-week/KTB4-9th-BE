@@ -12,8 +12,8 @@ ai:
 evaluation:
   worker:
     enabled: ${EVALUATION_WORKER_ENABLED:true}
-    poll-interval: ${EVALUATION_WORKER_POLL_INTERVAL:3s}
-    concurrency: ${EVALUATION_WORKER_CONCURRENCY:5}
+    poll-interval: ${EVALUATION_WORKER_POLL_INTERVAL:5s}
+    concurrency: ${EVALUATION_WORKER_CONCURRENCY:2}
     max-attempts: ${EVALUATION_WORKER_MAX_ATTEMPTS:3}
     retry-delay: ${EVALUATION_WORKER_RETRY_DELAY:15s}
     stuck-after: ${EVALUATION_WORKER_STUCK_AFTER:2m}
