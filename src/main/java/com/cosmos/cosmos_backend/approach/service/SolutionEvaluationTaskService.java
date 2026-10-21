@@ -11,6 +11,7 @@ import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepos
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
+import com.cosmos.cosmos_backend.problem.service.ProblemService;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -32,6 +33,7 @@ public class SolutionEvaluationTaskService {
     private final SolutionEvaluationTaskRepository taskRepository;
     private final ProblemRepository problemRepository;
     private final ApproachSubmissionRepository approachSubmissionRepository;
+    private final ProblemService problemService;
     private final Clock clock;
 
     /**
@@ -42,6 +44,11 @@ public class SolutionEvaluationTaskService {
         // 1. 문제를 조회 (없으면 404 예외를 던짐)
         problemRepository.findById(problemId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found"));
+
+        // 1-1. 열 수 없는 문제면 풀이를 접수하지 않음 (열 수 없는 문제에 풀이를 제출해서 문제를 읽는 우회를 막음)
+        if (!problemService.canOpen(userId, problemId)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found");
+        }
 
         // 2. 선택한 카테고리를 enum으로 변환 (없는 값이면 400 예외를 던짐)
         Category category = parseCategory(selectedCategory);

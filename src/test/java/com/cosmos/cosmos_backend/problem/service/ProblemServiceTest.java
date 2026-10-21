@@ -374,6 +374,71 @@ class ProblemServiceTest {
     }
 
     @Test
+    void getProblemDetail_opens_whenUserSubmittedApproachBefore() {
+        // Given: 저장도 오늘의 문제도 마지막 생성도 아니지만 내가 풀이를 제출한 적이 있는 문제 (알림에서 나중에 열 때)
+        stubProblemForCategoryRule();
+        when(approachSubmissionRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+
+        // When & Then: 열리고, 카테고리는 숨김
+        assertThat(service().getProblemDetail(7L, 1L).category()).isNull();
+    }
+
+    @Test
+    void getProblemDetail_opens_whenOnlyEvaluationTaskExists() {
+        // Given: 평가가 실패해서 제출 행은 없고 평가 작업만 있는 문제
+        stubProblemForCategoryRule();
+        when(solutionEvaluationTaskRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+
+        // When & Then
+        assertThat(service().getProblemDetail(7L, 1L).category()).isNull();
+    }
+
+    @Test
+    void canOpen_returnsTrue_whenProblemIsTodayDaily() {
+        // Given
+        when(dailyProblemRepository.existsByProblemIdAndRecommendDate(1L, TODAY)).thenReturn(true);
+
+        // When & Then
+        assertThat(service().canOpen(7L, 1L)).isTrue();
+    }
+
+    @Test
+    void canOpen_returnsTrue_whenUserSubmittedApproachBefore() {
+        // Given
+        when(approachSubmissionRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+
+        // When & Then
+        assertThat(service().canOpen(7L, 1L)).isTrue();
+    }
+
+    @Test
+    void canOpen_returnsTrue_whenOnlyEvaluationTaskExists() {
+        // Given
+        when(solutionEvaluationTaskRepository.existsByUserIdAndProblemId(7L, 1L)).thenReturn(true);
+
+        // When & Then
+        assertThat(service().canOpen(7L, 1L)).isTrue();
+    }
+
+    @Test
+    void canOpen_returnsTrue_whenLastGeneratedToday() {
+        // Given
+        givenLastGenerated(1L);
+
+        // When & Then
+        assertThat(service().canOpen(7L, 1L)).isTrue();
+    }
+
+    @Test
+    void canOpen_returnsFalse_whenNoReasonToOpen() {
+        // Given: 저장도, 오늘의 문제도, 제출 이력도, 마지막 생성도 아닌 문제 (다른 문제를 마지막으로 생성)
+        givenLastGenerated(2L);
+
+        // When & Then
+        assertThat(service().canOpen(7L, 1L)).isFalse();
+    }
+
+    @Test
     void getProblemDetail_throwsNotFound_whenNotSavedNotDailyNotLastGenerated() {
         // Given: 문제는 있지만 저장도, 오늘의 문제도, 마지막으로 생성한 문제도 아님
         Problem problem = new Problem(
