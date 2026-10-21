@@ -1,4 +1,4 @@
-성package com.cosmos.cosmos_backend.dailyBattle.service;
+package com.cosmos.cosmos_backend.dailyBattle.service;
 
 import static com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus.IN_PROGRESS;
 import static com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus.SUBMITTED;
