@@ -249,4 +249,18 @@ class SolutionEvaluationTaskRepositoryTest {
         assertThat(ids).containsExactly(stuck.getId());
         assertThat(ids).doesNotContain(recent.getId(), pending.getId(), finished.getId());
     }
+
+    @Test
+    void existsByUserIdAndProblemId_isTrueOnlyForMyTaskOnThatProblem() {
+        // Given: 사용자 1이 문제 10에 접수한 작업만 있음 (끝난 작업도 포함됨)
+        SolutionEvaluationTask finished = repository.saveAndFlush(task(1L, 10L));
+        finished.startProcessing(NOW);
+        finished.markSucceeded(501L, NOW);
+        repository.saveAndFlush(finished);
+
+        // When & Then
+        assertThat(repository.existsByUserIdAndProblemId(1L, 10L)).isTrue();
+        assertThat(repository.existsByUserIdAndProblemId(1L, 11L)).isFalse();
+        assertThat(repository.existsByUserIdAndProblemId(2L, 10L)).isFalse();
+    }
 }
