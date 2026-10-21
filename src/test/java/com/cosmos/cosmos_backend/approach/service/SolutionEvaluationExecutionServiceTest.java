@@ -23,6 +23,8 @@ import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationExecutionSer
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.notification.domain.NotificationType;
+import com.cosmos.cosmos_backend.notification.service.NotificationService;
 import com.cosmos.cosmos_backend.problem.domain.entity.Keyword;
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
@@ -69,6 +71,9 @@ class SolutionEvaluationExecutionServiceTest {
     @Mock
     private ApproachSubmissionService approachSubmissionService;
 
+    @Mock
+    private NotificationService notificationService;
+
     private SolutionEvaluationExecutionService service;
 
     @BeforeEach
@@ -78,7 +83,7 @@ class SolutionEvaluationExecutionServiceTest {
                 true, Duration.ofSeconds(3), 5, 3, Duration.ofSeconds(15), Duration.ofMinutes(2), Duration.ofSeconds(30));
         service = new SolutionEvaluationExecutionService(
                 taskRepository, problemRepository, keywordRepository, runningLimitRepository,
-                approachSubmissionRepository, approachSubmissionService, properties, fixedClock
+                approachSubmissionRepository, approachSubmissionService, notificationService, properties, fixedClock
         );
     }
 
@@ -205,6 +210,7 @@ class SolutionEvaluationExecutionServiceTest {
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.SUCCEEDED);
         assertThat(task.getSubmissionId()).isEqualTo(501L);
         assertThat(task.getActiveSlot()).isNull();
+        verify(notificationService).createEvaluationNotification(10L, 1L, 5L, NotificationType.NL_EVALUATION_DONE, "제목");
     }
 
     @Test
@@ -288,6 +294,7 @@ class SolutionEvaluationExecutionServiceTest {
         assertThat(existing.getSubmittedCount()).isEqualTo(ApproachSubmission.MAX_SUBMISSION_COUNT);
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.PROCESSING);
         verify(approachSubmissionService, never()).applyFirstSolveRewards(any(), anyBoolean(), any(), any(), any());
+        verifyNoInteractions(notificationService);
     }
 
     @Test
@@ -299,7 +306,7 @@ class SolutionEvaluationExecutionServiceTest {
         // When & Then
         assertThatThrownBy(() -> service.complete(5L, 1, List.of(), aiResult()))
                 .isInstanceOf(IllegalStateException.class);
-        verifyNoInteractions(approachSubmissionRepository, approachSubmissionService);
+        verifyNoInteractions(approachSubmissionRepository, approachSubmissionService, notificationService);
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.PROCESSING);
     }
 
@@ -341,6 +348,7 @@ class SolutionEvaluationExecutionServiceTest {
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.RETRY_WAIT);
         assertThat(task.getNextRetryAt()).isEqualTo(NOW.plusSeconds(15));
         assertThat(task.getErrorCode()).isEqualTo("AI_SERVER_TIMEOUT");
+        verifyNoInteractions(notificationService);
         assertThat(task.getActiveSlot()).isEqualTo(SolutionEvaluationTask.ACTIVE_SLOT);
     }
 
@@ -348,7 +356,9 @@ class SolutionEvaluationExecutionServiceTest {
     void handleFailure_failsImmediately_whenNotRetryable() {
         // Given
         SolutionEvaluationTask task = processingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
         when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
 
         // When
         service.handleFailure(5L, 1, EvaluationFailureCode.AI_REQUEST_REJECTED, "INVALID_CATEGORY", false);
@@ -359,19 +369,23 @@ class SolutionEvaluationExecutionServiceTest {
         assertThat(task.getErrorMessage()).isEqualTo("INVALID_CATEGORY");
         assertThat(task.getActiveSlot()).isNull();
         assertThat(task.getCompletedAt()).isEqualTo(NOW);
+        verify(notificationService).createEvaluationNotification(10L, 1L, 5L, NotificationType.NL_EVALUATION_FAILED, "제목");
     }
 
     @Test
     void handleFailure_failsFinally_whenThirdAttemptFails() {
         // Given
         SolutionEvaluationTask task = processingTask(Category.ARRAY, REQUESTED_AT.plusSeconds(1), 3);
+        ReflectionTestUtils.setField(task, "id", 5L);
         when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
 
         // When
         service.handleFailure(5L, 3, EvaluationFailureCode.AI_SERVER_UNAVAILABLE, "ai_server_unavailable", true);
 
         // Then
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.FAILED);
+        verify(notificationService).createEvaluationNotification(10L, 1L, 5L, NotificationType.NL_EVALUATION_FAILED, "제목");
         assertThat(task.getActiveSlot()).isNull();
     }
 
@@ -386,6 +400,7 @@ class SolutionEvaluationExecutionServiceTest {
 
         // Then
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.RETRY_WAIT);
+        verifyNoInteractions(notificationService);
     }
 
     @Test
@@ -400,6 +415,7 @@ class SolutionEvaluationExecutionServiceTest {
         // Then
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.PROCESSING);
         assertThat(task.getWorkerAttemptCount()).isEqualTo(2);
+        verifyNoInteractions(notificationService);
     }
 
     @Test
@@ -414,6 +430,7 @@ class SolutionEvaluationExecutionServiceTest {
 
         // Then
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.SUCCEEDED);
+        verifyNoInteractions(notificationService);
     }
 
     @Test
@@ -439,13 +456,16 @@ class SolutionEvaluationExecutionServiceTest {
         assertThat(task.getNextRetryAt()).isEqualTo(NOW);
         assertThat(task.getErrorCode()).isEqualTo("WORKER_TIMEOUT");
         assertThat(task.getActiveSlot()).isEqualTo(SolutionEvaluationTask.ACTIVE_SLOT);
+        verifyNoInteractions(notificationService);
     }
 
     @Test
     void recoverStuck_failsTask_whenAttemptsAreExhausted() {
         // Given
         SolutionEvaluationTask task = processingTask(Category.ARRAY, NOW.minusMinutes(3), 3);
+        ReflectionTestUtils.setField(task, "id", 5L);
         when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
 
         // When
         service.recoverStuck(5L);
@@ -454,6 +474,7 @@ class SolutionEvaluationExecutionServiceTest {
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.FAILED);
         assertThat(task.getErrorCode()).isEqualTo("WORKER_TIMEOUT");
         assertThat(task.getActiveSlot()).isNull();
+        verify(notificationService).createEvaluationNotification(10L, 1L, 5L, NotificationType.NL_EVALUATION_FAILED, "제목");
     }
 
     @Test
@@ -481,5 +502,6 @@ class SolutionEvaluationExecutionServiceTest {
 
         // Then
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.SUCCEEDED);
+        verifyNoInteractions(notificationService);
     }
 }
