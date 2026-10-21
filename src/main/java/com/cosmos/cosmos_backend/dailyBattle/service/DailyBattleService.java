@@ -242,19 +242,32 @@ public class DailyBattleService {
         LocalDateTime submittedTime = submittedAt.atZone(ZoneId.of("Asia/Seoul")).toLocalDateTime();
 
         // 4. 제출 상태로 변경
-        Integer updatedCountCheck = battleParticipationRepository.updateStatusIfMatch(
+        Instant deadline = battleInfo.getBattleDate()
+                .atTime(12, 59, 59)
+                .atZone(ZoneId.of("Asia/Seoul"))
+                .toInstant();
+
+        // 타임아웃이 먼저 커밋했더라도 요청 접수 시각이 마감 전이면 제출 인정
+        int updatedCountCheck = battleParticipationRepository.submitIfReceivedBeforeDeadline(
                 participationInfo.getParticipationId(),
                 ParticipationStatus.IN_PROGRESS,
+                ParticipationStatus.TIME_OVER,
                 ParticipationStatus.SUBMITTED,
-                submittedAt
-        );
+                submittedAt,
+                deadline
+                );
 
         // 5. 상태 변경 실패 시 중복 제출 예외
-        // 현재 상태가 IN_PROGRESS가 아니면 UPDATE가 실행되지 않고 0 반환
+        // 현재 상태가 IN_PROGRESS 또는 TIME_OVER가 아니거나, 요청 접수 시각이 마감 이후이면 UPDATE 결과 0 반환
         if (updatedCountCheck == 0) {
             throw new BusinessException(HttpStatus.CONFLICT, "Battle_already_participated"
             );
         }
+
+        // 조건부 업데이트 clearAutomatically 실행 이후 답안 연관관계에 사용할 관리 상태 참조를 다시 가져옴
+        BattleParticipation participationReference = battleParticipationRepository.getReferenceById(
+                participationInfo.getParticipationId()
+        );
 
         // 6. 제출 답안 3개 저장
         List<DailyBattleSubmissionRequestDto.Answer> userAnswers = battleSubmissionRequest.userAnswers();
@@ -296,7 +309,7 @@ public class DailyBattleService {
 
             // 6-2. BattleSubmission 엔티티 생성
             BattleSubmission submission = new BattleSubmission(
-                    participationInfo,
+                    participationReference,
                     battleCase,
                     answer.userAnswer()
             );
@@ -382,15 +395,12 @@ public class DailyBattleService {
     // 배틀 타임 아웃 처리
     @Transactional
     public void timeoutInProgress(Long battleId) {
-        // 1. 해당 배틀에서 아직 참여 중인 사용자만 조회
-        List<BattleParticipation> inProgressParticipation = battleParticipationRepository.findAllByDailyBattleIdAndParticipationStatus(
+        // 참여중 상태만 직접 조건부 UPDATE (더티 체킹 방지)
+        battleParticipationRepository.timeoutIfInProgress(
                 battleId,
-                ParticipationStatus.IN_PROGRESS);
-
-        // 2. 타임 아웃 상태로 변경
-        for (BattleParticipation participation : inProgressParticipation) {
-            participation.markTimeOut();
-        }
+                ParticipationStatus.IN_PROGRESS,
+                ParticipationStatus.TIME_OVER
+        );
     }
 
 }
