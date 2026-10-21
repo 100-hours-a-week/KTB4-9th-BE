@@ -22,19 +22,37 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
     Optional<BattleParticipation> findByDailyBattleIdAndUser_Id(Long battleId, Long userId);
 
     // 제출 처리를 위한 상태 변경 조건부 update 직접 실행
-    @Modifying
+    // 마감 전에 접수된 요청이면 IN_PROGRESS 또는 TIME_OVER에서 SUBMITTED로 변경
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
-    UPDATE BattleParticipation bp
-    SET bp.participationStatus = :submittedStatus,
-        bp.submittedAt = :submittedAt
-    WHERE bp.participationId = :participationId
-      AND bp.participationStatus = :expectedStatus
-    """)
-    Integer updateStatusIfMatch(
+        UPDATE BattleParticipation bp
+           SET bp.participationStatus = :submittedStatus,
+               bp.submittedAt = :submittedAt
+         WHERE bp.participationId = :participationId
+           AND bp.participationStatus IN (:inProgressStatus, :timeOverStatus)
+           AND :submittedAt < :deadline
+        """)
+    int submitIfReceivedBeforeDeadline(
             @Param("participationId") Long participationId,
-            @Param("expectedStatus") ParticipationStatus expectedStatus,
+            @Param("inProgressStatus") ParticipationStatus inProgressStatus,
+            @Param("timeOverStatus") ParticipationStatus timeOverStatus,
             @Param("submittedStatus") ParticipationStatus submittedStatus,
-            @Param("submittedAt") Instant submittedAt
+            @Param("submittedAt") Instant submittedAt,
+            @Param("deadline") Instant deadline
+    );
+
+    // 조회 후 Dirty Checking 대신 IN_PROGRESS 상태만 직접 타임아웃 처리
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        UPDATE BattleParticipation bp
+           SET bp.participationStatus = :timeOverStatus
+         WHERE bp.dailyBattleId = :battleId
+           AND bp.participationStatus = :inProgressStatus
+        """)
+    int timeoutIfInProgress(
+            @Param("battleId") Long battleId,
+            @Param("inProgressStatus") ParticipationStatus inProgressStatus,
+            @Param("timeOverStatus") ParticipationStatus timeOverStatus
     );
 
     // 채점 worker의 작업 선점을 위한 메소드(제출 처리인 상태인 행 중에 제출 시각 빠른것, 락 가진건 건너 뛰기)
