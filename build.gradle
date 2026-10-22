@@ -65,6 +65,22 @@ tasks.named('test') {
 	useJUnitPlatform()
 }
 
+tasks.register('dailyBattleConcurrencyTest', Test) {
+	group = 'verification'
+	description = 'Runs the MySQL daily battle submission/timeout concurrency reproduction test.'
+	dependsOn tasks.named('testClasses')
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform()
+	filter {
+		includeTestsMatching 'com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleSubmissionTimeoutConcurrencyIntegrationTest'
+	}
+	testLogging {
+		events 'passed', 'skipped', 'failed'
+		showStandardStreams = true
+	}
+}
+
 // 로컬 실행에서만 `-Ppyroscope=true`로 켜는 프로파일러입니다.
 tasks.named('bootRun') {
 	if (providers.gradleProperty('pyroscope').map { it.toBoolean() }.getOrElse(false)) {
