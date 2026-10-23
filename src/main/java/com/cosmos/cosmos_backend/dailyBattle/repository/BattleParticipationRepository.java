@@ -3,6 +3,7 @@ package com.cosmos.cosmos_backend.dailyBattle.repository;
 import com.cosmos.cosmos_backend.auth.domain.entity.User;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
+import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleStatusCountProjection;
 import com.cosmos.cosmos_backend.dailyBattle.projection.MyBattleRankingProjection;
 import com.cosmos.cosmos_backend.dailyBattle.projection.TopRankingProjection;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -65,6 +66,15 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
     FOR UPDATE SKIP LOCKED
     """, nativeQuery = true)
     Optional<BattleParticipation> findSubmittedForUpdate();
+
+    // 부하테스트를 위한 메트릭
+    @Query("""
+        SELECT bp.participationStatus AS status, COUNT(bp) AS taskCount
+          FROM BattleParticipation bp
+         WHERE bp.dailyBattleId = :battleId
+         GROUP BY bp.participationStatus
+        """)
+    List<BattleStatusCountProjection> countTasksByStatus(@Param("battleId") Long battleId);
 
     // 채점 미완료된 제출있는지 확인
     Boolean existsByDailyBattleIdAndParticipationStatusIn(Long battleId, Collection<ParticipationStatus> statuses);

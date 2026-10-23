@@ -5,6 +5,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
+import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
@@ -13,6 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 
 @Service
@@ -24,6 +28,12 @@ public class BattleGradingService {
     private final BattleSubmissionRepository battleSubmissionRepository;
 
     private final BattleCaseRepository battleCaseRepository;
+
+    // 부하테스트를 위한 메트릭
+    private final BattleMetrics battleMetrics;
+
+    // 부하테스트를 위한 메트릭
+    private final Clock clock;
 
 
     // 작업 선점 트랜잭션
@@ -41,6 +51,8 @@ public class BattleGradingService {
         // 3. 채점 중으로 상태 변경
         BattleParticipation preemptedParticipation = optional.get();
         preemptedParticipation.markGrading();
+        // 부하테스트를 위한 메트릭
+        battleMetrics.recordClaim(preemptedParticipation.getSubmittedAt(), clock.instant());
 
         // 4. 참여 id 반환
         return Optional.of(preemptedParticipation.getParticipationId());
@@ -49,7 +61,11 @@ public class BattleGradingService {
 
     // 채점 메소드
     @Transactional
-    public void battleGrade(Long participationId) {
+    public void battleGrade(
+            Long participationId,
+            // 부하테스트를 위한 메트릭
+            Instant processingStartedAt
+    ) {
 
         // 유저 제출 정보 가져오기
         List<BattleSubmission> userSubmissions = battleSubmissionRepository.findByParticipation_participationId(participationId);
@@ -104,6 +120,14 @@ public class BattleGradingService {
         }
 
         battleParticipation.markEvaluatingComplete();
+
+        // 부하테스트를 위한 메트릭
+        Instant completedAt = clock.instant();
+        battleMetrics.recordProcessing(
+                Duration.between(processingStartedAt, completedAt),
+                "success"
+        );
+        battleMetrics.recordCompleted(battleParticipation.getSubmittedAt(), completedAt);
     }
 
     // 채점 재시도 횟수 증가
@@ -116,6 +140,8 @@ public class BattleGradingService {
 
         // 재시도 횟수 증가
         battleParticipation.increaseRetryCount();
+        // 부하테스트를 위한 메트릭
+        battleMetrics.recordRetry();
 
         Integer retryCount = battleParticipation.getRetryCount();
 
@@ -126,6 +152,8 @@ public class BattleGradingService {
         } else {
             // 재시도 횟수 초과 시 채점 실패 처리
             battleParticipation.markGradingFailed();
+            // 부하테스트를 위한 메트릭
+            battleMetrics.recordFailure();
         }
     }
 
@@ -137,5 +165,7 @@ public class BattleGradingService {
         );
 
         battleParticipation.markGradingFailed();
+        // 부하테스트를 위한 메트릭
+        battleMetrics.recordFailure();
     }
 }
