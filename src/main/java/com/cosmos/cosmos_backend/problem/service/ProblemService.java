@@ -62,13 +62,9 @@ public class ProblemService {
         Optional<SavedProblem> savedProblem = savedProblemRepository.findByUserIdAndProblemId(userId, problemId);
         boolean saved = savedProblem.isPresent();
 
-        // 3. 열 수 있는 문제인지 확인 (저장한 문제, 오늘의 문제, 오늘 마지막으로 생성한 문제만 허용, 아니면 404 예외를 던짐)
-        LocalDate today = LocalDate.now(clock);
-        boolean todayDaily = dailyProblemRepository.existsByProblemIdAndRecommendDate(problemId, today);
-        boolean lastGenerated = dailyGeneratedCountRepository.findLastProblemId(userId, today)
-                .filter(problemId::equals)
-                .isPresent();
-        if (!saved && !todayDaily && !lastGenerated) {
+        // 3. 열 수 있는 문제인지 확인 (저장한 문제, 오늘의 문제, 오늘 마지막으로 생성한 문제, 내가 풀이를 제출한 적 있는 문제만 허용, 아니면 404 예외를 던짐)
+        boolean todayDaily = dailyProblemRepository.existsByProblemIdAndRecommendDate(problemId, LocalDate.now(clock));
+        if (!canOpen(userId, problemId, saved, todayDaily)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "problem_not_found");
         }
 
@@ -114,6 +110,34 @@ public class ProblemService {
                 myCode,
                 activeEvaluation
         );
+    }
+
+    /** 사용자가 열 수 있는 문제인지. 풀이 접수 때도 같은 규칙을 쓰려고 밖에 공개함. */
+    @Transactional(readOnly = true)
+    public boolean canOpen(Long userId, Long problemId) {
+        // 1. 저장했는지, 오늘의 문제인지 조회해서 아래 판단에 넘김
+        boolean saved = savedProblemRepository.findByUserIdAndProblemId(userId, problemId).isPresent();
+        boolean todayDaily = dailyProblemRepository.existsByProblemIdAndRecommendDate(problemId, LocalDate.now(clock));
+        return canOpen(userId, problemId, saved, todayDaily);
+    }
+
+    // 이미 조회한 저장·오늘의 문제 여부를 받아서 열 수 있는지 판단 (같은 조회를 두 번 하지 않으려고 나눔)
+    private boolean canOpen(Long userId, Long problemId, boolean saved, boolean todayDaily) {
+        // 1. 가볍게 알 수 있는 조건부터 확인
+        if (saved || todayDaily) {
+            return true;
+        }
+
+        // 2. 내가 풀이를 제출한 적이 있는 문제면 열 수 있음 (제출했다면 그때 열 수 있었던 문제)
+        if (approachSubmissionRepository.existsByUserIdAndProblemId(userId, problemId)
+                || solutionEvaluationTaskRepository.existsByUserIdAndProblemId(userId, problemId)) {
+            return true;
+        }
+
+        // 3. 오늘 마지막으로 생성한 문제인지 확인
+        return dailyGeneratedCountRepository.findLastProblemId(userId, LocalDate.now(clock))
+                .filter(problemId::equals)
+                .isPresent();
     }
 
     // 온디맨드 문제 생성

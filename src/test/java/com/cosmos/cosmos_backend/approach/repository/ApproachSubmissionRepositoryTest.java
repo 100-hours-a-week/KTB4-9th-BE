@@ -50,4 +50,16 @@ class ApproachSubmissionRepositoryTest {
         // Then
         assertThat(loaded.getKeywordResults()).isNull();
     }
+
+    @Test
+    void existsByUserIdAndProblemId_isTrueOnlyForMySubmissionOnThatProblem() {
+        // Given: 사용자 7이 문제 1에 제출한 풀이만 있음
+        em.persist(new ApproachSubmission(7L, 1L, Category.ARRAY, "풀이", false, 10, "아쉬워요"));
+        em.flush();
+
+        // When & Then
+        assertThat(approachSubmissionRepository.existsByUserIdAndProblemId(7L, 1L)).isTrue();
+        assertThat(approachSubmissionRepository.existsByUserIdAndProblemId(7L, 2L)).isFalse();
+        assertThat(approachSubmissionRepository.existsByUserIdAndProblemId(8L, 1L)).isFalse();
+    }
 }

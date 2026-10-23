@@ -20,4 +20,7 @@ public interface ApproachSubmissionRepository extends JpaRepository<ApproachSubm
 
     // 사용자·문제별 기존 제출 조회 (재제출 여부 판단용)
     Optional<ApproachSubmission> findByUserIdAndProblemId(Long userId, Long problemId);
+
+    // 사용자가 해당 문제에 제출한 풀이가 있는지
+    boolean existsByUserIdAndProblemId(Long userId, Long problemId);
 }
