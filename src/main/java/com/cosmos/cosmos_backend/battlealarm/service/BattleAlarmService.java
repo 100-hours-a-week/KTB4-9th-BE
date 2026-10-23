@@ -36,6 +36,7 @@ public class BattleAlarmService {
     private final BattleParticipationRepository battleParticipationRepository;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
+    private final BattleAlarmTimePolicy battleAlarmTimePolicy;
 
     /** 서버 시각과 배틀 준비 여부로 모달 표시 상태를 계산. */
     public BattleAlarmStatusResponse getStatus(Long userId) {
@@ -43,15 +44,15 @@ public class BattleAlarmService {
         OffsetDateTime now = OffsetDateTime.now(clock);
         LocalDate today = now.toLocalDate();
         LocalTime time = now.toLocalTime();
-        OffsetDateTime closesAt = BattleAlarmTimePolicy.closesAt(today, clock.getZone());
+        OffsetDateTime closesAt = battleAlarmTimePolicy.closesAt(today, clock.getZone());
 
-        // 2. 12:00 전이면 DB를 보지 않고 NOT_OPEN
-        if (BattleAlarmTimePolicy.isBeforeOpen(time)) {
+        // 2. 설정된 시작 시각 전이면 DB를 보지 않고 NOT_OPEN
+        if (battleAlarmTimePolicy.isBeforeOpen(time)) {
             return BattleAlarmStatusResponse.notOpen(now, closesAt);
         }
 
-        // 3. 마감 이후에는 미참여자도 결과를 조회할 수 있도록 오늘의 배틀 ID를 함께 반환
-        if (BattleAlarmTimePolicy.isClosed(time)) {
+        // 3. 결과 공개 시각 이후에는 미참여자도 결과를 조회할 수 있도록 오늘의 배틀 ID를 함께 반환
+        if (battleAlarmTimePolicy.isClosed(time)) {
             Long battleId = dailyBattleRepository.findByBattleDate(today)
                     .map(DailyBattle::getBattleId)
                     .orElse(null);

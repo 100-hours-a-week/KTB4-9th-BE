@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.cosmos.cosmos_backend.battlealarm.domain.BattleAlarm;
 import com.cosmos.cosmos_backend.battlealarm.domain.BattleAlarmStatus;
+import com.cosmos.cosmos_backend.battlealarm.domain.BattleAlarmTimePolicy;
 import com.cosmos.cosmos_backend.battlealarm.dto.response.BattleAlarmStatusResponse;
 import com.cosmos.cosmos_backend.battlealarm.repository.BattleAlarmRepository;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
@@ -23,8 +24,10 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
+import com.cosmos.cosmos_backend.global.config.BattleSchedule;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -64,9 +67,16 @@ class BattleAlarmServiceTest {
     // 한국 시각 기준으로 고정한 시계로 서비스를 만든다.
     private BattleAlarmService serviceAt(String kstTime) {
         Clock clock = Clock.fixed(OffsetDateTime.parse(kstTime).toInstant(), ZoneId.of("Asia/Seoul"));
+        BattleAlarmTimePolicy timePolicy = new BattleAlarmTimePolicy(
+                new BattleSchedule(
+                        LocalTime.of(12, 50),
+                        LocalTime.of(12, 59, 59),
+                        LocalTime.of(13, 0)
+                )
+        );
         return new BattleAlarmService(
                 battleAlarmRepository, dailyBattleRepository, battleCaseRepository,
-                battleParticipationRepository, transactionTemplate, clock
+                battleParticipationRepository, transactionTemplate, clock, timePolicy
         );
     }
 
