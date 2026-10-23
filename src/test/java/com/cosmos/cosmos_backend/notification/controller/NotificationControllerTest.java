@@ -67,7 +67,7 @@ class NotificationControllerTest {
         Notification failed = notification(13L, NotificationType.NL_EVALUATION_FAILED, 9002L, 102L,
                 "'괄호 검사' 평가를 완료하지 못했어요. 다시 제출해 주세요.");
         failed.markRead(CREATED_AT.plusSeconds(10));
-        when(notificationService.getNotifications(42L)).thenReturn(NotificationListResponse.of(1, List.of(done, failed)));
+        when(notificationService.getNotifications(42L)).thenReturn(NotificationListResponse.of(1, false, List.of(done, failed)));
 
         // When & Then
         var body = mvc().get().uri("/notifications")
@@ -94,7 +94,7 @@ class NotificationControllerTest {
     void list_returns200WithEmptyList_whenNoNotifications() {
         // Given
         loginAs("42");
-        when(notificationService.getNotifications(42L)).thenReturn(NotificationListResponse.of(0, List.of()));
+        when(notificationService.getNotifications(42L)).thenReturn(NotificationListResponse.of(0, false, List.of()));
 
         // When & Then
         var body = mvc().get().uri("/notifications")

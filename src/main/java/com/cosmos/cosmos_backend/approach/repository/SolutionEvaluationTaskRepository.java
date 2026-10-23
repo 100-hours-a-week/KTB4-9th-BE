@@ -16,6 +16,9 @@ public interface SolutionEvaluationTaskRepository extends JpaRepository<Solution
     @Query("select t from SolutionEvaluationTask t where t.userId = :userId and t.problemId = :problemId and t.activeSlot = 1")
     Optional<SolutionEvaluationTask> findActive(@Param("userId") Long userId, @Param("problemId") Long problemId);
 
+    // 사용자에게 진행 중인 평가 작업(active_slot이 있는 작업)이 있는지
+    boolean existsByUserIdAndActiveSlot(Long userId, Integer activeSlot);
+
     // 작업 id와 소유자로 조회 (남의 작업은 조회되지 않음)
     Optional<SolutionEvaluationTask> findByIdAndUserId(Long id, Long userId);
 

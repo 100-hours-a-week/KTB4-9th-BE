@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepository;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.notification.domain.Notification;
 import com.cosmos.cosmos_backend.notification.domain.NotificationType;
@@ -34,12 +35,15 @@ class NotificationServiceTest {
     @Mock
     private NotificationRepository notificationRepository;
 
+    @Mock
+    private SolutionEvaluationTaskRepository evaluationTaskRepository;
+
     private NotificationService service;
 
     @BeforeEach
     void setUp() {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-10-19T03:30:06Z"), ZoneId.of("Asia/Seoul"));
-        service = new NotificationService(notificationRepository, fixedClock);
+        service = new NotificationService(notificationRepository, evaluationTaskRepository, fixedClock);
     }
 
     private Notification notification(Long id, NotificationType type, LocalDateTime createdAt) {
@@ -113,6 +117,20 @@ class NotificationServiceTest {
         // Then
         assertThat(response.unreadCount()).isZero();
         assertThat(response.notifications()).isEmpty();
+    }
+
+    @Test
+    void getNotifications_reportsPendingEvaluation_whenActiveTaskExists() {
+        // Given
+        when(notificationRepository.findTop10ByUserIdOrderByIdDesc(42L)).thenReturn(List.of());
+        when(notificationRepository.countByUserIdAndReadAtIsNull(42L)).thenReturn(0L);
+        when(evaluationTaskRepository.existsByUserIdAndActiveSlot(42L, 1)).thenReturn(true);
+
+        // When
+        NotificationListResponse response = service.getNotifications(42L);
+
+        // Then
+        assertThat(response.hasPendingEvaluation()).isTrue();
     }
 
     @Test

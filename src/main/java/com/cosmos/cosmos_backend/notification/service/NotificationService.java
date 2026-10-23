@@ -1,5 +1,7 @@
 package com.cosmos.cosmos_backend.notification.service;
 
+import com.cosmos.cosmos_backend.approach.domain.SolutionEvaluationTask;
+import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepository;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.notification.domain.Notification;
 import com.cosmos.cosmos_backend.notification.domain.NotificationType;
@@ -23,6 +25,7 @@ public class NotificationService {
     private static final String FAILED_MESSAGE = "'%s' 평가를 완료하지 못했어요. 다시 제출해 주세요.";
 
     private final NotificationRepository notificationRepository;
+    private final SolutionEvaluationTaskRepository evaluationTaskRepository;
     private final Clock clock;
 
     /** 평가 작업이 최종 상태가 될 때 알림을 생성. 호출한 쪽 트랜잭션에 합류. */
@@ -39,7 +42,7 @@ public class NotificationService {
         notificationRepository.save(new Notification(userId, type, problemId, evaluationTaskId, message, now()));
     }
 
-    /** 내 최근 알림(읽음 포함)과 안 읽은 전체 개수를 조회. */
+    /** 내 최근 알림(읽음 포함), 안 읽은 전체 개수, 진행 중인 평가 여부를 조회. */
     @Transactional(readOnly = true)
     public NotificationListResponse getNotifications(Long userId) {
         // 1. 최근 알림 10개를 조회
@@ -48,8 +51,12 @@ public class NotificationService {
         // 2. 안 읽은 알림 전체 개수를 셈
         long unreadCount = notificationRepository.countByUserIdAndReadAtIsNull(userId);
 
-        // 3. 응답으로 조립
-        return NotificationListResponse.of(unreadCount, recent);
+        // 3. 진행 중인 평가 작업이 있는지 확인
+        boolean hasPendingEvaluation = evaluationTaskRepository.existsByUserIdAndActiveSlot(
+                userId, SolutionEvaluationTask.ACTIVE_SLOT);
+
+        // 4. 응답으로 조립
+        return NotificationListResponse.of(unreadCount, hasPendingEvaluation, recent);
     }
 
     /** 알림을 읽음 처리. 이미 읽었어도 성공. */

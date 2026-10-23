@@ -6,8 +6,9 @@ import com.cosmos.cosmos_backend.notification.domain.NotificationType;
 import java.time.Instant;
 import java.util.List;
 
-/** 알림 목록 응답. 안 읽은 전체 개수와 최근 알림 목록. */
-public record NotificationListResponse(long unreadCount, List<NotificationItem> notifications) {
+/** 알림 목록 응답. 안 읽은 전체 개수, 진행 중인 평가 여부, 최근 알림 목록. */
+public record NotificationListResponse(long unreadCount, boolean hasPendingEvaluation,
+                                       List<NotificationItem> notifications) {
 
     /** 알림 1건. */
     public record NotificationItem(
@@ -33,9 +34,10 @@ public record NotificationListResponse(long unreadCount, List<NotificationItem> 
         }
     }
 
-    /** 안 읽은 개수와 알림 엔티티 목록으로 응답을 조립. */
-    public static NotificationListResponse of(long unreadCount, List<Notification> notifications) {
-        return new NotificationListResponse(unreadCount,
+    /** 안 읽은 개수, 진행 중인 평가 여부, 알림 엔티티 목록으로 응답을 조립. */
+    public static NotificationListResponse of(long unreadCount, boolean hasPendingEvaluation,
+                                              List<Notification> notifications) {
+        return new NotificationListResponse(unreadCount, hasPendingEvaluation,
                 notifications.stream().map(NotificationItem::from).toList());
     }
 }
