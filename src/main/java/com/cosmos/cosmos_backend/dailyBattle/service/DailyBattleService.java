@@ -15,6 +15,7 @@ import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
+import com.cosmos.cosmos_backend.global.config.BattleSchedule;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,8 @@ public class DailyBattleService {
     private final BattleSubmissionRepository battleSubmissionRepository;
 
     private final Clock clock;
+
+    private final BattleSchedule battleSchedule;
 
     @Transactional
     public Long createDailyBattle(AiBattleCreateRequestDto request){
@@ -151,7 +154,7 @@ public class DailyBattleService {
         LocalDateTime now = LocalDateTime.now(clock);
 
         LocalDateTime battleEndTime = battleInfo.getBattleDate()
-                .atTime(13, 00);
+                .atTime(battleSchedule.resultTime());
 
         Long remainedTimeSecond = Math.max(
                 0L,
@@ -243,7 +246,7 @@ public class DailyBattleService {
 
         // 4. 제출 상태로 변경
         Instant deadline = battleInfo.getBattleDate()
-                .atTime(12, 59, 59)
+                .atTime(battleSchedule.submissionDeadline())
                 .atZone(ZoneId.of("Asia/Seoul"))
                 .toInstant();
 
@@ -380,12 +383,9 @@ public class DailyBattleService {
         // 요청 접수 시각을 한국 시간으로 변환
         LocalTime receivedTime = receivedAt.atZone(ZoneId.of("Asia/Seoul")).toLocalTime();
 
-        // 배틀 시작, 마감 시각
-        LocalTime start = LocalTime.of(12, 50);
-        LocalTime end = LocalTime.of(12, 59, 59);
-
-        // 시간 유효한지 검증 (12:50:00.000 이상 ~ 12:59:59.000 미만에 접수된 요청만 유효)
-        if (receivedTime.isBefore(start) || !receivedTime.isBefore(end)) {
+        // 설정된 시작 시각 이상, 제출 마감 시각 미만에 접수된 요청만 유효
+        if (receivedTime.isBefore(battleSchedule.openTime())
+                || !receivedTime.isBefore(battleSchedule.submissionDeadline())) {
             throw new BusinessException(
                     HttpStatus.BAD_REQUEST, "Not_Battle_Time"
             );

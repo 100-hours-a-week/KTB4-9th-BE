@@ -4,6 +4,12 @@ spring:
   jpa:
     open-in-view: true
 
+battle:
+  schedule:
+    open-time: ${BATTLE_OPEN_TIME:12:50:00}
+    submission-deadline: ${BATTLE_SUBMISSION_DEADLINE:12:59:59}
+    result-time: ${BATTLE_RESULT_TIME:13:00:00}
+
 ai:
   server:
     connect-timeout: ${AI_SERVER_CONNECT_TIMEOUT:3s}

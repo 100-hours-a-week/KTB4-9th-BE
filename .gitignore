@@ -15,6 +15,10 @@
 .env
 .env.*
 
+# 부하 테스트용 사용자 인증 정보
+/loadtest/data/*
+!/loadtest/data/battle-users.example.json
+
 # 기타
 *.log
 .DS_Store

@@ -33,6 +33,9 @@ public class SecurityConfig {
                         .requestMatchers("/auth/oauth/**", "/auth/token/refresh",
                                 "/auth/logout"
                         ).permitAll()
+                        // dev 프로필에서만 생성되는 부하 테스트 fixture 엔드포인트
+                        // 컨트롤러에서 별도의 X-Load-Test-Secret을 검증
+                        .requestMatchers(HttpMethod.POST, "/internal/load-test/battle/users").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                         .requestMatchers("/daily-problems").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
