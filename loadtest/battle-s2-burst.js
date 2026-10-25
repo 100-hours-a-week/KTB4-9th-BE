@@ -9,9 +9,7 @@ const KST_OFFSET = '+09:00';
 const BASE_URL = requiredEnv('BASE_URL').replace(/\/+$/, '');
 const TOKEN_FILE = __ENV.TOKEN_FILE || './data/battle-users.json';
 const BATTLE_OPEN_TIME = __ENV.BATTLE_OPEN_TIME || '12:50:00';
-const BATTLE_BURST_SUBMISSION_TIME = __ENV.BATTLE_BURST_SUBMISSION_TIME
-    || __ENV.BATTLE_LAST_SUBMISSION_TIME
-    || '12:59:50';
+const BATTLE_BURST_SUBMISSION_TIME = requiredEnv('BATTLE_BURST_SUBMISSION_TIME');
 const BATTLE_SUBMISSION_DEADLINE = __ENV.BATTLE_SUBMISSION_DEADLINE || '12:59:59';
 const BATTLE_RESULT_TIME = __ENV.BATTLE_RESULT_TIME || '13:00:00';
 const PARTICIPATION_START_GRACE_MS = Number(
@@ -203,18 +201,20 @@ function validateBurstSchedule() {
         throw new Error('participation timing values must be zero or positive numbers');
     }
     if (resultAt - openAt !== 10 * 60 * 1000
-            || burstSubmissionAt - openAt !== 9 * 60 * 1000 + 50 * 1000
             || resultAt - deadlineAt !== 1000) {
         throw new Error(
-            'S2 keeps a 10-minute battle: 100-user burst at +09:50, deadline at +09:59, result at +10:00',
+            'S2 keeps a 10-minute battle: deadline at +09:59 and result at +10:00',
         );
     }
-    if (opensAfterParticipationWindow(openAt, burstSubmissionAt)) {
+    if (participationWindowOverlapsBurst(openAt, burstSubmissionAt)) {
         throw new Error('participation window must finish before the 100-user submission burst');
+    }
+    if (burstSubmissionAt >= deadlineAt) {
+        throw new Error('100-user submission burst must run before the submission deadline');
     }
 }
 
-function opensAfterParticipationWindow(openAt, burstSubmissionAt) {
+function participationWindowOverlapsBurst(openAt, burstSubmissionAt) {
     return openAt + PARTICIPATION_START_GRACE_MS + PARTICIPATION_SPREAD_MS
         >= burstSubmissionAt;
 }
