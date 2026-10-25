@@ -12,6 +12,9 @@ const BATTLE_OPEN_TIME = __ENV.BATTLE_OPEN_TIME || '12:50:00';
 const BATTLE_LAST_SUBMISSION_TIME = __ENV.BATTLE_LAST_SUBMISSION_TIME || '12:59:50';
 const BATTLE_SUBMISSION_DEADLINE = __ENV.BATTLE_SUBMISSION_DEADLINE || '12:59:59';
 const BATTLE_RESULT_TIME = __ENV.BATTLE_RESULT_TIME || '13:00:00';
+const PARTICIPATION_START_GRACE_MS = Number(
+    __ENV.BATTLE_PARTICIPATION_START_GRACE_MS || '500',
+);
 
 validateBaselineSchedule();
 
@@ -106,7 +109,11 @@ export function normalBattle() {
     // 100명의 제출 시각을 설정된 10분 배틀 구간에 균등하게 고정합니다.
     const scheduledSubmissionAt = opensAt
         + ((lastSubmissionAt - opensAt) * userIndex / (USER_COUNT - 1));
-    const scheduledParticipationAt = Math.max(opensAt, scheduledSubmissionAt - 30_000);
+    // 서버와 부하 발생기의 시각 오차로 오픈 직전 요청이 되는 것을 막습니다.
+    const scheduledParticipationAt = Math.max(
+        opensAt + PARTICIPATION_START_GRACE_MS,
+        scheduledSubmissionAt - 30_000,
+    );
 
     sleepUntilServerTime(scheduledParticipationAt, clockOffsetMs);
 
@@ -184,6 +191,10 @@ function validateBaselineSchedule() {
 
     if ([openAt, lastSubmissionAt, deadlineAt, resultAt].some(Number.isNaN)) {
         throw new Error('battle times must use HH:mm:ss format');
+    }
+    if (!Number.isFinite(PARTICIPATION_START_GRACE_MS)
+            || PARTICIPATION_START_GRACE_MS < 0) {
+        throw new Error('BATTLE_PARTICIPATION_START_GRACE_MS must be zero or a positive number');
     }
     if (resultAt - openAt !== 10 * 60 * 1000
             || lastSubmissionAt - openAt !== 9 * 60 * 1000 + 50 * 1000
