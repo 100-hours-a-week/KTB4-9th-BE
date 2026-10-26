@@ -17,4 +17,10 @@ public record Judge0Properties(
         int maxMemoryKb,
         Map<Language, Integer> languageIds
 ) {
+
+    /** 배치 수만큼 채점할 때 걸릴 수 있는 최대 시간 (배치마다 제출 1번 + 대기 + 마지막 조회 1번). */
+    public Duration worstCaseJudgingTime(int batches) {
+        Duration call = connectTimeout.plus(readTimeout);
+        return call.multipliedBy(2).plus(maxWait).multipliedBy(batches);
+    }
 }
