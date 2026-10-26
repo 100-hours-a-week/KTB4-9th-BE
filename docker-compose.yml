@@ -46,6 +46,15 @@ services:
       AWS_S3_BUCKET: ${AWS_S3_BUCKET}
       AWS_S3_PUBLIC_BASE_URL: ${AWS_S3_PUBLIC_BASE_URL}
       CLOUD_AWS_S3_PUBLIC_BASE_URL: ${AWS_S3_PUBLIC_BASE_URL}
+
+      # dev 프로필의 부하 테스트 사용자 준비 엔드포인트. 기본값은 비활성화
+      LOADTEST_FIXTURES_ENABLED: ${LOADTEST_FIXTURES_ENABLED:-false}
+      LOADTEST_FIXTURES_SECRET: ${LOADTEST_FIXTURES_SECRET:-}
+
+      # 기본 배틀 길이는 그대로 두고 시계 시각만 옮겨 개발 서버에서 반복 검증한다.
+      BATTLE_OPEN_TIME: ${BATTLE_OPEN_TIME:-12:50:00}
+      BATTLE_SUBMISSION_DEADLINE: ${BATTLE_SUBMISSION_DEADLINE:-12:59:59}
+      BATTLE_RESULT_TIME: ${BATTLE_RESULT_TIME:-13:00:00}
       # 헬스체크 readiness를 걸어놓으면 계속 서버가 운영 중 일 때도 확인하니까
       # 그냥 ci/cd에서 deploy.sh 같은 걸로 blue/green 배포할 때 새 버전이 준비됐는지 확인하고 nginx를 전환하는 것이 목적이라 compose에서는 헬스체크 제외
     networks:

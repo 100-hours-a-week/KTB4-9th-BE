@@ -4,6 +4,12 @@ spring:
   jpa:
     open-in-view: true
 
+battle:
+  schedule:
+    open-time: ${BATTLE_OPEN_TIME:12:50:00}
+    submission-deadline: ${BATTLE_SUBMISSION_DEADLINE:12:59:59}
+    result-time: ${BATTLE_RESULT_TIME:13:00:00}
+
 ai:
   server:
     connect-timeout: ${AI_SERVER_CONNECT_TIMEOUT:3s}
@@ -88,6 +94,19 @@ judge0:
 server:
   servlet:
     context-path: /api
+  # 부하테스트를 위한 메트릭
+  tomcat:
+    mbeanregistry:
+      enabled: true
+
+# 부하테스트를 위한 메트릭
+management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        hikaricp.connections.acquire: true
+        jvm.gc.pause: true
 
 frontend:
   base-url: ${FRONTEND_BASE_URL}

@@ -2,11 +2,13 @@ package com.cosmos.cosmos_backend.dailyBattle.scheduler;
 
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
+import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import com.cosmos.cosmos_backend.dailyBattle.worker.BattleGradingWorker;
+import com.cosmos.cosmos_backend.global.config.BattleSchedule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.TaskScheduler;
@@ -17,6 +19,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;
@@ -39,13 +42,22 @@ public class BattleWorkerScheduler {
 
     private final BattleGradingWorker battleGradingWorker;
 
+    // 부하테스트를 위한 메트릭
+    private final BattleMetrics battleMetrics;
+
+    // 부하테스트를 위한 메트릭
+    private final BattleSchedule battleSchedule;
+
     private List<ScheduledFuture<?>> workerTasks = new ArrayList<>();
 
     private ScheduledFuture<?> recheckTask;
 
-    // 매일 12:50에 채점 워커 시작
-    @Scheduled(cron = "0 50 12 * * *", zone = "Asia/Seoul")
+    // 설정된 배틀 시작 시각에 채점 워커 시작
+    @Scheduled(cron = "#{@battleSchedule.openCron()}", zone = "Asia/Seoul")
     public void startGradingWorker(){
+
+        // 부하테스트를 위한 메트릭
+        battleMetrics.resetBattleRun();
 
         // worker 작업 2개 등록
         for (int i = 0; i < 2; i++) {
@@ -57,6 +69,9 @@ public class BattleWorkerScheduler {
 
             workerTasks.add(task);
         }
+
+        // 부하테스트를 위한 메트릭
+        battleMetrics.setActiveWorkers(workerTasks.size());
     }
 
     // worker 종료
@@ -67,11 +82,16 @@ public class BattleWorkerScheduler {
         }
 
         workerTasks.clear();
+        // 부하테스트를 위한 메트릭
+        battleMetrics.setActiveWorkers(0);
     }
 
-    // 13:00 결과 공개 시점에 실행할 결과 확정 메소드
-    @Scheduled(cron = "00 00 13 * * *", zone = "Asia/Seoul")
+    // 설정된 결과 공개 시각에 실행할 결과 확정 메소드
+    @Scheduled(cron = "#{@battleSchedule.resultCron()}", zone = "Asia/Seoul")
     public void finalizeBattle() {
+
+        // 부하테스트를 위한 메트릭
+        battleMetrics.recordFinalizeAttempt();
 
         LocalDate today = LocalDate.now(clock);
 
@@ -104,6 +124,13 @@ public class BattleWorkerScheduler {
         LocalDateTime publishedAt = LocalDateTime.now(clock);
 
         battleResultService.battleResultPublished(todayBattleId, publishedAt);
+        // 부하테스트를 위한 메트릭
+        battleMetrics.recordResultPublished(
+                today.atTime(battleSchedule.resultTime())
+                        .atZone(ZoneId.of("Asia/Seoul"))
+                        .toInstant(),
+                publishedAt.atZone(ZoneId.of("Asia/Seoul")).toInstant()
+        );
 
         // 4. 남은 채점 없으면 worker들 종료
         stopGradingWorker();
@@ -115,8 +142,8 @@ public class BattleWorkerScheduler {
     }
 
 
-    // 매일 12:59:59에 미제출 참여자 타임아웃 처리
-    @Scheduled(cron = "59 59 12 * * *", zone = "Asia/Seoul")
+    // 설정된 제출 마감 시각에 미제출 참여자 타임아웃 처리
+    @Scheduled(cron = "#{@battleSchedule.submissionDeadlineCron()}", zone = "Asia/Seoul")
     public void timeoutBattle() {
 
         LocalDate today = LocalDate.now(clock);
