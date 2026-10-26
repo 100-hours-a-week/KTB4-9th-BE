@@ -10,6 +10,8 @@ import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.domain.entity.TestCase;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -36,12 +38,14 @@ class Judge0ClientTest {
     );
 
     private FakeJudge0 fake;
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @AfterEach
     void tearDown() {
         if (fake != null) {
             fake.stop();
         }
+        meterRegistry.clear();
     }
 
     private Judge0Client clientFor(String baseUrl, Duration maxWait, Map<Language, Integer> languageIds) {
@@ -49,7 +53,7 @@ class Judge0ClientTest {
                 baseUrl, Duration.ofMillis(500), Duration.ofSeconds(2),
                 Duration.ofMillis(10), maxWait, 20, 512000, languageIds
         );
-        return new Judge0Client(new Judge0Config().judge0RestClient(properties), properties);
+        return new Judge0Client(new Judge0Config().judge0RestClient(properties), properties, meterRegistry);
     }
 
     private Judge0Client client() {
@@ -142,6 +146,18 @@ class Judge0ClientTest {
         // Then
         assertThat(verdicts).containsExactly(JudgingResult.CORRECT, JudgingResult.CORRECT);
         assertThat(fake.getCount.get()).isEqualTo(3);
+    }
+
+    @Test
+    void judge_recordsTotalWaitingDuration() throws IOException {
+        fake = new FakeJudge0(index -> 3);
+        fake.processingPolls = 1;
+
+        client().judge(Language.PYTHON, "code", testCases(1), null);
+
+        Timer timer = meterRegistry.get("judge0.judging.duration").timer();
+        assertThat(timer.count()).isEqualTo(1);
+        assertThat(timer.totalTime(java.util.concurrent.TimeUnit.MILLISECONDS)).isPositive();
     }
 
     @Test

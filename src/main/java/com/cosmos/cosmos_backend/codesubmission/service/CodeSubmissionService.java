@@ -18,6 +18,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -86,25 +87,47 @@ public class CodeSubmissionService {
                 .findFirst()
                 .orElse(JudgingResult.CORRECT);
 
-        // 9. 성공했을 때만 이 트랜잭션 안에서 잠근 채로 기존 제출을 갱신하거나 새로 저장
-        CodeSubmission submission = transactionTemplate.execute(status ->
-                codeSubmissionRepository.findForUpdateByUserIdAndProblemId(userId, problemId)
-                        .map(existing -> {
-                            // 1. 잠근 뒤 다시 확인 (앞의 빠른 확인 이후 다른 요청이 올렸을 수 있음)
-                            if (existing.getSubmittedCount() >= CodeSubmission.MAX_SUBMISSION_COUNT) {
-                                throw limitExceeded(existing.getSubmittedCount());
-                            }
-                            // 2. 재제출 처리 (커밋 때 UPDATE가 나감)
-                            existing.resubmit(lang, sourceCode, receivedAt, result, passed, verdicts.size());
-                            return existing;
-                        })
-                        .orElseGet(() -> codeSubmissionRepository.save(
-                                new CodeSubmission(userId, problemId, lang, sourceCode, receivedAt, result, passed, verdicts.size())
-                        ))
-        );
+        // 9. 성공했을 때만 저장 (같은 사용자의 동시 최초 제출과 부딪히면 한 번 다시 시도)
+        CodeSubmission submission = saveWithRetry(userId, problemId, lang, sourceCode, receivedAt, result, passed, verdicts.size());
 
         // 10. 테스트케이스별 판정도 같이 반환 (화면에서 테스트별 통과/실패 표시에 사용)
         return new CodeSubmissionResult(submission, verdicts);
+    }
+
+    // 저장을 시도하고, 동시 최초 제출과 유니크 제약이 충돌하면 한 번만 다시 시도
+    private CodeSubmission saveWithRetry(Long userId, Long problemId, Language lang, String sourceCode,
+                                         LocalDateTime receivedAt, JudgingResult result, int passed, int total) {
+        try {
+            // 1. 처음 시도
+            return transactionTemplate.execute(status ->
+                    saveSubmission(userId, problemId, lang, sourceCode, receivedAt, result, passed, total));
+        } catch (DataIntegrityViolationException e) {
+            // 2. 먼저 들어온 요청이 행을 만든 경우: 롤백됐으므로 새 트랜잭션에서 기존 행을 갱신
+            log.warn("동시 최초 제출 충돌, 기존 행으로 다시 시도: userId={}, problemId={}", userId, problemId);
+            return transactionTemplate.execute(status ->
+                    saveSubmission(userId, problemId, lang, sourceCode, receivedAt, result, passed, total));
+        }
+    }
+
+    // 신규 행은 잠금 없이 INSERT하고, 기존 행에만 비관적 락을 적용
+    private CodeSubmission saveSubmission(Long userId, Long problemId, Language lang, String sourceCode,
+                                          LocalDateTime receivedAt, JudgingResult result, int passed, int total) {
+        // 없는 행을 FOR UPDATE로 조회하면 인덱스 gap lock이 생길 수 있으므로 먼저 일반 조회로 분기
+        if (codeSubmissionRepository.findByUserIdAndProblemId(userId, problemId).isEmpty()) {
+            return codeSubmissionRepository.save(
+                    new CodeSubmission(userId, problemId, lang, sourceCode, receivedAt, result, passed, total)
+            );
+        }
+
+        // 기존 행일 때만 잠근 뒤 제출 한도를 다시 확인하고 UPDATE
+        CodeSubmission existing = codeSubmissionRepository
+                .findForUpdateByUserIdAndProblemId(userId, problemId)
+                .orElseThrow();
+        if (existing.getSubmittedCount() >= CodeSubmission.MAX_SUBMISSION_COUNT) {
+            throw limitExceeded(existing.getSubmittedCount());
+        }
+        existing.resubmit(lang, sourceCode, receivedAt, result, passed, total);
+        return existing;
     }
 
     // language 문자열을 Language enum으로 변환
