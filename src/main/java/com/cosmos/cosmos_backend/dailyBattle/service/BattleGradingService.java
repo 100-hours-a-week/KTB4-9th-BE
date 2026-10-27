@@ -5,6 +5,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
+import com.cosmos.cosmos_backend.dailyBattle.domain.entity.GradingPreempt;
 import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
@@ -38,24 +40,35 @@ public class BattleGradingService {
 
     // 작업 선점 트랜잭션
     @Transactional
-    public Optional<Long> preemptSubmission(){
+    public Optional<GradingPreempt> preemptSubmission(){
 
         // 1. 작업 조회 + 락 획득
-        Optional<BattleParticipation> optional = battleParticipationRepository.findSubmittedForUpdate();
+        Optional<BattleParticipation> submissionTask = battleParticipationRepository.findSubmittedForUpdate();
 
         // 2. 작업이 없으면 종료
-        if (optional.isEmpty()) {
+        if (submissionTask.isEmpty()) {
             return Optional.empty();
         }
 
         // 3. 채점 중으로 상태 변경
-        BattleParticipation preemptedParticipation = optional.get();
-        preemptedParticipation.markGrading();
+        LocalDateTime leaseTime = LocalDateTime.now(clock).plusSeconds(2);
+
+        UUID leaseToken = UUID.randomUUID();
+
+        BattleParticipation preemptedParticipation = submissionTask.get();
+
+        preemptedParticipation.markGrading(leaseTime, leaseToken);
+
         // 부하테스트를 위한 메트릭
         battleMetrics.recordClaim(preemptedParticipation.getSubmittedAt(), clock.instant());
 
-        // 4. 참여 id 반환
-        return Optional.of(preemptedParticipation.getParticipationId());
+        // 4. 참여 작업 정보 반환
+        GradingPreempt preemptTask = new GradingPreempt(
+                submissionTask.get().getParticipationId(),
+                leaseToken
+        );
+
+        return Optional.of(preemptTask);
 
     }
 
@@ -63,6 +76,7 @@ public class BattleGradingService {
     @Transactional
     public void battleGrade(
             Long participationId,
+            UUID leaseToken,
             // 부하테스트를 위한 메트릭
             Instant processingStartedAt
     ) {

@@ -1,5 +1,6 @@
 package com.cosmos.cosmos_backend.dailyBattle.worker;
 
+import com.cosmos.cosmos_backend.dailyBattle.domain.entity.GradingPreempt;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleGradingService;
 import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -25,20 +27,24 @@ public class BattleGradingWorker {
     public void gradingBattleSubmissions() {
 
         // 선점 작업 확인 (트랜잭션 1)
-        Optional<Long> preemptParticipationId = battleGradingService.preemptSubmission();
+        Optional<GradingPreempt> preemptGrading = battleGradingService.preemptSubmission();
 
         // 선점 작업 없으면 종료
-        if(preemptParticipationId.isEmpty()){
+        if(preemptGrading.isEmpty()){
             return;
         }
 
-        // 선점 작업 있으면 채점으로 (트랜잭션 2)
-        Long participationId = preemptParticipationId.get();
+        // 선점 작업 정보 (참여 id, 임대 토큰) 가져오기
+        GradingPreempt preemptParticipation = preemptGrading.get();
+
+        Long participationId = preemptParticipation.participationId();
+        UUID leaseToken = preemptParticipation.leaseToken();
+
         // 부하테스트를 위한 메트릭
         Instant processingStartedAt = clock.instant();
 
         try {
-            battleGradingService.battleGrade(participationId, processingStartedAt);
+            battleGradingService.battleGrade(participationId, leaseToken, processingStartedAt);
 
         } catch (Exception e) {
 

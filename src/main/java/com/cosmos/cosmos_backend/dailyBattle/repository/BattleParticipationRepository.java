@@ -61,6 +61,10 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
     SELECT *
     FROM battle_participations
     WHERE participation_status = 'SUBMITTED'
+        OR (
+            participation_status = 'GRADING'
+            AND lease_time <= NOW(3)
+        )
     ORDER BY submitted_at ASC
     LIMIT 1
     FOR UPDATE SKIP LOCKED

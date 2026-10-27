@@ -15,6 +15,7 @@ import org.springframework.security.core.parameters.P;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @EntityListeners(AuditingEntityListener.class)
@@ -59,6 +60,16 @@ public class BattleParticipation {
     @Column(name = "retry_count", nullable = false)
     private Integer retryCount = 0;
 
+    // 임대시간
+    @Column(name = "lease_time", columnDefinition = "DATETIME(3)")
+    private LocalDateTime leaseTime;
+
+    // 작업 선점 토큰
+    @JdbcTypeCode(SqlTypes.BINARY)
+    @Column(name = "lease_token", columnDefinition = "BINARY(16)")
+    private UUID leaseToken;
+
+
 
     public BattleParticipation(Long dailyBattleId, User user) {
         this.dailyBattleId = dailyBattleId;
@@ -73,9 +84,11 @@ public class BattleParticipation {
         this.participationStatus = ParticipationStatus.SUBMITTED;
     }
 
-    // 채점 중으로 처리
-    public void markGrading(){
+    // 채점 중으로 처리 + 임대 시간 등록
+    public void markGrading(LocalDateTime leaseTime, UUID leaseToken) {
         this.participationStatus = ParticipationStatus.GRADING;
+        this.leaseTime = leaseTime;
+        this.leaseToken = leaseToken;
     }
 
     // 채점 완료 처리
