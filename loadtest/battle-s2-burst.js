@@ -2,7 +2,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import exec from 'k6/execution';
 import { SharedArray } from 'k6/data';
-import { Rate, Trend } from 'k6/metrics';
+import { Counter, Rate, Trend } from 'k6/metrics';
 
 const USER_COUNT = 100;
 const KST_OFFSET = '+09:00';
@@ -25,6 +25,8 @@ const firstPollReady = new Rate('battle_first_poll_ready');
 const firstPollCompleted = new Rate('battle_first_poll_grading_completed');
 const submissionScheduleMissed = new Rate('battle_submission_schedule_missed');
 const submissionLateness = new Trend('battle_submission_lateness_ms', true);
+const submissionAttempts = new Counter('battle_submission_attempts');
+const submissionAccepted = new Counter('battle_submission_accepted');
 
 const users = new SharedArray('battle S2 burst users', function () {
     const parsed = JSON.parse(open(TOKEN_FILE));
@@ -141,6 +143,7 @@ export function burstSubmission() {
         return;
     }
 
+    submissionAttempts.add(1);
     const submissionResponse = http.post(
         `${BASE_URL}/daily-battles/${currentBattleId}/submissions`,
         JSON.stringify({
@@ -153,9 +156,12 @@ export function burstSubmission() {
         }),
         tagged(requestParams, 'submit'),
     );
-    check(submissionResponse, {
+    const submissionOk = check(submissionResponse, {
         'submission is accepted': (response) => response.status === 202,
     }, { operation: 'submit' });
+    if (submissionOk) {
+        submissionAccepted.add(1);
+    }
 
     sleepUntilServerTime(resultAt, clockOffsetMs);
     const resultResponse = http.get(
