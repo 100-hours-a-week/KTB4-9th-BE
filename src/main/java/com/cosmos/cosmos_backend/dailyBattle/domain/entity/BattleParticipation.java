@@ -58,16 +58,21 @@ public class BattleParticipation {
 
     @Max(3)
     @Column(name = "retry_count", nullable = false)
-    private Integer retryCount = 0;
+    private Integer retryCount;
 
     // 임대시간
-    @Column(name = "lease_time", columnDefinition = "DATETIME(3)")
-    private LocalDateTime leaseTime;
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "lease_expires_at", columnDefinition = "TIMESTAMP(3)")
+    private Instant leaseExpiresAt;
 
     // 작업 선점 토큰
     @JdbcTypeCode(SqlTypes.BINARY)
     @Column(name = "lease_token", columnDefinition = "BINARY(16)")
     private UUID leaseToken;
+
+    // 작업 재선점 횟수
+    @Column(name = "lease_retry_count", nullable = false)
+    private Integer leaseRetryCount;
 
 
 
@@ -75,7 +80,8 @@ public class BattleParticipation {
         this.dailyBattleId = dailyBattleId;
         this.user = user;
         this.participationStatus = ParticipationStatus.IN_PROGRESS;
-
+        this.retryCount = 0;
+        this.leaseRetryCount = 0;
     }
 
     //제출 처리
@@ -85,9 +91,9 @@ public class BattleParticipation {
     }
 
     // 채점 중으로 처리 + 임대 시간 등록
-    public void markGrading(LocalDateTime leaseTime, UUID leaseToken) {
+    public void markGrading(Instant leaseExpiresAt, UUID leaseToken) {
         this.participationStatus = ParticipationStatus.GRADING;
-        this.leaseTime = leaseTime;
+        this.leaseExpiresAt = leaseExpiresAt;
         this.leaseToken = leaseToken;
     }
 
@@ -126,6 +132,11 @@ public class BattleParticipation {
     // 재시도 횟수 증가 처리
     public void increaseRetryCount(){
         this.retryCount++;
+    }
+
+    // 재선점 횟수 증가 처리
+    public void increaseLeaseRetryCount(){
+        this.leaseRetryCount++;
     }
 
     // 다시 제출 처리로 되돌리기

@@ -2,10 +2,8 @@ package com.cosmos.cosmos_backend.dailyBattle.service;
 
 
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.GradingPreempt;
+import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
+import com.cosmos.cosmos_backend.dailyBattle.domain.entity.*;
 import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
@@ -31,6 +29,8 @@ public class BattleGradingService {
 
     private final BattleCaseRepository battleCaseRepository;
 
+    private final BattleResultSaveService battleResultSaveService;
+
     // 부하테스트를 위한 메트릭
     private final BattleMetrics battleMetrics;
 
@@ -50,19 +50,33 @@ public class BattleGradingService {
             return Optional.empty();
         }
 
-        // 3. 채점 중으로 상태 변경
-        LocalDateTime leaseTime = LocalDateTime.now(clock).plusSeconds(2);
+        BattleParticipation preemptedParticipation = submissionTask.get();
+
+        // 2. 재선점 대상일 때만 횟수 검사
+        if (preemptedParticipation.getParticipationStatus() == ParticipationStatus.GRADING) {
+
+            // 3. 재선점 한도에 도달했다면 최종 실패 처리
+            if (preemptedParticipation.getLeaseRetryCount() >= 3) {
+                preemptedParticipation.markGradingFailed();
+                battleMetrics.recordFailure();
+                return Optional.empty();
+            }
+
+            // 4. 실제 재선점 횟수 증가
+            preemptedParticipation.increaseLeaseRetryCount();
+        }
+
+        // 5. 채점 중으로 상태 변경
+        Instant leaseExpiresAt = clock.instant().plusSeconds(2);
 
         UUID leaseToken = UUID.randomUUID();
 
-        BattleParticipation preemptedParticipation = submissionTask.get();
-
-        preemptedParticipation.markGrading(leaseTime, leaseToken);
+        preemptedParticipation.markGrading(leaseExpiresAt, leaseToken);
 
         // 부하테스트를 위한 메트릭
         battleMetrics.recordClaim(preemptedParticipation.getSubmittedAt(), clock.instant());
 
-        // 4. 참여 작업 정보 반환
+        // 6. 참여 작업 정보 반환
         GradingPreempt preemptTask = new GradingPreempt(
                 submissionTask.get().getParticipationId(),
                 leaseToken
@@ -73,7 +87,6 @@ public class BattleGradingService {
     }
 
     // 채점 메소드
-    @Transactional
     public void battleGrade(
             Long participationId,
             UUID leaseToken,
@@ -84,6 +97,7 @@ public class BattleGradingService {
         // 유저 제출 정보 가져오기
         List<BattleSubmission> userSubmissions = battleSubmissionRepository.findByParticipation_participationId(participationId);
 
+        // TODO : 이부분 캐시로 빼도 괜찮을듯
         // 제출 정보에서 BattleCase id 리스트 추출
         List<Long> caseIds = new ArrayList<>();
 
@@ -101,8 +115,8 @@ public class BattleGradingService {
             answerMap.put(battleCase.getCaseId(), battleCase);
         }
 
-        // 정답 확인
-        Boolean allAnswersCorrect = true;
+        // 정답 확인 후 결과 담기
+        List<GradingResult> gradingResults = new ArrayList<>();
 
         for(BattleSubmission battleSubmission : userSubmissions){
             BattleCase battleCase = answerMap.get(battleSubmission.getBattleCase().getCaseId());
@@ -112,31 +126,37 @@ public class BattleGradingService {
                 throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "Battle_Case_not_found");
             }
 
-            if(Objects.equals(battleCase.getExpectedOutput(), battleSubmission.getSubmittedOutput())){
-                battleSubmission.answerCorrect();
-            } else {
-                battleSubmission.answerIncorrect();
-                // 1개라도 오답이면 전체 정답 오답처리
-                allAnswersCorrect = false;
+            GradingResult gradingResult;
 
+            if(Objects.equals(battleCase.getExpectedOutput(), battleSubmission.getSubmittedOutput())){
+                gradingResult = new GradingResult(battleSubmission.getBattleSubmissionId(), true);
+                gradingResults.add(gradingResult);
+            } else {
+                gradingResult = new GradingResult(battleSubmission.getBattleSubmissionId(), false);
+                gradingResults.add(gradingResult);
             }
         }
 
-        // 참여 상태 변경, 전체 정답/오답처리
+        // 채점 결과 저장
         BattleParticipation battleParticipation = battleParticipationRepository.findById(participationId).orElseThrow(() -> new BusinessException(
                 HttpStatus.NOT_FOUND, "Battle_Participation_not_found"
         ));
 
-        if(allAnswersCorrect){
-            battleParticipation.isCorrect();
-        } else {
-            battleParticipation.isWrong();
-        }
+        boolean resultSaveSuccess = battleResultSaveService.saveGradedResult(battleParticipation.getParticipationId(), leaseToken, gradingResults);
 
-        battleParticipation.markEvaluatingComplete();
 
         // 부하테스트를 위한 메트릭
         Instant completedAt = clock.instant();
+        if (!resultSaveSuccess) {
+            // 재선점 등으로 토큰이 변경되어 결과 저장이 거부된 경우
+            battleMetrics.recordProcessing(
+                    Duration.between(processingStartedAt, completedAt),
+                    "stale"
+            );
+            return;
+        }
+
+        // 결과 저장 성공 매트릭
         battleMetrics.recordProcessing(
                 Duration.between(processingStartedAt, completedAt),
                 "success"
@@ -146,21 +166,25 @@ public class BattleGradingService {
 
     // 채점 재시도 횟수 증가
     @Transactional
-    public void checkGradingFailed(Long participationId) {
+    public void checkGradingFailed(Long participationId, UUID leaseToken) {
 
-        BattleParticipation battleParticipation = battleParticipationRepository.findById(participationId).orElseThrow(
+        BattleParticipation battleParticipation = battleParticipationRepository.findByIdForUpdate(participationId).orElseThrow(
                 () -> new BusinessException(HttpStatus.NOT_FOUND, "Battle_Participation_not_found")
         );
+
+        //현재 선점자와 처리 상태 검증
+        if (!Objects.equals(battleParticipation.getLeaseToken(), leaseToken)
+                || battleParticipation.getParticipationStatus() != ParticipationStatus.GRADING) {
+            return;
+        }
 
         // 재시도 횟수 증가
         battleParticipation.increaseRetryCount();
         // 부하테스트를 위한 메트릭
         battleMetrics.recordRetry();
 
-        Integer retryCount = battleParticipation.getRetryCount();
-
         // 재시도 가능 여부 확인
-        if (retryCount < 3) {
+        if (battleParticipation.getRetryCount() < 3) {
             // 제출 처리로 되돌리기 (다시 worker가 선점하도록)
             battleParticipation.markReSubmit();
         } else {

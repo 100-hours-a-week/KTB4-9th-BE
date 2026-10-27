@@ -43,6 +43,7 @@ public class BattleGradingWorker {
         // 부하테스트를 위한 메트릭
         Instant processingStartedAt = clock.instant();
 
+        // 선점한 작업으로 채점 진행
         try {
             battleGradingService.battleGrade(participationId, leaseToken, processingStartedAt);
 
@@ -55,7 +56,7 @@ public class BattleGradingWorker {
             );
 
             // 3. 채점 실패 상태 저장 (트랜잭션 3)
-            battleGradingService.checkGradingFailed(participationId);
+            battleGradingService.checkGradingFailed(participationId, leaseToken);
         }
     }
 }

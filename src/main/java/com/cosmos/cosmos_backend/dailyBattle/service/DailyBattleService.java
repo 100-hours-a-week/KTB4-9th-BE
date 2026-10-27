@@ -108,6 +108,7 @@ public class DailyBattleService {
         return currentDailyBattleResponse;
     }
 
+    // 배틀 참여 메소드
     @Transactional
     public BattleParticipationResponseDto battleParticipation(Long battleId, Long userId){
 

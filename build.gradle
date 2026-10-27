@@ -53,6 +53,9 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+	testImplementation 'org.testcontainers:testcontainers-mysql'
 
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'com.h2database:h2'
@@ -74,6 +77,22 @@ tasks.register('dailyBattleConcurrencyTest', Test) {
 	useJUnitPlatform()
 	filter {
 		includeTestsMatching 'com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleSubmissionTimeoutConcurrencyIntegrationTest'
+	}
+	testLogging {
+		events 'passed', 'skipped', 'failed'
+		showStandardStreams = true
+	}
+}
+
+tasks.register('battleGradingIntegrationTest', Test) {
+	group = 'verification'
+	description = 'Runs the MySQL grading lease and stale-worker integration tests.'
+	dependsOn tasks.named('testClasses')
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform()
+	filter {
+		includeTestsMatching 'com.cosmos.cosmos_backend.dailyBattle.service.BattleGradingIntegrationTest'
 	}
 	testLogging {
 		events 'passed', 'skipped', 'failed'

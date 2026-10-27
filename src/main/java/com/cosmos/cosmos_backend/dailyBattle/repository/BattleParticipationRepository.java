@@ -6,8 +6,10 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
 import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleStatusCountProjection;
 import com.cosmos.cosmos_backend.dailyBattle.projection.MyBattleRankingProjection;
 import com.cosmos.cosmos_backend.dailyBattle.projection.TopRankingProjection;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -61,10 +63,10 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
     SELECT *
     FROM battle_participations
     WHERE participation_status = 'SUBMITTED'
-        OR (
-            participation_status = 'GRADING'
-            AND lease_time <= NOW(3)
-        )
+       OR (
+           participation_status = 'GRADING'
+           AND lease_expires_at <= UTC_TIMESTAMP(3)
+       )
     ORDER BY submitted_at ASC
     LIMIT 1
     FOR UPDATE SKIP LOCKED
@@ -79,6 +81,17 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
          GROUP BY bp.participationStatus
         """)
     List<BattleStatusCountProjection> countTasksByStatus(@Param("battleId") Long battleId);
+
+    // 채점 저장을 위한 락
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+    SELECT bp
+    FROM BattleParticipation bp
+    WHERE bp.participationId = :participationId
+    """)
+    Optional<BattleParticipation> findByIdForUpdate(
+            @Param("participationId") Long participationId
+    );
 
     // 채점 미완료된 제출있는지 확인
     Boolean existsByDailyBattleIdAndParticipationStatusIn(Long battleId, Collection<ParticipationStatus> statuses);
