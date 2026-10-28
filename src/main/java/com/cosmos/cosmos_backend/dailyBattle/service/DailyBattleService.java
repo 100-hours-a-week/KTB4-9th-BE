@@ -15,7 +15,7 @@ import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
-import com.cosmos.cosmos_backend.global.config.BattleSchedule;
+import com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleSchedule;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -108,6 +108,7 @@ public class DailyBattleService {
         return currentDailyBattleResponse;
     }
 
+    // 배틀 참여 메소드
     @Transactional
     public BattleParticipationResponseDto battleParticipation(Long battleId, Long userId){
 

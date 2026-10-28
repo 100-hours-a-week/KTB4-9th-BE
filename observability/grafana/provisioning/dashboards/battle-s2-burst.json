@@ -47,15 +47,24 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "전체 RPS (1분 평균)" }, "properties": [{ "id": "unit", "value": "reqps" }] },
+          { "matcher": { "id": "byName", "options": "제출 RPS (1분 평균)" }, "properties": [{ "id": "unit", "value": "reqps" }] }
+        ]
+      },
       "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
       "id": 3,
+      "description": "실행 전체 누적 요청 수와 1분 평균 RPS를 함께 봅니다. 짧은 단발성 요청에서 rate가 계산되지 않아도 누적 요청 수는 남으므로 No data를 실제 요청 0건으로 오해하지 않게 합니다.",
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "sum(rate(k6_http_reqs_total{testid=~\"$testid\"}[10s]))", "legendFormat": "전체 RPS", "refId": "A" },
-        { "expr": "sum(rate(k6_http_reqs_total{testid=~\"$testid\",operation=\"submit\"}[10s]))", "legendFormat": "제출 RPS", "refId": "B" }
+        { "expr": "sum(k6_http_reqs_total{testid=~\"$testid\"})", "legendFormat": "누적 전체 요청", "refId": "A" },
+        { "expr": "sum(k6_http_reqs_total{testid=~\"$testid\",operation=\"submit\"})", "legendFormat": "누적 제출 요청", "refId": "B" },
+        { "expr": "sum(rate(k6_http_reqs_total{testid=~\"$testid\"}[1m]))", "legendFormat": "전체 RPS (1분 평균)", "refId": "C" },
+        { "expr": "sum(rate(k6_http_reqs_total{testid=~\"$testid\",operation=\"submit\"}[1m]))", "legendFormat": "제출 RPS (1분 평균)", "refId": "D" }
       ],
-      "title": "k6 요청 처리량",
+      "title": "k6 요청 수·처리량",
       "type": "timeseries"
     },
     {
@@ -139,11 +148,12 @@
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
       "gridPos": { "h": 7, "w": 4, "x": 16, "y": 12 },
       "id": 10,
+      "description": "배틀 시작 시 스케줄러에 등록된 채점 작업 수입니다. 실제로 같은 순간 CPU에서 실행 중인 작업 수나 스레드 수를 뜻하지 않습니다.",
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
-        { "expr": "battle_worker_active{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}", "legendFormat": "워커", "refId": "A" }
+        { "expr": "battle_worker_active{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}", "legendFormat": "등록 작업", "refId": "A" }
       ],
-      "title": "활성 채점 워커",
+      "title": "등록된 채점 워커 작업",
       "type": "stat"
     },
     {
@@ -161,7 +171,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "max": 100, "min": 0, "unit": "percent" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 19 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 19 },
       "id": 12,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -174,7 +184,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 6, "x": 6, "y": 19 },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 19 },
       "id": 13,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -188,7 +198,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 6, "x": 12, "y": 19 },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 19 },
       "id": 14,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -201,7 +211,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 19 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 26 },
       "id": 15,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -215,8 +225,21 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "max": 200, "min": 0, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 26 },
+      "id": 31,
+      "description": "cAdvisor가 수집한 cosmos-mysql 컨테이너 CPU 사용률입니다. 100%는 vCPU 1개를 완전히 사용하는 상태이고, 개발 서버가 2 vCPU라면 이론상 최대는 200%입니다.",
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\".*cosmos-mysql.*\"}[$__rate_interval]) or rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service=\"mysql\"}[$__rate_interval])) * 100", "legendFormat": "MySQL CPU (1 vCPU = 100%)", "refId": "A" }
+      ],
+      "title": "MySQL 컨테이너 CPU",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 26 },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 26 },
       "id": 16,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -229,7 +252,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 26 },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 33 },
       "id": 17,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -242,7 +265,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 26 },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 33 },
       "id": 18,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -255,7 +278,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "dateTimeAsIso" }, "overrides": [] },
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 33 },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 40 },
       "id": 19,
       "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
@@ -266,12 +289,20 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
-      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 33 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 200 }, { "color": "red", "value": 500 }] },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 40 },
       "id": 20,
+      "description": "결과 공개 예정 시각부터 실제 DB 반영까지의 지연 중 현재 대시보드 시간 범위의 최대값입니다. Timer의 순간 max가 만료돼 나중에 0ms로 보이던 문제를 방지합니다.",
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
-        { "expr": "battle_result_publish_delay_seconds_max{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"} * 1000", "legendFormat": "공개 지연", "refId": "A" }
+        { "expr": "max_over_time(battle_result_publish_delay_seconds_max{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__range]) * 1000", "legendFormat": "실행 중 최대 공개 지연", "refId": "A" }
       ],
       "title": "결과 공개 지연",
       "type": "stat"
@@ -279,7 +310,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 33 },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 40 },
       "id": 21,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
@@ -291,7 +322,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "max": 100, "min": 0, "unit": "percent" }, "overrides": [] },
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 33 },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 40 },
       "id": 22,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -304,7 +335,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "max": 100, "min": 0, "unit": "percent" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 39 },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 46 },
       "id": 23,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -326,7 +357,7 @@
           { "matcher": { "id": "byName", "options": "2초 초과 비율(%)" }, "properties": [{ "id": "unit", "value": "percent" }] }
         ]
       },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 39 },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 46 },
       "id": 24,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -339,13 +370,20 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 46 },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "수락 RPS (1분 평균)" }, "properties": [{ "id": "unit", "value": "reqps" }] }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 53 },
       "id": 25,
+      "description": "S2 전용 k6 카운터로 제출 시도 수와 HTTP 202 수락 수를 직접 셉니다. operation 라벨 보존 여부와 무관하므로 다음 실행부터 100명 burst가 비지 않고 표시됩니다.",
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "sum(increase(k6_http_reqs_total{testid=~\"$testid\",operation=\"submit\"}[10s]))", "legendFormat": "10초 구간 제출 수", "refId": "A" },
-        { "expr": "sum(rate(k6_http_reqs_total{testid=~\"$testid\",operation=\"submit\"}[10s]))", "legendFormat": "제출 RPS", "refId": "B" }
+        { "expr": "sum(k6_battle_submission_attempts_total{testid=~\"$testid\"})", "legendFormat": "누적 제출 시도", "refId": "A" },
+        { "expr": "sum(k6_battle_submission_accepted_total{testid=~\"$testid\"})", "legendFormat": "누적 202 수락", "refId": "B" },
+        { "expr": "sum(rate(k6_battle_submission_accepted_total{testid=~\"$testid\"}[1m]))", "legendFormat": "수락 RPS (1분 평균)", "refId": "C" }
       ],
       "title": "100명 동시 제출 Burst",
       "type": "timeseries"
@@ -353,12 +391,13 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 46 },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 53 },
       "id": 26,
+      "description": "서버가 작업을 선점하고 완료한 속도의 1분 평균입니다. 서버 scrape 간격보다 짧았던 10초 rate 때문에 No data가 발생하던 문제를 방지합니다.",
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "sum(rate(battle_grading_tasks_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"claimed\"}[10s]))", "legendFormat": "선점/초", "refId": "A" },
-        { "expr": "sum(rate(battle_grading_tasks_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"completed\"}[10s]))", "legendFormat": "완료/초", "refId": "B" }
+        { "expr": "sum(rate(battle_grading_tasks_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"claimed\"}[1m]))", "legendFormat": "선점/초 (1분 평균)", "refId": "A" },
+        { "expr": "sum(rate(battle_grading_tasks_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"completed\"}[1m]))", "legendFormat": "완료/초 (1분 평균)", "refId": "B" }
       ],
       "title": "채점 선점·완료 처리량",
       "type": "timeseries"
@@ -366,22 +405,31 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 46 },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 53 },
       "id": 27,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "description": "선택한 시간 범위 안에서 실제로 관측된 최대값입니다. P95/P99 히스토그램 추정치가 아니라 임대 시간 후보를 잡을 때 사용할 실행별 최대값입니다.",
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
-        { "expr": "battle_grading_queue_wait_seconds_max{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"} * 1000", "legendFormat": "최대 큐 대기", "refId": "A" },
-        { "expr": "battle_grading_processing_seconds_max{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"success\"} * 1000", "legendFormat": "최대 채점 처리", "refId": "B" },
-        { "expr": "battle_grading_end_to_end_seconds_max{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"} * 1000", "legendFormat": "최대 제출→완료(큐 소진)", "refId": "C" }
+        { "expr": "max_over_time(battle_grading_queue_wait_seconds_max{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__range]) * 1000", "legendFormat": "최대 큐 대기", "refId": "A" },
+        { "expr": "max_over_time(battle_grading_processing_seconds_max{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"success\"}[$__range]) * 1000", "legendFormat": "최대 실제 채점 처리", "refId": "B" },
+        { "expr": "max_over_time(battle_grading_end_to_end_seconds_max{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__range]) * 1000", "legendFormat": "최대 제출→완료", "refId": "C" }
       ],
-      "title": "최대 정상 처리시간·큐 소진",
-      "type": "timeseries"
+      "title": "실행 중 실제 최대 처리시간",
+      "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 53 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 100 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 60 },
       "id": 28,
+      "description": "테스트 종료 시 GRADING_COMPLETED 상태 작업 수입니다. S2의 기대값 100 이상이면 초록색으로 표시합니다.",
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
         { "expr": "battle_queue_depth{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",status=\"GRADING_COMPLETED\"}", "legendFormat": "완료", "refId": "A" }
@@ -391,9 +439,17 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 53 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 60 },
       "id": 29,
+      "description": "테스트 종료 시 SUBMITTED, GRADING, GRADING_FAILED의 합입니다. 0은 정상, 1건 이상은 빨간색입니다.",
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
         { "expr": "sum(battle_queue_depth{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",status=~\"SUBMITTED|GRADING|GRADING_FAILED\"})", "legendFormat": "잔존·실패", "refId": "A" }
@@ -404,7 +460,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "$datasource" },
       "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 53 },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 60 },
       "id": 30,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -448,8 +504,8 @@
   "time": { "from": "now-30m", "to": "now" },
   "timepicker": {},
   "timezone": "Asia/Seoul",
-  "title": "COSMOS 데일리 배틀 S2 100명 동시 제출",
+  "title": "COSMOS 데일리 배틀 S2 - 100명 동시 제출",
   "uid": "cosmos-battle-s2",
-  "version": 1,
+  "version": 3,
   "weekStart": "monday"
 }

@@ -8,7 +8,6 @@ import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import com.cosmos.cosmos_backend.dailyBattle.worker.BattleGradingWorker;
-import com.cosmos.cosmos_backend.global.config.BattleSchedule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.TaskScheduler;

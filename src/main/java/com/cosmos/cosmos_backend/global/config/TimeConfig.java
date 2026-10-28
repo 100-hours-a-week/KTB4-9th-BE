@@ -1,5 +1,6 @@
 package com.cosmos.cosmos_backend.global.config;
 
+import com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleSchedule;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Value;

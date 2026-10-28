@@ -1,6 +1,6 @@
 package com.cosmos.cosmos_backend.battlealarm.domain;
 
-import com.cosmos.cosmos_backend.global.config.BattleSchedule;
+import com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleSchedule;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;

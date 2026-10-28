@@ -11,15 +11,10 @@ import com.cosmos.cosmos_backend.dailyBattle.projection.TopRankingProjection;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
-import com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleWorkerScheduler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Clock;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;

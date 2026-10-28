@@ -1,11 +1,10 @@
-package com.cosmos.cosmos_backend.global.config;
+package com.cosmos.cosmos_backend.dailyBattle.scheduler;
 
 import java.time.LocalTime;
 
-/**
- * 하루 배틀에서 사용하는 시각을 한 곳에서 관리한다.
- * 세 시각은 같은 날짜 안에서 시작 < 제출 마감 < 결과 공개 순서여야 한다.
- */
+
+// 하루 배틀에서 사용하는 시각
+// 세 시각은 같은 날짜 안에서 시작 < 제출 마감 < 결과 공개 순서
 public record BattleSchedule(
         LocalTime openTime,
         LocalTime submissionDeadline,

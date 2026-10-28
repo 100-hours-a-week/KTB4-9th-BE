@@ -15,6 +15,7 @@ import org.springframework.security.core.parameters.P;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @EntityListeners(AuditingEntityListener.class)
@@ -57,14 +58,30 @@ public class BattleParticipation {
 
     @Max(3)
     @Column(name = "retry_count", nullable = false)
-    private Integer retryCount = 0;
+    private Integer retryCount;
+
+    // 임대시간
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "lease_expires_at", columnDefinition = "TIMESTAMP(3)")
+    private Instant leaseExpiresAt;
+
+    // 작업 선점 토큰
+    @JdbcTypeCode(SqlTypes.BINARY)
+    @Column(name = "lease_token", columnDefinition = "BINARY(16)")
+    private UUID leaseToken;
+
+    // 작업 재선점 횟수
+    @Column(name = "lease_retry_count", nullable = false)
+    private Integer leaseRetryCount;
+
 
 
     public BattleParticipation(Long dailyBattleId, User user) {
         this.dailyBattleId = dailyBattleId;
         this.user = user;
         this.participationStatus = ParticipationStatus.IN_PROGRESS;
-
+        this.retryCount = 0;
+        this.leaseRetryCount = 0;
     }
 
     //제출 처리
@@ -73,9 +90,11 @@ public class BattleParticipation {
         this.participationStatus = ParticipationStatus.SUBMITTED;
     }
 
-    // 채점 중으로 처리
-    public void markGrading(){
+    // 채점 중으로 처리 + 임대 시간 등록
+    public void markGrading(Instant leaseExpiresAt, UUID leaseToken) {
         this.participationStatus = ParticipationStatus.GRADING;
+        this.leaseExpiresAt = leaseExpiresAt;
+        this.leaseToken = leaseToken;
     }
 
     // 채점 완료 처리
@@ -113,6 +132,11 @@ public class BattleParticipation {
     // 재시도 횟수 증가 처리
     public void increaseRetryCount(){
         this.retryCount++;
+    }
+
+    // 재선점 횟수 증가 처리
+    public void increaseLeaseRetryCount(){
+        this.leaseRetryCount++;
     }
 
     // 다시 제출 처리로 되돌리기

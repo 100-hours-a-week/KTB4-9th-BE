@@ -8,7 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
-public interface BattleCaseRepository extends JpaRepository<BattleCase, Integer> {
+public interface BattleCaseRepository extends JpaRepository<BattleCase, Long> {
     List<BattleCase> findByDailyBattle_BattleIdOrderByDisplayOrderAsc(Long battleId);
 
     @Query("""
