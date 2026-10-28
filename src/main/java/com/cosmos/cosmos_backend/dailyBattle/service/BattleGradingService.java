@@ -40,10 +40,10 @@ public class BattleGradingService {
 
     // 작업 선점 트랜잭션
     @Transactional
-    public Optional<GradingPreempt> preemptSubmission(){
+    public Optional<GradingPreempt> preemptSubmission(Long battleId) {
 
         // 1. 작업 조회 + 락 획득
-        Optional<BattleParticipation> submissionTask = battleParticipationRepository.findSubmittedForUpdate();
+        Optional<BattleParticipation> submissionTask = battleParticipationRepository.findSubmittedForUpdate(battleId);
 
         // 2. 작업이 없으면 종료
         if (submissionTask.isEmpty()) {

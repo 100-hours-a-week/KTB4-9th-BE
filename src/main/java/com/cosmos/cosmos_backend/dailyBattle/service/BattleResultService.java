@@ -33,12 +33,12 @@ public class BattleResultService {
 
     // 결과 공개 가능 처리
     @Transactional
-    public void battleResultPublished(Long battleId, LocalDateTime publishedAt) {
+    public int battleResultPublished(Long battleId, LocalDateTime publishedAt) {
         DailyBattle dailyBattle = dailyBattleRepository.findById(battleId).orElseThrow(() -> new BusinessException(
                 HttpStatus.NOT_FOUND, "Battle_not_found."
         ));
 
-        dailyBattle.publishResult(publishedAt);
+        return dailyBattleRepository.publishResultIfNotPublished(battleId, publishedAt);
 
     }
 

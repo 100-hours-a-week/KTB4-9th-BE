@@ -111,6 +111,7 @@ class BattleGradingIntegrationTest {
 
     private Long participationId;
     private Long submissionId;
+    private Long battleId;
 
     @BeforeEach
     void setUp() {
@@ -129,6 +130,7 @@ class BattleGradingIntegrationTest {
                     Category.ARRAY,
                     "grading worker integration battle",
                     "lease and stale worker integration test"));
+            battleId = battle.getBattleId();
             BattleCase battleCase = battleCaseRepository.save(new BattleCase(
                     battle,
                     "1 2",
@@ -154,7 +156,7 @@ class BattleGradingIntegrationTest {
         //given: SUBMITTED 상태의 채점 작업이 존재
 
         //when: 워커가 작업을 최초로 선점
-        GradingPreempt claim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt claim = battleGradingService.preemptSubmission(battleId).orElseThrow();
 
         //then: GRADING 상태와 임대 토큰이 설정되고 재선점 횟수는 증가하지 않음
         BattleParticipation participation = findParticipation();
@@ -174,13 +176,48 @@ class BattleGradingIntegrationTest {
     }
 
     @Test
+    void workerClaimsOnlyTheRequestedBattleTask() {
+        //given: 다른 배틀에 더 일찍 제출된 작업이 존재
+        Long otherParticipationId = transactionTemplate.execute(status -> {
+            User otherUser = userRepository.save(new User("other-battle-user", null));
+            DailyBattle otherBattle = dailyBattleRepository.save(new DailyBattle(
+                    LocalDate.of(2098, 12, 31),
+                    Category.ARRAY,
+                    "other grading worker integration battle",
+                    "battle scope integration test"));
+
+            BattleParticipation otherParticipation = new BattleParticipation(
+                    otherBattle.getBattleId(),
+                    otherUser
+            );
+            otherParticipation.markSubmit(clock.instant().minusSeconds(60));
+            return participationRepository.save(otherParticipation).getParticipationId();
+        });
+
+        //when: 현재 배틀 ID로 작업 선점을 요청
+        GradingPreempt claim = battleGradingService.preemptSubmission(battleId).orElseThrow();
+
+        //then: 제출 시각이 더 이른 다른 배틀 작업이 아닌 요청한 배틀 작업만 선점
+        BattleParticipation otherParticipation = participationRepository.findById(otherParticipationId).orElseThrow();
+
+        assertThat(claim.participationId()).isEqualTo(participationId);
+        assertThat(otherParticipation.getParticipationStatus()).isEqualTo(ParticipationStatus.SUBMITTED);
+
+        printTestResult("배틀 범위가 제한된 작업 선점",
+                "요청 배틀 ID      : " + battleId,
+                "선점 참여 ID      : " + claim.participationId(),
+                "다른 배틀 참여 ID : " + otherParticipationId,
+                "다른 배틀 상태    : " + otherParticipation.getParticipationStatus());
+    }
+
+    @Test
     void expiredLeaseCanBeReclaimed() {
         //given: 한 워커가 작업을 선점한 뒤 임대 시간이 만료
-        GradingPreempt firstClaim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt firstClaim = battleGradingService.preemptSubmission(battleId).orElseThrow();
         expireLease();
 
         //when: 다른 워커가 만료된 작업을 다시 선점
-        GradingPreempt secondClaim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt secondClaim = battleGradingService.preemptSubmission(battleId).orElseThrow();
 
         //then: 새 임대 토큰이 발급되고 재선점 횟수가 1 증가
         BattleParticipation participation = findParticipation();
@@ -202,9 +239,9 @@ class BattleGradingIntegrationTest {
     @Test
     void staleWorkerCannotSaveResultAfterLeaseIsReclaimed() {
         //given: 첫 워커의 임대가 만료되고 다른 워커가 새 토큰으로 재선점
-        GradingPreempt staleClaim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt staleClaim = battleGradingService.preemptSubmission(battleId).orElseThrow();
         expireLease();
-        GradingPreempt currentClaim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt currentClaim = battleGradingService.preemptSubmission(battleId).orElseThrow();
 
         //when: 첫 워커가 만료된 토큰으로 채점 결과 저장을 시도
         boolean saved = battleResultSaveService.saveGradedResult(
@@ -234,9 +271,9 @@ class BattleGradingIntegrationTest {
     @Test
     void staleWorkerCannotChangeRetryStateAfterLeaseIsReclaimed() {
         //given: 첫 워커의 임대가 만료되고 다른 워커가 새 토큰으로 재선점
-        GradingPreempt staleClaim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt staleClaim = battleGradingService.preemptSubmission(battleId).orElseThrow();
         expireLease();
-        GradingPreempt currentClaim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt currentClaim = battleGradingService.preemptSubmission(battleId).orElseThrow();
 
         //when: 첫 워커가 만료된 토큰으로 채점 실패 처리를 시도
         battleGradingService.checkGradingFailed(participationId, staleClaim.leaseToken());
@@ -261,11 +298,11 @@ class BattleGradingIntegrationTest {
     @Test
     void taskFailsWhenExpiredLeaseExceedsThreeReclaims() {
         //given: 최초 선점 이후 임대 만료와 재선점이 3회 반복
-        battleGradingService.preemptSubmission().orElseThrow();
+        battleGradingService.preemptSubmission(battleId).orElseThrow();
 
         for (int retry = 1; retry <= 3; retry++) {
             expireLease();
-            GradingPreempt reclaimed = battleGradingService.preemptSubmission().orElseThrow();
+            GradingPreempt reclaimed = battleGradingService.preemptSubmission(battleId).orElseThrow();
 
             assertThat(findParticipation().getLeaseRetryCount()).isEqualTo(retry);
             assertThat(reclaimed.participationId()).isEqualTo(participationId);
@@ -273,7 +310,7 @@ class BattleGradingIntegrationTest {
 
         //when: 세 번째 재선점의 임대까지 만료된 뒤 추가 선점을 시도
         expireLease();
-        Optional<GradingPreempt> fourthReclaim = battleGradingService.preemptSubmission();
+        Optional<GradingPreempt> fourthReclaim = battleGradingService.preemptSubmission(battleId);
 
         //then: 추가 선점은 거부되고 작업은 최종 실패 상태로
         BattleParticipation failed = findParticipation();
@@ -292,7 +329,7 @@ class BattleGradingIntegrationTest {
     @Test
     void currentWorkerCanGradeAndSaveResult() {
         //given: 현재 워커가 유효한 임대 토큰으로 작업을 선점
-        GradingPreempt claim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt claim = battleGradingService.preemptSubmission(battleId).orElseThrow();
 
         //when: 현재 워커가 실제 채점과 결과 저장을 수행
         battleGradingService.battleGrade(
@@ -327,7 +364,7 @@ class BattleGradingIntegrationTest {
         assertThatCode(() -> detachedSubmission.getBattleCase().getCaseId())
                 .doesNotThrowAnyException();
 
-        GradingPreempt claim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt claim = battleGradingService.preemptSubmission(battleId).orElseThrow();
         assertThatCode(() -> battleGradingService.battleGrade(
                 participationId,
                 claim.leaseToken(),
@@ -362,12 +399,12 @@ class BattleGradingIntegrationTest {
             Future<Optional<GradingPreempt>> firstWorker = executor.submit(() -> {
                 workersReady.countDown();
                 await(startTogether, "첫 번째 워커가 선점 시작 신호를 받지 못함");
-                return battleGradingService.preemptSubmission();
+                return battleGradingService.preemptSubmission(battleId);
             });
             Future<Optional<GradingPreempt>> secondWorker = executor.submit(() -> {
                 workersReady.countDown();
                 await(startTogether, "두 번째 워커가 선점 시작 신호를 받지 못함");
-                return battleGradingService.preemptSubmission();
+                return battleGradingService.preemptSubmission(battleId);
             });
 
             await(workersReady, "두 워커가 동시에 준비되지 못함");
@@ -399,7 +436,7 @@ class BattleGradingIntegrationTest {
     @Test
     void anotherWorkerCannotReclaimWhilePreviousWorkerIsSavingResult() throws Exception {
         //given: 임대는 만료됐지만 이전 워커가 유효한 토큰으로 결과 저장을 시작
-        GradingPreempt previousClaim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt previousClaim = battleGradingService.preemptSubmission(battleId).orElseThrow();
         expireLease();
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -423,7 +460,7 @@ class BattleGradingIntegrationTest {
 
             //when: 결과 저장 트랜잭션이 락을 보유한 동안 다른 워커가 재선점을 시도
             Future<Optional<GradingPreempt>> reclaim = executor.submit(
-                    battleGradingService::preemptSubmission);
+                    () -> battleGradingService.preemptSubmission(battleId));
             Optional<GradingPreempt> reclaimedWhileSaving = get(reclaim);
 
             allowSaveTransactionCommit.countDown();
@@ -454,7 +491,7 @@ class BattleGradingIntegrationTest {
     void taskFailsAfterThreeGradingFailures() {
         //given: 동일한 채점 작업에서 예외 후 실패 처리가 반복되는 상황
         for (int attempt = 1; attempt <= 3; attempt++) {
-            GradingPreempt claim = battleGradingService.preemptSubmission().orElseThrow();
+            GradingPreempt claim = battleGradingService.preemptSubmission(battleId).orElseThrow();
 
             //when: 워커가 채점 예외를 잡고 현재 임대 토큰으로 실패 처리
             battleGradingService.checkGradingFailed(participationId, claim.leaseToken());
@@ -482,7 +519,7 @@ class BattleGradingIntegrationTest {
     @Test
     void gradingRetryCountAndLeaseRetryCountIncreaseIndependently() {
         //given: 한 번의 채점 예외로 retryCount만 증가한 작업
-        GradingPreempt failedClaim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt failedClaim = battleGradingService.preemptSubmission(battleId).orElseThrow();
         battleGradingService.checkGradingFailed(participationId, failedClaim.leaseToken());
 
         BattleParticipation afterGradingFailure = findParticipation();
@@ -490,9 +527,9 @@ class BattleGradingIntegrationTest {
         assertThat(afterGradingFailure.getLeaseRetryCount()).isZero();
 
         //when: 다시 선점된 작업의 임대가 만료되어 다른 워커가 재선점
-        battleGradingService.preemptSubmission().orElseThrow();
+        battleGradingService.preemptSubmission(battleId).orElseThrow();
         expireLease();
-        battleGradingService.preemptSubmission().orElseThrow();
+        battleGradingService.preemptSubmission(battleId).orElseThrow();
 
         //then: retryCount는 유지되고 leaseRetryCount만 증가
         BattleParticipation afterLeaseReclaim = findParticipation();
@@ -509,7 +546,7 @@ class BattleGradingIntegrationTest {
     @Test
     void currentWorkerCanSaveAfterLeaseExpiresBeforeAnotherWorkerReclaims() {
         //given: 현재 워커의 임대 시간은 만료됐지만 아직 다른 워커가 재선점하지 않은 상태
-        GradingPreempt currentClaim = battleGradingService.preemptSubmission().orElseThrow();
+        GradingPreempt currentClaim = battleGradingService.preemptSubmission(battleId).orElseThrow();
         expireLease();
 
         //when: 현재 토큰을 가진 워커가 결과 저장을 시도

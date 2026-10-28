@@ -58,20 +58,23 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
             @Param("timeOverStatus") ParticipationStatus timeOverStatus
     );
 
-    // 채점 worker의 작업 선점을 위한 메소드(제출 처리인 상태인 행 중에 제출 시각 빠른것, 락 가진건 건너 뛰기)
+    // 현재 배틀의 미선점 작업 또는 임대가 만료된 작업을 제출 시각순으로 선점하고, 잠긴 행은 건너뛰기
     @Query(value = """
     SELECT *
     FROM battle_participations
-    WHERE participation_status = 'SUBMITTED'
-       OR (
-           participation_status = 'GRADING'
-           AND lease_expires_at <= UTC_TIMESTAMP(3)
-       )
+    WHERE daily_battle_id = :battleId
+      AND (
+          participation_status = 'SUBMITTED'
+          OR (
+              participation_status = 'GRADING'
+              AND lease_expires_at <= UTC_TIMESTAMP(3)
+          )
+      )
     ORDER BY submitted_at ASC
     LIMIT 1
     FOR UPDATE SKIP LOCKED
     """, nativeQuery = true)
-    Optional<BattleParticipation> findSubmittedForUpdate();
+    Optional<BattleParticipation> findSubmittedForUpdate(@Param("battleId") Long battleId);
 
     // 부하테스트를 위한 메트릭
     @Query("""
