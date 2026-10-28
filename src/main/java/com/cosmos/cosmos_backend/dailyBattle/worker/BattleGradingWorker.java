@@ -24,10 +24,10 @@ public class BattleGradingWorker {
     private final Clock clock;
 
     // 작업 선점, 채점 작업을 진행하는 워커
-    public void gradingBattleSubmissions() {
+    public void gradingBattleSubmissions(Long battleId) {
 
         // 선점 작업 확인 (트랜잭션 1)
-        Optional<GradingPreempt> preemptGrading = battleGradingService.preemptSubmission();
+        Optional<GradingPreempt> preemptGrading = battleGradingService.preemptSubmission(battleId);
 
         // 선점 작업 없으면 종료
         if(preemptGrading.isEmpty()){
