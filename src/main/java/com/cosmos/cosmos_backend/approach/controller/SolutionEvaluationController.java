@@ -26,7 +26,7 @@ public class SolutionEvaluationController {
     private final SolutionEvaluationTaskService solutionEvaluationTaskService;
 
     @GetMapping("/{evaluationTaskId}")
-    @Operation(summary = "평가 작업 조회", description = "접수한 풀이 평가의 진행 상태와 결과를 조회합니다. 본인이 접수한 작업만 조회할 수 있습니다.")
+    @Operation(summary = "평가 작업 조회", description = "접수한 풀이 평가의 진행 상태와 결과를 조회합니다. 본인이 접수한 작업만 조회할 수 있습니다. 알림이 생성된 작업이면 notificationId를 함께 반환합니다.")
     public ResponseEntity<ApiResponse<SolutionEvaluationResponse>> get(
             @Parameter(description = "평가 작업 ID", required = true, example = "1") @PathVariable String evaluationTaskId,
             @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt

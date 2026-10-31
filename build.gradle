@@ -31,6 +31,9 @@ dependencies {
 	// 헬스체크 및 프로메테우스 메트릭
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+
+	// 평가 완료 이벤트 서버 간 전달
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	// Local-profile JDBC query timing observations (disabled outside local profile).
 	implementation 'net.ttddyy.observation:datasource-micrometer-spring-boot:2.3.0'
 

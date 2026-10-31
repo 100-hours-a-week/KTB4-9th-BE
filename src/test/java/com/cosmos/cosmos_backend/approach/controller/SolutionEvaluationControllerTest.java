@@ -54,7 +54,7 @@ class SolutionEvaluationControllerTest {
                                                 ApproachSubmitResponse.Result result, SolutionEvaluationResponse.Failure failure) {
         return new SolutionEvaluationResponse(
                 9001L, 101L, status, isLatest, new SolutionEvaluationResponse.LatestEvaluation(9001L, status),
-                submissionId, "BINARY_SEARCH", "중간값을 기준으로 탐색 범위를 줄입니다.", result, failure,
+                submissionId, "BINARY_SEARCH", "중간값을 기준으로 탐색 범위를 줄입니다.", result, failure, null,
                 ApproachSubmitResponse.SubmissionUsage.of(2),
                 CREATED_AT, CREATED_AT.plusSeconds(1), null, null
         );
@@ -142,7 +142,7 @@ class SolutionEvaluationControllerTest {
         loginAs("42");
         var old = new SolutionEvaluationResponse(
                 9001L, 101L, "SUCCEEDED", false, new SolutionEvaluationResponse.LatestEvaluation(9004L, "SUCCEEDED"),
-                null, "BINARY_SEARCH", "과거 풀이", null, null,
+                null, "BINARY_SEARCH", "과거 풀이", null, null, 7001L,
                 ApproachSubmitResponse.SubmissionUsage.of(3), CREATED_AT, null, null, null);
         when(solutionEvaluationTaskService.get(42L, 9001L)).thenReturn(old);
 
@@ -157,6 +157,7 @@ class SolutionEvaluationControllerTest {
         body.extractingPath("$.data.submissionId").isNull();
         body.extractingPath("$.data.result").isNull();
         body.extractingPath("$.data.failure").isNull();
+        body.extractingPath("$.data.notificationId").isEqualTo(7001);
     }
 
     @Test

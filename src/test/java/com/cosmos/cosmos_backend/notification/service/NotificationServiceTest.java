@@ -2,6 +2,7 @@ package com.cosmos.cosmos_backend.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -10,6 +11,7 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.notification.domain.Notification;
 import com.cosmos.cosmos_backend.notification.domain.NotificationType;
 import com.cosmos.cosmos_backend.notification.dto.response.NotificationListResponse;
+import com.cosmos.cosmos_backend.notification.event.EvaluationCompletedEvent;
 import com.cosmos.cosmos_backend.notification.repository.NotificationRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -23,6 +25,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Limit;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -38,12 +42,24 @@ class NotificationServiceTest {
     @Mock
     private SolutionEvaluationTaskRepository evaluationTaskRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private NotificationService service;
 
     @BeforeEach
     void setUp() {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-10-19T03:30:06Z"), ZoneId.of("Asia/Seoul"));
-        service = new NotificationService(notificationRepository, evaluationTaskRepository, fixedClock);
+        service = new NotificationService(notificationRepository, evaluationTaskRepository, eventPublisher, fixedClock);
+    }
+
+    // save가 id 7001을 부여한 알림을 돌려주게 함
+    private void stubSaveWithId() {
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> {
+            Notification saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 7001L);
+            return saved;
+        });
     }
 
     private Notification notification(Long id, NotificationType type, LocalDateTime createdAt) {
@@ -54,6 +70,9 @@ class NotificationServiceTest {
 
     @Test
     void createEvaluationNotification_savesDoneNotification_withTitleInMessage() {
+        // Given
+        stubSaveWithId();
+
         // When
         service.createEvaluationNotification(42L, 101L, 9001L, NotificationType.NL_EVALUATION_DONE, "두 수의 합");
 
@@ -72,6 +91,9 @@ class NotificationServiceTest {
 
     @Test
     void createEvaluationNotification_savesFailedNotification_withResubmitGuide() {
+        // Given
+        stubSaveWithId();
+
         // When
         service.createEvaluationNotification(42L, 102L, 9002L, NotificationType.NL_EVALUATION_FAILED, "괄호 검사");
 
@@ -83,13 +105,47 @@ class NotificationServiceTest {
     }
 
     @Test
+    void createEvaluationNotification_publishesSucceededEvent_withNotificationId() {
+        // Given
+        stubSaveWithId();
+
+        // When
+        service.createEvaluationNotification(42L, 101L, 9001L, NotificationType.NL_EVALUATION_DONE, "두 수의 합");
+
+        // Then
+        ArgumentCaptor<EvaluationCompletedEvent> captor = ArgumentCaptor.forClass(EvaluationCompletedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        EvaluationCompletedEvent event = captor.getValue();
+        assertThat(event.eventId()).isNotBlank();
+        assertThat(event.userId()).isEqualTo(42L);
+        assertThat(event.evaluationTaskId()).isEqualTo(9001L);
+        assertThat(event.status()).isEqualTo("SUCCEEDED");
+        assertThat(event.notificationId()).isEqualTo(7001L);
+    }
+
+    @Test
+    void createEvaluationNotification_publishesFailedEvent_whenEvaluationFailed() {
+        // Given
+        stubSaveWithId();
+
+        // When
+        service.createEvaluationNotification(42L, 102L, 9002L, NotificationType.NL_EVALUATION_FAILED, "괄호 검사");
+
+        // Then
+        ArgumentCaptor<EvaluationCompletedEvent> captor = ArgumentCaptor.forClass(EvaluationCompletedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().status()).isEqualTo("FAILED");
+        assertThat(captor.getValue().notificationId()).isEqualTo(7001L);
+    }
+
+    @Test
     void getNotifications_returnsRecentNotifications_andUnreadCount() {
         // Given
         Notification newer = notification(13L, NotificationType.NL_EVALUATION_FAILED, CREATED_AT.plusMinutes(1));
         Notification older = notification(12L, NotificationType.NL_EVALUATION_DONE, CREATED_AT);
         older.markRead(CREATED_AT.plusSeconds(30));
-        when(notificationRepository.findTop10ByUserIdOrderByIdDesc(42L)).thenReturn(List.of(newer, older));
-        when(notificationRepository.countByUserIdAndReadAtIsNull(42L)).thenReturn(15L);
+        when(notificationRepository.findOfLatestTasks(42L, Limit.of(10))).thenReturn(List.of(newer, older));
+        when(notificationRepository.countUnreadOfLatestTasks(42L)).thenReturn(15L);
 
         // When
         NotificationListResponse response = service.getNotifications(42L);
@@ -108,8 +164,8 @@ class NotificationServiceTest {
     @Test
     void getNotifications_returnsEmptyList_whenNoNotifications() {
         // Given
-        when(notificationRepository.findTop10ByUserIdOrderByIdDesc(42L)).thenReturn(List.of());
-        when(notificationRepository.countByUserIdAndReadAtIsNull(42L)).thenReturn(0L);
+        when(notificationRepository.findOfLatestTasks(42L, Limit.of(10))).thenReturn(List.of());
+        when(notificationRepository.countUnreadOfLatestTasks(42L)).thenReturn(0L);
 
         // When
         NotificationListResponse response = service.getNotifications(42L);
@@ -122,8 +178,8 @@ class NotificationServiceTest {
     @Test
     void getNotifications_reportsPendingEvaluation_whenActiveTaskExists() {
         // Given
-        when(notificationRepository.findTop10ByUserIdOrderByIdDesc(42L)).thenReturn(List.of());
-        when(notificationRepository.countByUserIdAndReadAtIsNull(42L)).thenReturn(0L);
+        when(notificationRepository.findOfLatestTasks(42L, Limit.of(10))).thenReturn(List.of());
+        when(notificationRepository.countUnreadOfLatestTasks(42L)).thenReturn(0L);
         when(evaluationTaskRepository.existsByUserIdAndActiveSlot(42L, 1)).thenReturn(true);
 
         // When
@@ -131,6 +187,18 @@ class NotificationServiceTest {
 
         // Then
         assertThat(response.hasPendingEvaluation()).isTrue();
+    }
+
+    @Test
+    void findIdByEvaluationTaskId_returnsNotificationId_orEmptyWhenNotCreatedYet() {
+        // Given
+        Notification notification = notification(12L, NotificationType.NL_EVALUATION_DONE, CREATED_AT);
+        when(notificationRepository.findByEvaluationTaskId(9012L)).thenReturn(Optional.of(notification));
+        when(notificationRepository.findByEvaluationTaskId(9999L)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThat(service.findIdByEvaluationTaskId(9012L)).contains(12L);
+        assertThat(service.findIdByEvaluationTaskId(9999L)).isEmpty();
     }
 
     @Test

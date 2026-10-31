@@ -52,6 +52,9 @@ public class SolutionEvaluationExecutionService {
     private final EvaluationWorkerProperties properties;
     private final Clock clock;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cosmos.cosmos_backend.loadtest.polling.PollingTelemetry pollingTelemetry;
+
     /** 작업을 선점해 PROCESSING으로 바꾸고 작업 id와 시도 번호를 반환. 처리할 작업이 없으면 빈 값. */
     @Transactional
     public Optional<ClaimedTask> claimNext() {
@@ -138,6 +141,7 @@ public class SolutionEvaluationExecutionService {
         // 7. 완료 알림을 만듦 (같은 트랜잭션)
         notificationService.createEvaluationNotification(
                 userId, problemId, taskId, NotificationType.NL_EVALUATION_DONE, problem.getTitle());
+        if (pollingTelemetry != null) pollingTelemetry.afterCommit(taskId, "SUCCEEDED");
     }
 
     /** 실패를 기록. 재시도할 수 있고 횟수가 남았으면 RETRY_WAIT, 아니면 FAILED. */
@@ -191,6 +195,7 @@ public class SolutionEvaluationExecutionService {
         notificationService.createEvaluationNotification(
                 task.getUserId(), task.getProblemId(), task.getId(),
                 NotificationType.NL_EVALUATION_FAILED, problem.getTitle());
+        if (pollingTelemetry != null) pollingTelemetry.afterCommit(task.getId(), "FAILED");
     }
 
     // 작업 조회 (없으면 404 예외를 던짐)

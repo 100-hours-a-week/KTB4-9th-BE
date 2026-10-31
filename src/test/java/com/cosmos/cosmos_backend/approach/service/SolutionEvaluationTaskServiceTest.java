@@ -19,6 +19,7 @@ import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepos
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.notification.service.NotificationService;
 import com.cosmos.cosmos_backend.problem.domain.entity.Problem;
 import com.cosmos.cosmos_backend.problem.dto.request.AiProblemsCreateRequestDto;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
@@ -56,12 +57,15 @@ class SolutionEvaluationTaskServiceTest {
     @Mock
     private ProblemService problemService;
 
+    @Mock
+    private NotificationService notificationService;
+
     private SolutionEvaluationTaskService service;
 
     @BeforeEach
     void setUp() {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-10-19T03:30:00Z"), ZoneId.of("Asia/Seoul"));
-        service = new SolutionEvaluationTaskService(taskRepository, problemRepository, approachSubmissionRepository, problemService, fixedClock);
+        service = new SolutionEvaluationTaskService(taskRepository, problemRepository, approachSubmissionRepository, problemService, notificationService, fixedClock);
     }
 
     private Problem problem(String category) {
@@ -285,6 +289,7 @@ class SolutionEvaluationTaskServiceTest {
         assertThat(response.submissionId()).isNull();
         assertThat(response.result()).isNull();
         assertThat(response.failure()).isNull();
+        assertThat(response.notificationId()).isNull();
         assertThat(response.submissionUsage()).isEqualTo(new ApproachSubmitResponse.SubmissionUsage(5, 0, 5));
         assertThat(response.selectedCategory()).isEqualTo("ARRAY");
         assertThat(response.naturalSolution()).isEqualTo("이렇게 풉니다");
@@ -341,6 +346,23 @@ class SolutionEvaluationTaskServiceTest {
     }
 
     @Test
+    void get_returnsNotificationId_whenNotificationWasCreatedForTask() {
+        // Given
+        SolutionEvaluationTask succeeded = processing(9001L);
+        succeeded.markSucceeded(501L, CREATED_AT.plusSeconds(6));
+        when(taskRepository.findByIdAndUserId(9001L, 10L)).thenReturn(Optional.of(succeeded));
+        when(taskRepository.findFirstByUserIdAndProblemIdOrderByIdDesc(10L, 1L)).thenReturn(Optional.of(succeeded));
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
+        when(notificationService.findIdByEvaluationTaskId(9001L)).thenReturn(Optional.of(7001L));
+
+        // When
+        SolutionEvaluationResponse response = service.get(10L, 9001L);
+
+        // Then
+        assertThat(response.notificationId()).isEqualTo(7001L);
+    }
+
+    @Test
     void get_hidesCorrectCategory_whenAnswerWasWrongAndLimitRemains() {
         // Given
         SolutionEvaluationTask succeeded = processing(9001L);
@@ -390,11 +412,13 @@ class SolutionEvaluationTaskServiceTest {
         when(taskRepository.findByIdAndUserId(9001L, 10L)).thenReturn(Optional.of(old));
         when(taskRepository.findFirstByUserIdAndProblemIdOrderByIdDesc(10L, 1L)).thenReturn(Optional.of(latest));
         when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.of(submission(501L, Category.ARRAY, 90, 3)));
+        when(notificationService.findIdByEvaluationTaskId(9001L)).thenReturn(Optional.of(7001L));
 
         // When
         SolutionEvaluationResponse response = service.get(10L, 9001L);
 
-        // Then
+        // Then: 과거 작업도 그 작업의 알림 id는 반환
+        assertThat(response.notificationId()).isEqualTo(7001L);
         assertThat(response.status()).isEqualTo("SUCCEEDED");
         assertThat(response.isLatest()).isFalse();
         assertThat(response.latestEvaluation()).isEqualTo(new SolutionEvaluationResponse.LatestEvaluation(9004L, "PENDING"));

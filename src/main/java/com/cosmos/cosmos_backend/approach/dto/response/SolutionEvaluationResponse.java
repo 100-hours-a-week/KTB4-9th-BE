@@ -15,6 +15,7 @@ public record SolutionEvaluationResponse(
         String naturalSolution,
         ApproachSubmitResponse.Result result,
         Failure failure,
+        Long notificationId,
         ApproachSubmitResponse.SubmissionUsage submissionUsage,
         Instant createdAt,
         Instant startedAt,
@@ -32,7 +33,8 @@ public record SolutionEvaluationResponse(
 
     /** 조회한 작업, 최신 작업, 결과·실패 안내, 성공한 제출 횟수로 응답을 조립. */
     public static SolutionEvaluationResponse of(SolutionEvaluationTask task, SolutionEvaluationTask latest,
-                                                ApproachSubmitResponse.Result result, Failure failure, int usedCount) {
+                                                ApproachSubmitResponse.Result result, Failure failure,
+                                                int usedCount, Long notificationId) {
         boolean isLatest = latest.getId().equals(task.getId());
         return new SolutionEvaluationResponse(
                 task.getId(),
@@ -46,6 +48,8 @@ public record SolutionEvaluationResponse(
                 task.getNaturalSolution(),
                 isLatest ? result : null,
                 isLatest ? failure : null,
+                // 과거 작업이어도 그 작업의 알림 id는 그대로 반환
+                notificationId,
                 ApproachSubmitResponse.SubmissionUsage.of(usedCount),
                 UtcInstants.of(task.getCreatedAt()),
                 UtcInstants.of(task.getStartedAt()),
