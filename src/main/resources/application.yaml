@@ -3,6 +3,13 @@ spring:
     name: cosmos-backend
   jpa:
     open-in-view: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      repositories:
+        enabled: false
 
 battle:
   schedule:
@@ -16,6 +23,8 @@ ai:
     read-timeout: ${AI_SERVER_READ_TIMEOUT:30s}
 
 evaluation:
+  event:
+    transport: ${EVALUATION_EVENT_TRANSPORT:local}
   worker:
     enabled: ${EVALUATION_WORKER_ENABLED:true}
     poll-interval: ${EVALUATION_WORKER_POLL_INTERVAL:5s}
@@ -55,6 +64,9 @@ management:
       show-details: always
     prometheus:
       enabled: true
+  health:
+    redis:
+      enabled: false
   metrics:
     tags:
       application: ${spring.application.name}
