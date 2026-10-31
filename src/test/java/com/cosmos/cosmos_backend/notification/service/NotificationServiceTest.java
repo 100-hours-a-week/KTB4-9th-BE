@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Limit;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -88,8 +89,8 @@ class NotificationServiceTest {
         Notification newer = notification(13L, NotificationType.NL_EVALUATION_FAILED, CREATED_AT.plusMinutes(1));
         Notification older = notification(12L, NotificationType.NL_EVALUATION_DONE, CREATED_AT);
         older.markRead(CREATED_AT.plusSeconds(30));
-        when(notificationRepository.findTop10ByUserIdOrderByIdDesc(42L)).thenReturn(List.of(newer, older));
-        when(notificationRepository.countByUserIdAndReadAtIsNull(42L)).thenReturn(15L);
+        when(notificationRepository.findOfLatestTasks(42L, Limit.of(10))).thenReturn(List.of(newer, older));
+        when(notificationRepository.countUnreadOfLatestTasks(42L)).thenReturn(15L);
 
         // When
         NotificationListResponse response = service.getNotifications(42L);
@@ -108,8 +109,8 @@ class NotificationServiceTest {
     @Test
     void getNotifications_returnsEmptyList_whenNoNotifications() {
         // Given
-        when(notificationRepository.findTop10ByUserIdOrderByIdDesc(42L)).thenReturn(List.of());
-        when(notificationRepository.countByUserIdAndReadAtIsNull(42L)).thenReturn(0L);
+        when(notificationRepository.findOfLatestTasks(42L, Limit.of(10))).thenReturn(List.of());
+        when(notificationRepository.countUnreadOfLatestTasks(42L)).thenReturn(0L);
 
         // When
         NotificationListResponse response = service.getNotifications(42L);
@@ -122,8 +123,8 @@ class NotificationServiceTest {
     @Test
     void getNotifications_reportsPendingEvaluation_whenActiveTaskExists() {
         // Given
-        when(notificationRepository.findTop10ByUserIdOrderByIdDesc(42L)).thenReturn(List.of());
-        when(notificationRepository.countByUserIdAndReadAtIsNull(42L)).thenReturn(0L);
+        when(notificationRepository.findOfLatestTasks(42L, Limit.of(10))).thenReturn(List.of());
+        when(notificationRepository.countUnreadOfLatestTasks(42L)).thenReturn(0L);
         when(evaluationTaskRepository.existsByUserIdAndActiveSlot(42L, 1)).thenReturn(true);
 
         // When
@@ -131,6 +132,18 @@ class NotificationServiceTest {
 
         // Then
         assertThat(response.hasPendingEvaluation()).isTrue();
+    }
+
+    @Test
+    void findIdByEvaluationTaskId_returnsNotificationId_orEmptyWhenNotCreatedYet() {
+        // Given
+        Notification notification = notification(12L, NotificationType.NL_EVALUATION_DONE, CREATED_AT);
+        when(notificationRepository.findByEvaluationTaskId(9012L)).thenReturn(Optional.of(notification));
+        when(notificationRepository.findByEvaluationTaskId(9999L)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThat(service.findIdByEvaluationTaskId(9012L)).contains(12L);
+        assertThat(service.findIdByEvaluationTaskId(9999L)).isEmpty();
     }
 
     @Test

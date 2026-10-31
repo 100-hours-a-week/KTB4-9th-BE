@@ -10,6 +10,7 @@ import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepositor
 import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepository;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.notification.service.NotificationService;
 import com.cosmos.cosmos_backend.problem.repository.ProblemRepository;
 import com.cosmos.cosmos_backend.problem.service.ProblemService;
 import java.time.Clock;
@@ -34,6 +35,7 @@ public class SolutionEvaluationTaskService {
     private final ProblemRepository problemRepository;
     private final ApproachSubmissionRepository approachSubmissionRepository;
     private final ProblemService problemService;
+    private final NotificationService notificationService;
     private final Clock clock;
 
     /**
@@ -108,8 +110,11 @@ public class SolutionEvaluationTaskService {
             failure = new SolutionEvaluationResponse.Failure(task.getErrorCode(), FAILURE_MESSAGE, true);
         }
 
-        // 5. 응답 조립
-        return SolutionEvaluationResponse.of(task, latest, result, failure, usedCount);
+        // 5. 이 작업에 연결된 알림 id를 조회 (아직 알림이 없으면 null)
+        Long notificationId = notificationService.findIdByEvaluationTaskId(taskId).orElse(null);
+
+        // 6. 응답 조립
+        return SolutionEvaluationResponse.of(task, latest, result, failure, usedCount, notificationId);
     }
 
     // 카테고리 문자열을 Category enum으로 변환

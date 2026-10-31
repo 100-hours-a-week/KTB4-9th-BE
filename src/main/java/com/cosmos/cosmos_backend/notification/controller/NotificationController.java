@@ -25,7 +25,7 @@ public class NotificationController {
     private final NotificationService notificationService;
 
     @GetMapping
-    @Operation(summary = "알림 목록 조회", description = "내 최근 알림을 읽음 여부와 상관없이 최신순 10개까지, 안 읽은 알림 전체 개수와 함께 반환합니다.")
+    @Operation(summary = "알림 목록 조회", description = "문제별 최신 평가에 연결된 알림만 읽음 여부와 상관없이 최신순 10개까지, 같은 조건의 안 읽은 알림 전체 개수와 진행 중인 평가 여부와 함께 반환합니다.")
     public ResponseEntity<ApiResponse<NotificationListResponse>> list(
             @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt
     ) {
