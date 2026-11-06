@@ -48,6 +48,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
 	implementation 'com.github.ben-manes.caffeine:caffeine'
 
+	// RabbitMQ
+	implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 
@@ -69,6 +72,7 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	systemProperty 'recovery.test.runtime-classpath', sourceSets.test.runtimeClasspath.asPath
 }
 
 tasks.register('dailyBattleConcurrencyTest', Test) {
@@ -96,6 +100,24 @@ tasks.register('battleGradingIntegrationTest', Test) {
 	useJUnitPlatform()
 	filter {
 		includeTestsMatching 'com.cosmos.cosmos_backend.dailyBattle.service.BattleGradingIntegrationTest'
+	}
+	testLogging {
+		events 'passed', 'skipped', 'failed'
+		showStandardStreams = true
+	}
+}
+
+tasks.register('battleWorkerRecoveryIntegrationTest', Test) {
+	group = 'verification'
+	description = 'Runs the MySQL daily battle server-restart recovery integration tests.'
+	dependsOn tasks.named('testClasses')
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform()
+	systemProperty 'recovery.test.runtime-classpath', sourceSets.test.runtimeClasspath.asPath
+	filter {
+		includeTestsMatching 'com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleWorkerRecoveryIntegrationTest'
+		includeTestsMatching 'com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleWorkerProcessRestartIntegrationTest'
 	}
 	testLogging {
 		events 'passed', 'skipped', 'failed'

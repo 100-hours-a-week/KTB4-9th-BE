@@ -11,6 +11,13 @@ spring:
       repositories:
         enabled: false
 
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER}
+    password: ${RABBITMQ_DEFAULT_PASS}
+    virtual-host: ${RABBITMQ_DEFAULT_VHOST}
+
 battle:
   schedule:
     open-time: ${BATTLE_OPEN_TIME:12:50:00}
