@@ -23,9 +23,6 @@ import java.util.UUID;
 @EntityListeners(AuditingEntityListener.class)
 public class OutboxEvent {
 
-    // TODO : 몇 초 기준으로 할지 부하테스트 해보고 바꾸기
-    private static final long PUBLISHER_LEASE_SECONDS = 5;
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "outbox_event_id")
@@ -77,16 +74,18 @@ public class OutboxEvent {
         this.battleSubmissionEventStatus = BattleSubmissionEventStatus.PENDING;
     }
 
-    public void changedPublishingStatus(UUID publisherLeaseToken, Instant now) {
+    public void changedPublishingStatus(UUID publisherLeaseToken, Instant publisherLeaseExpiresAt) {
         this.battleSubmissionEventStatus = BattleSubmissionEventStatus.PUBLISHING;
         this.publisherLeaseToken = publisherLeaseToken;
-        this.publisherLeaseExpiresAt = now.plusSeconds(PUBLISHER_LEASE_SECONDS);
-        this.publishedAttemptCount ++;
+        this.publisherLeaseExpiresAt = publisherLeaseExpiresAt;
     }
 
-    // publisher confirm 수신하면 메세지 발행 완료 처리
-    public void changedSentStatus(){
-        this.battleSubmissionEventStatus = BattleSubmissionEventStatus.SENT;
+    public void increasePublishedAttemptCount() {
+        this.publishedAttemptCount++;
+    }
+
+    public void changeStatusFailed(){
+        this.battleSubmissionEventStatus = BattleSubmissionEventStatus.PUBLISH_FAILED;
     }
 
 }
