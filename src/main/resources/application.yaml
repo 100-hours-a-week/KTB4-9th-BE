@@ -11,12 +11,17 @@ spring:
       repositories:
         enabled: false
 
-  rabbitmq:
+  RabbitMQ:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_DEFAULT_USER}
     password: ${RABBITMQ_DEFAULT_PASS}
     virtual-host: ${RABBITMQ_DEFAULT_VHOST}
+    # publisher confirm
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 
 battle:
   schedule:
