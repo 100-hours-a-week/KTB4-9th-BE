@@ -3,8 +3,10 @@ package com.cosmos.cosmos_backend.dailyBattle.service;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.OutboxEvent;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.OutboxEventPreemptResponseDto;
 import lombok.RequiredArgsConstructor;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -45,12 +47,19 @@ public class OutboxPublishService {
                 }
             });
 
-            rabbitTemplate.convertAndSend(
-                    "battle.grading.exchange",
-                    "battle.grading.request",
-                    event.getBattleAnswerPayload(),
-                    publishConfirmData
-            );
+            // 발행 과정 예외 처리
+            try {
+                rabbitTemplate.convertAndSend(
+                        "battle.grading.exchange",
+                        "battle.grading.request",
+                        event.getBattleAnswerPayload(),
+                        publishConfirmData
+                );
+            } catch (AmqpException e){
+                // 해당 이벤트는 PUBLISHING으로 유지 + 재선점 되도록
+                continue;
+            }
+
 
         }
 
