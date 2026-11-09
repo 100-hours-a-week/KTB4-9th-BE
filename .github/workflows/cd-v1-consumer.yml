@@ -1,0 +1,116 @@
+name: V1 Consumer Manual Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Docker Hub에 게시된 dev commit SHA (40자리)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-consumer-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-consumer:
+    name: Deploy consumer to Judge EC2
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    env:
+      IMAGE_REPOSITORY: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+
+    steps:
+      - name: Checkout deployment script
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate consumer deployment settings
+        env:
+          CONSUMER_EC2_HOST: ${{ secrets.CONSUMER_EC2_HOST }}
+          CONSUMER_EC2_USER: ${{ secrets.CONSUMER_EC2_USER }}
+          CONSUMER_EC2_KNOWN_HOSTS: ${{ secrets.CONSUMER_EC2_KNOWN_HOSTS }}
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          for name in CONSUMER_EC2_HOST CONSUMER_EC2_USER CONSUMER_EC2_KNOWN_HOSTS EC2_SSH_PRIVATE_KEY; do
+            [[ -n "${!name:-}" ]] || { echo "::error::Missing required consumer deployment secret: ${name}"; exit 1; }
+          done
+
+          [[ "${IMAGE_TAG}" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::image_tag must be a 40-character lowercase commit SHA"; exit 1; }
+          [[ "${IMAGE_REPOSITORY}" =~ ^[a-z0-9][a-z0-9._/-]*$ ]] || { echo "::error::Invalid Docker image repository"; exit 1; }
+
+      - name: Configure consumer SSH
+        env:
+          CONSUMER_EC2_KNOWN_HOSTS: ${{ secrets.CONSUMER_EC2_KNOWN_HOSTS }}
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          install -d -m 700 "${HOME}/.ssh"
+          printf '%s\n' "${EC2_SSH_PRIVATE_KEY}" >"${RUNNER_TEMP}/consumer_ec2_key"
+          printf '%s\n' "${CONSUMER_EC2_KNOWN_HOSTS}" >"${HOME}/.ssh/consumer_known_hosts"
+          chmod 600 "${RUNNER_TEMP}/consumer_ec2_key" "${HOME}/.ssh/consumer_known_hosts"
+
+      - name: Upload versioned consumer deployment script
+        env:
+          CONSUMER_EC2_HOST: ${{ secrets.CONSUMER_EC2_HOST }}
+          CONSUMER_EC2_USER: ${{ secrets.CONSUMER_EC2_USER }}
+        run: |
+          set -euo pipefail
+
+          scp \
+            -i "${RUNNER_TEMP}/consumer_ec2_key" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="${HOME}/.ssh/consumer_known_hosts" \
+            -o ConnectTimeout=10 \
+            .github/scripts/deploy-v1-consumer.sh \
+            "${CONSUMER_EC2_USER}@${CONSUMER_EC2_HOST}:/tmp/deploy-v1-consumer.sh"
+
+      - name: Deploy consumer image
+        env:
+          CONSUMER_EC2_HOST: ${{ secrets.CONSUMER_EC2_HOST }}
+          CONSUMER_EC2_USER: ${{ secrets.CONSUMER_EC2_USER }}
+        run: |
+          set -euo pipefail
+
+          remote_image="${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+          ssh \
+            -i "${RUNNER_TEMP}/consumer_ec2_key" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="${HOME}/.ssh/consumer_known_hosts" \
+            -o ConnectTimeout=10 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=3 \
+            "${CONSUMER_EC2_USER}@${CONSUMER_EC2_HOST}" \
+            "chmod 700 /tmp/deploy-v1-consumer.sh && /tmp/deploy-v1-consumer.sh '${remote_image}'"
+
+      - name: Remove remote deployment script
+        if: always()
+        env:
+          CONSUMER_EC2_HOST: ${{ secrets.CONSUMER_EC2_HOST }}
+          CONSUMER_EC2_USER: ${{ secrets.CONSUMER_EC2_USER }}
+        run: |
+          set -euo pipefail
+
+          if [[ -f "${RUNNER_TEMP}/consumer_ec2_key" && -n "${CONSUMER_EC2_HOST:-}" && -n "${CONSUMER_EC2_USER:-}" ]]; then
+            ssh \
+              -i "${RUNNER_TEMP}/consumer_ec2_key" \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="${HOME}/.ssh/consumer_known_hosts" \
+              -o ConnectTimeout=10 \
+              "${CONSUMER_EC2_USER}@${CONSUMER_EC2_HOST}" \
+              'rm -f /tmp/deploy-v1-consumer.sh' || true
+          fi
