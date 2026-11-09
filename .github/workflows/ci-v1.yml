@@ -31,23 +31,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "25"
-          cache: gradle
-
-      - name: Grant Gradle wrapper permission
-        run: chmod +x ./gradlew
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
       - name: Verify Docker image build
-        env:
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build \
-            --tag "cosmos-backend:${IMAGE_TAG}" \
-            .
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./dockerfile
+          load: true
+          push: false
+          tags: cosmos-backend:${{ github.sha }}
+          cache-from: type=gha,scope=v1-backend
+          cache-to: type=gha,mode=max,scope=v1-backend
 
       - name: Export deployment image
         if: github.event_name == 'push' && github.ref == 'refs/heads/dev'

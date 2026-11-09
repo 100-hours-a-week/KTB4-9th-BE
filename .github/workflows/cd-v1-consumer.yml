@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: Docker Hub에 게시된 dev commit SHA (40자리)
-        required: true
+        description: 선택 사항 - 비워두면 선택한 dev 브랜치의 현재 commit SHA 사용
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -25,7 +26,7 @@ jobs:
 
     env:
       IMAGE_REPOSITORY: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}
-      IMAGE_TAG: ${{ inputs.image_tag }}
+      IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
 
     steps:
       - name: Checkout deployment script
