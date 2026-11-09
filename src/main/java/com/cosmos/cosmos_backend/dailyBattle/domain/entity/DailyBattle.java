@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "daily_battles",
@@ -37,6 +38,9 @@ public class DailyBattle {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "result_published_at")
+    private LocalDateTime resultPublishedAt;
+
     public DailyBattle(
             LocalDate battleDate,
             Category category,
@@ -47,6 +51,13 @@ public class DailyBattle {
         this.category = category;
         this.title = title;
         this.content = content;
+    }
+
+    // 정답 공개 가능 처리
+    public void publishResult(LocalDateTime publishedAt) {
+        if (this.resultPublishedAt == null) {
+            this.resultPublishedAt = publishedAt;
+        }
     }
 
 

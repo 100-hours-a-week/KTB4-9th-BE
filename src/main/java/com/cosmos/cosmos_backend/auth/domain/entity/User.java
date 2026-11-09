@@ -43,4 +43,14 @@ public class User {
         this.profileImageUrl = profileImageUrl;
     }
 
+    // 탈퇴 처리
+    public void requestWithdrawal(LocalDateTime now) {
+        this.deletedAt = now;
+    }
+
+    // 탈퇴 취소 처리
+    public void cancelWithdrawal() {
+        this.deletedAt = null;
+    }
+
 }

@@ -5,8 +5,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
@@ -33,14 +35,33 @@ public class SecurityConfig {
                         .requestMatchers("/auth/oauth/**", "/auth/token/refresh",
                                 "/auth/logout"
                         ).permitAll()
+                        .requestMatchers(
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/auth/me"),
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/auth/withdrawal/cancel")
+                        ).authenticated()
+                        // dev 프로필에서만 생성되는 부하 테스트 fixture 엔드포인트
+                        // 컨트롤러에서 별도의 X-Load-Test-Secret을 검증
+                        .requestMatchers(HttpMethod.POST, "/internal/load-test/battle/users").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                         .requestMatchers("/daily-problems").permitAll()
-                        .requestMatchers("/daily-battles/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers(
                                 PathPatternRequestMatcher.pathPattern(HttpMethod.GET,"/problems/new"),
-                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/problems")).permitAll()
-                        .anyRequest().authenticated()
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/problems"),
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.POST,"/daily-battles/problem")).permitAll()
+                        .anyRequest().access((authentication, context) -> {
+                            Object principal = authentication.get().getPrincipal();
+
+                            if (!(principal instanceof Jwt jwt)) {
+                                return new AuthorizationDecision(false);
+                            }
+
+                            String tokenType = jwt.getClaimAsString("token_type");
+                            boolean isWithdrawalRecoveryToken =
+                                    "WITHDRAWAL_RECOVERY".equals(tokenType);
+
+                            return new AuthorizationDecision(!isWithdrawalRecoveryToken);
+                        })
                 )
 
                 .oauth2ResourceServer(oauth -> oauth

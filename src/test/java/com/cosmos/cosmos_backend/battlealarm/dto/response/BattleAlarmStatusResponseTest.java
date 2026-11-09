@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test;
 
 class BattleAlarmStatusResponseTest {
 
-    private static final OffsetDateTime SERVER_TIME = OffsetDateTime.parse("2026-10-13T12:00:01+09:00");
-    private static final OffsetDateTime CLOSES_AT = OffsetDateTime.parse("2026-10-13T12:10:00+09:00");
+    private static final OffsetDateTime SERVER_TIME = OffsetDateTime.parse("2026-10-13T12:50:01+09:00");
+    private static final OffsetDateTime CLOSES_AT = OffsetDateTime.parse("2026-10-13T13:00:00+09:00");
 
     @Test
     void notOpen_hasNoBattleIdAndFalseFlags() {
@@ -26,13 +26,13 @@ class BattleAlarmStatusResponseTest {
     }
 
     @Test
-    void closed_hasNoBattleIdAndFalseFlags() {
+    void closed_keepsBattleIdForResultLookup_andFalseFlags() {
         // When
-        BattleAlarmStatusResponse response = BattleAlarmStatusResponse.closed(SERVER_TIME, CLOSES_AT);
+        BattleAlarmStatusResponse response = BattleAlarmStatusResponse.closed(SERVER_TIME, 3L, CLOSES_AT);
 
         // Then
         assertThat(response.status()).isEqualTo(BattleAlarmStatus.CLOSED);
-        assertThat(response.battleId()).isNull();
+        assertThat(response.battleId()).isEqualTo(3L);
         assertThat(response.participated()).isFalse();
         assertThat(response.dismissed()).isFalse();
     }

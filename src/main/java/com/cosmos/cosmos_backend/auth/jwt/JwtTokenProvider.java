@@ -47,4 +47,29 @@ public class JwtTokenProvider {
         // 5. 최종 JWT 문자열 반환
         return jwt.getTokenValue();
     }
+
+    // 탈퇴 취소 후 복구용 JWT 생성
+    public String createWithdrawalRecoveryToken(
+            Long userId,
+            String username
+    ) {
+        Instant now = Instant.now();
+
+        Instant expiresAt = now.plusSeconds(accessTokenExpiration);
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .subject(String.valueOf(userId))
+                .claim("username", username)
+                // 일반 Access Token과 구분하기 위한 토큰 종류 추가
+                .claim("token_type", "WITHDRAWAL_RECOVERY")
+                .issuedAt(now)
+                .expiresAt(expiresAt)
+                .build();
+
+        JwtEncoderParameters parameters = JwtEncoderParameters.from(claims);
+
+        Jwt jwt = jwtEncoder.encode(parameters);
+
+        return jwt.getTokenValue();
+    }
 }

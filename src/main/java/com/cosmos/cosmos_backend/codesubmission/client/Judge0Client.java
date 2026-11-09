@@ -5,6 +5,8 @@ import com.cosmos.cosmos_backend.common.Language;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.problem.domain.entity.RunningLimit;
 import com.cosmos.cosmos_backend.problem.domain.entity.TestCase;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -31,14 +33,29 @@ public class Judge0Client {
 
     private final RestClient judge0RestClient;
     private final Judge0Properties properties;
+    private final Timer judgingDuration;
 
-    public Judge0Client(@Qualifier("judge0RestClient") RestClient judge0RestClient, Judge0Properties properties) {
+    public Judge0Client(
+            @Qualifier("judge0RestClient") RestClient judge0RestClient,
+            Judge0Properties properties,
+            MeterRegistry meterRegistry
+    ) {
         this.judge0RestClient = judge0RestClient;
         this.properties = properties;
+        this.judgingDuration = Timer.builder("judge0.judging.duration")
+                .description("Time from submitting code to Judge0 until all polling results are complete")
+                .publishPercentileHistogram()
+                .minimumExpectedValue(Duration.ofMillis(1))
+                .maximumExpectedValue(properties.maxWait().plus(properties.readTimeout()))
+                .register(meterRegistry);
     }
 
     /** 테스트케이스마다 판정을 받아 테스트케이스 순서대로 반환. 실패하면 503. */
     public List<JudgingResult> judge(Language language, String sourceCode, List<TestCase> testCases, RunningLimit limit) {
+        return judgingDuration.record(() -> judgeAndWait(language, sourceCode, testCases, limit));
+    }
+
+    private List<JudgingResult> judgeAndWait(Language language, String sourceCode, List<TestCase> testCases, RunningLimit limit) {
         List<JudgingResult> verdicts = new ArrayList<>();
         try {
             // 1. 테스트케이스를 Judge0 배치 한도씩 나눠서 처리

@@ -4,10 +4,19 @@ spring:
     username: cosmos
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
   task:
     scheduling:
       pool:
-        size: 2
+        size: 3
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: ${RABBITMQ_DEFAULT_USER:guest}
+    password: ${RABBITMQ_DEFAULT_PASS:guest}
+    virtual-host: ${RABBITMQ_DEFAULT_VHOST:/}
 
   jpa:
     hibernate:
@@ -17,7 +26,7 @@ spring:
 
 logging:
   level:
-    org.springframework.security.web.FilterChainProxy: TRACE
+    org.springframework.security.web.FilterChainProxy: INFO
 
 kakao:
   client-id: ${KAKAO_CLIENT_ID}
@@ -67,4 +76,5 @@ jdbc:
   datasource-proxy:
     enabled: true
   includes:
+    - CONNECTION
     - QUERY

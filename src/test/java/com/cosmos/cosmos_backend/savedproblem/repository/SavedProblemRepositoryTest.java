@@ -33,9 +33,9 @@ class SavedProblemRepositoryTest {
         Problem solved = saveProblem(Difficulty.LV1, "정답 문제");
         Problem trying = saveProblem(Difficulty.LV2, "풀이 중 문제");
         Problem none = saveProblem(Difficulty.LV3, "미제출 문제");
-        em.persist(new SavedProblem(7L, solved.getId()));
-        em.persist(new SavedProblem(7L, trying.getId()));
-        em.persist(new SavedProblem(7L, none.getId()));
+        em.persist(new SavedProblem(7L, solved.getId(), false));
+        em.persist(new SavedProblem(7L, trying.getId(), true));
+        em.persist(new SavedProblem(7L, none.getId(), false));
         ApproachSubmission mine = new ApproachSubmission(7L, solved.getId(), Category.ARRAY, "내 풀이", true, 90, "좋아요");
         mine.markAsSolved();
         em.persist(mine);
@@ -57,6 +57,14 @@ class SavedProblemRepositoryTest {
         assertThat(tryingRow.isSolved()).isFalse();
         assertThat(noneRow.isSolved()).isNull();
         assertThat(noneRow.naturalSolution()).isNull();
+        // 저장할 때 기록한 categoryKnown과 제출 결과(카테고리 정답 여부, 제출 횟수)가 함께 조회됨
+        assertThat(solvedRow.categoryKnown()).isFalse();
+        assertThat(tryingRow.categoryKnown()).isTrue();
+        assertThat(solvedRow.categoryResult()).isTrue();
+        assertThat(tryingRow.categoryResult()).isFalse();
+        assertThat(solvedRow.submittedCount()).isEqualTo(1);
+        assertThat(noneRow.categoryResult()).isNull();
+        assertThat(noneRow.submittedCount()).isNull();
     }
 
     @Test
@@ -64,8 +72,8 @@ class SavedProblemRepositoryTest {
         // Given
         Problem easy = saveProblem(Difficulty.LV1, "쉬운 문제");
         Problem hard = saveProblem(Difficulty.LV4, "어려운 문제");
-        em.persist(new SavedProblem(7L, easy.getId()));
-        em.persist(new SavedProblem(7L, hard.getId()));
+        em.persist(new SavedProblem(7L, easy.getId(), false));
+        em.persist(new SavedProblem(7L, hard.getId(), false));
         em.flush();
 
         // When

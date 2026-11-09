@@ -10,6 +10,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.cosmos.cosmos_backend.approach.domain.EvaluationFailureCode;
 import com.cosmos.cosmos_backend.common.Language;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import java.io.IOException;
@@ -166,9 +167,68 @@ class AiEvaluationClientTest {
     void evaluate_throws503_whenAiReturnsErrorStatus(int status) {
         server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.valueOf(status))
                 .contentType(MediaType.APPLICATION_JSON)
-                .body("{\"success\":false,\"error_code\":\"INVALID_CATEGORY\",\"message\":\"오류\"}"));
+                .body("{\"success\":false,\"errorCode\":\"INVALID_CATEGORY\",\"message\":\"오류\"}"));
 
         assertFailsWith(HttpStatus.SERVICE_UNAVAILABLE, "ai_server_unavailable");
+    }
+
+    private void assertFailureClassifiedAs(EvaluationFailureCode code, boolean retryable, String detail) {
+        assertThatThrownBy(() -> client.evaluate(request()))
+                .isInstanceOfSatisfying(AiEvaluationFailedException.class, e -> {
+                    assertThat(e.getFailureCode()).isEqualTo(code);
+                    assertThat(e.isRetryable()).isEqualTo(retryable);
+                    assertThat(e.getDetail()).isEqualTo(detail);
+                });
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {400, 422})
+    void evaluate_isNotRetryable_andKeepsAiErrorCode_whenAiRejectsRequest(int status) {
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.valueOf(status))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"success\":false,\"errorCode\":\"INVALID_CATEGORY\",\"message\":\"오류\"}"));
+
+        assertFailureClassifiedAs(EvaluationFailureCode.AI_REQUEST_REJECTED, false, "INVALID_CATEGORY");
+    }
+
+    @Test
+    void evaluate_isNotRetryable_withNullDetail_whenRejectionBodyIsNotReadable() {
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("not json"));
+
+        assertFailureClassifiedAs(EvaluationFailureCode.AI_REQUEST_REJECTED, false, null);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {429, 500, 503})
+    void evaluate_isRetryable_whenAiReturnsServerErrorOrRateLimit(int status) {
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.valueOf(status))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"success\":false,\"errorCode\":\"MODEL_UNAVAILABLE\",\"message\":\"장애\"}"));
+
+        assertFailureClassifiedAs(EvaluationFailureCode.AI_SERVER_UNAVAILABLE, true, null);
+    }
+
+    @Test
+    void evaluate_isRetryable_whenConnectionFails() {
+        server.expect(requestTo(URL)).andRespond(withException(new ConnectException("Connection refused")));
+
+        assertFailureClassifiedAs(EvaluationFailureCode.AI_SERVER_UNAVAILABLE, true, null);
+    }
+
+    @Test
+    void evaluate_isRetryableTimeout_whenReadTimesOut() {
+        server.expect(requestTo(URL)).andRespond(withException(new SocketTimeoutException("Read timed out")));
+
+        assertFailureClassifiedAs(EvaluationFailureCode.AI_SERVER_TIMEOUT, true, null);
+    }
+
+    @Test
+    void evaluate_isRetryable_whenAiReportsFailureWithStatus200() {
+        respond200("{\"success\":false,\"errorCode\":\"MODEL_UNAVAILABLE\",\"message\":\"장애\"}");
+
+        assertFailureClassifiedAs(EvaluationFailureCode.AI_SERVER_UNAVAILABLE, true, null);
     }
 
     @Test

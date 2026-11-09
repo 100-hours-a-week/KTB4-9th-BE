@@ -3,7 +3,9 @@ package com.cosmos.cosmos_backend.codesubmission.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,8 +32,10 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -99,7 +103,7 @@ class CodeSubmissionServiceTest {
     // 이 사용자의 이전 제출이 없는 상태(첫 제출)를 만든다.
     private void givenNoPreviousSubmission() {
         when(codeSubmissionRepository.findSubmittedCount(USER_ID, PROBLEM_ID)).thenReturn(Optional.empty());
-        when(codeSubmissionRepository.findForUpdateByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.empty());
+        when(codeSubmissionRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.empty());
         when(codeSubmissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -107,6 +111,7 @@ class CodeSubmissionServiceTest {
     private CodeSubmission givenPreviousSubmissions(int count) {
         CodeSubmission existing = existingWithCount(count);
         when(codeSubmissionRepository.findSubmittedCount(USER_ID, PROBLEM_ID)).thenReturn(Optional.of(count));
+        when(codeSubmissionRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.of(existing));
         when(codeSubmissionRepository.findForUpdateByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.of(existing));
         return existing;
     }
@@ -139,6 +144,8 @@ class CodeSubmissionServiceTest {
         assertThat(submission.getSubmittedCount()).isEqualTo(1);
         assertThat(submission.getLanguage()).isEqualTo(Language.PYTHON);
         assertThat(submission.getSourceCode()).isEqualTo("print(1)");
+        verify(codeSubmissionRepository).findByUserIdAndProblemId(USER_ID, PROBLEM_ID);
+        verify(codeSubmissionRepository, never()).findForUpdateByUserIdAndProblemId(any(), any());
     }
 
     @Test
@@ -230,6 +237,9 @@ class CodeSubmissionServiceTest {
         assertThat(submission.getJudgingResult()).isEqualTo(JudgingResult.CORRECT);
         assertThat(submission.getLanguage()).isEqualTo(Language.JAVASCRIPT);
         assertThat(submission.getSourceCode()).isEqualTo("console.log(1)");
+        InOrder lookupOrder = inOrder(codeSubmissionRepository);
+        lookupOrder.verify(codeSubmissionRepository).findByUserIdAndProblemId(USER_ID, PROBLEM_ID);
+        lookupOrder.verify(codeSubmissionRepository).findForUpdateByUserIdAndProblemId(USER_ID, PROBLEM_ID);
         verify(codeSubmissionRepository, never()).save(any());
     }
 
@@ -274,6 +284,7 @@ class CodeSubmissionServiceTest {
         givenLimits();
         CodeSubmission existing = existingWithCount(5);
         when(codeSubmissionRepository.findSubmittedCount(USER_ID, PROBLEM_ID)).thenReturn(Optional.of(4));
+        when(codeSubmissionRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.of(existing));
         when(codeSubmissionRepository.findForUpdateByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.of(existing));
         when(judge0Client.judge(any(), any(), any(), any())).thenReturn(List.of(JudgingResult.CORRECT));
 
@@ -375,5 +386,60 @@ class CodeSubmissionServiceTest {
             existing.resubmit(Language.PYTHON, "old", LocalDateTime.now().minusMinutes(10 - i), JudgingResult.WRONG_ANSWER, 0, 1);
         }
         return existing;
+    }
+
+    @Test
+    void submit_retriesAsUpdate_whenConcurrentFirstSubmissionInsertedFirst() {
+        // Given: 처음 조회는 비어 있고(INSERT 시 유니크 위반), 다시 조회하면 먼저 들어온 행이 있음
+        givenTestCases(1);
+        givenLimits();
+        CodeSubmission existing = existingWithCount(1);
+        when(codeSubmissionRepository.findSubmittedCount(USER_ID, PROBLEM_ID)).thenReturn(Optional.empty());
+        when(codeSubmissionRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID))
+                .thenReturn(Optional.empty(), Optional.of(existing));
+        when(codeSubmissionRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(codeSubmissionRepository.findForUpdateByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.of(existing));
+        when(judge0Client.judge(any(), any(), any(), any())).thenReturn(List.of(JudgingResult.CORRECT));
+
+        // When
+        CodeSubmissionResult result = service.submit(USER_ID, PROBLEM_ID, "JAVASCRIPT", "console.log(1)");
+
+        // Then: 기존 행이 갱신되고 제출 횟수가 올라감
+        assertThat(result.submission()).isSameAs(existing);
+        assertThat(result.submission().getSubmittedCount()).isEqualTo(2);
+    }
+
+    @Test
+    void submit_throwsOriginalException_whenRetryAlsoFails() {
+        // Given: 재시도에서도 유니크 위반이 나는 상황
+        givenTestCases(1);
+        givenLimits();
+        when(codeSubmissionRepository.findSubmittedCount(USER_ID, PROBLEM_ID)).thenReturn(Optional.empty());
+        when(codeSubmissionRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.empty());
+        when(codeSubmissionRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(judge0Client.judge(any(), any(), any(), any())).thenReturn(List.of(JudgingResult.CORRECT));
+
+        // When & Then: 한 번만 재시도하고 예외가 그대로 나감
+        assertThatThrownBy(() -> service.submit(USER_ID, PROBLEM_ID, "JAVASCRIPT", "console.log(1)"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        verify(codeSubmissionRepository, times(2)).save(any());
+    }
+
+    @Test
+    void submit_throws429_whenRetryFindsLimitReached() {
+        // Given: 충돌 후 다시 보니 이미 한도에 도달한 상태
+        givenTestCases(1);
+        givenLimits();
+        CodeSubmission full = existingWithCount(CodeSubmission.MAX_SUBMISSION_COUNT);
+        when(codeSubmissionRepository.findSubmittedCount(USER_ID, PROBLEM_ID)).thenReturn(Optional.empty());
+        when(codeSubmissionRepository.findByUserIdAndProblemId(USER_ID, PROBLEM_ID))
+                .thenReturn(Optional.empty(), Optional.of(full));
+        when(codeSubmissionRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(codeSubmissionRepository.findForUpdateByUserIdAndProblemId(USER_ID, PROBLEM_ID)).thenReturn(Optional.of(full));
+        when(judge0Client.judge(any(), any(), any(), any())).thenReturn(List.of(JudgingResult.CORRECT));
+
+        // When & Then
+        assertBusiness(() -> service.submit(USER_ID, PROBLEM_ID, "JAVASCRIPT", "console.log(1)"),
+                HttpStatus.TOO_MANY_REQUESTS, "submission_limit_exceeded");
     }
 }

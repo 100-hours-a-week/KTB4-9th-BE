@@ -15,6 +15,10 @@ public interface DailyGeneratedCountRepository extends JpaRepository<DailyGenera
     @Query("select c.generationCount from DailyGeneratedCount c where c.userId = :userId and c.usageDate = :usageDate")
     Optional<Integer> findCount(@Param("userId") Long userId, @Param("usageDate") LocalDate usageDate);
 
+    // 오늘 마지막으로 생성한 문제 id를 조회 (행이 없거나 값이 NULL이면 비어 있음)
+    @Query("select c.lastProblemId from DailyGeneratedCount c where c.userId = :userId and c.usageDate = :usageDate")
+    Optional<Long> findLastProblemId(@Param("userId") Long userId, @Param("usageDate") LocalDate usageDate);
+
     // 행을 잠그고 조회 (트랜잭션 안에서만 호출 가능)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<DailyGeneratedCount> findForUpdateByUserIdAndUsageDate(Long userId, LocalDate usageDate);

@@ -38,6 +38,7 @@ public record ProblemSelectionResponse(ProblemSummary problem, DailyUsage dailyU
     public static ProblemSelectionResponse of(
             Problem problem,
             List<ProblemExample> examples,
+            Category visibleCategory,
             LocalDate date,
             int usedCount,
             int limit
@@ -47,7 +48,7 @@ public record ProblemSelectionResponse(ProblemSummary problem, DailyUsage dailyU
                         problem.getId(),
                         // "LV3" → 3 (명세의 level은 숫자)
                         Integer.parseInt(problem.getDifficulty().name().substring(2)),
-                        problem.getCategory(),
+                        visibleCategory,
                         problem.getTitle(),
                         problem.getContent(),
                         examples.stream()

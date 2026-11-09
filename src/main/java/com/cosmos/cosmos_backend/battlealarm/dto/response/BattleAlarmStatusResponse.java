@@ -4,7 +4,7 @@ import com.cosmos.cosmos_backend.battlealarm.domain.BattleAlarmStatus;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.OffsetDateTime;
 
-/** 배틀 알림 상태 확인 응답. OPEN이 아니면 battle_id는 null, participated와 dismissed는 false. */
+/** 배틀 알림 상태 확인 응답. CLOSED 상태에서도 결과 조회를 위해 오늘의 battle_id를 반환할 수 있음. */
 public record BattleAlarmStatusResponse(
         BattleAlarmStatus status,
         @JsonProperty("server_time") OffsetDateTime serverTime,
@@ -20,8 +20,8 @@ public record BattleAlarmStatusResponse(
     }
 
     /** 12:10 이후 응답. */
-    public static BattleAlarmStatusResponse closed(OffsetDateTime serverTime, OffsetDateTime closesAt) {
-        return new BattleAlarmStatusResponse(BattleAlarmStatus.CLOSED, serverTime, null, false, false, closesAt);
+    public static BattleAlarmStatusResponse closed(OffsetDateTime serverTime, Long battleId, OffsetDateTime closesAt) {
+        return new BattleAlarmStatusResponse(BattleAlarmStatus.CLOSED, serverTime, battleId, false, false, closesAt);
     }
 
     /** 열려 있어야 하는 시간인데 배틀이 준비되지 않은 응답. */

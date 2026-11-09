@@ -31,6 +31,9 @@ dependencies {
 	// 헬스체크 및 프로메테우스 메트릭
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+
+	// 평가 완료 이벤트 서버 간 전달
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	// Local-profile JDBC query timing observations (disabled outside local profile).
 	implementation 'net.ttddyy.observation:datasource-micrometer-spring-boot:2.3.0'
 
@@ -45,6 +48,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
 	implementation 'com.github.ben-manes.caffeine:caffeine'
 
+	// RabbitMQ
+	implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 
@@ -53,6 +59,9 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+	testImplementation 'org.testcontainers:testcontainers-mysql'
 
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'com.h2database:h2'
@@ -63,6 +72,57 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	systemProperty 'recovery.test.runtime-classpath', sourceSets.test.runtimeClasspath.asPath
+}
+
+tasks.register('dailyBattleConcurrencyTest', Test) {
+	group = 'verification'
+	description = 'Runs the MySQL daily battle submission/timeout concurrency reproduction test.'
+	dependsOn tasks.named('testClasses')
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform()
+	filter {
+		includeTestsMatching 'com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleSubmissionTimeoutConcurrencyIntegrationTest'
+	}
+	testLogging {
+		events 'passed', 'skipped', 'failed'
+		showStandardStreams = true
+	}
+}
+
+tasks.register('battleGradingIntegrationTest', Test) {
+	group = 'verification'
+	description = 'Runs the MySQL grading lease and stale-worker integration tests.'
+	dependsOn tasks.named('testClasses')
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform()
+	filter {
+		includeTestsMatching 'com.cosmos.cosmos_backend.dailyBattle.service.BattleGradingIntegrationTest'
+	}
+	testLogging {
+		events 'passed', 'skipped', 'failed'
+		showStandardStreams = true
+	}
+}
+
+tasks.register('battleWorkerRecoveryIntegrationTest', Test) {
+	group = 'verification'
+	description = 'Runs the MySQL daily battle server-restart recovery integration tests.'
+	dependsOn tasks.named('testClasses')
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform()
+	systemProperty 'recovery.test.runtime-classpath', sourceSets.test.runtimeClasspath.asPath
+	filter {
+		includeTestsMatching 'com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleWorkerRecoveryIntegrationTest'
+		includeTestsMatching 'com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleWorkerProcessRestartIntegrationTest'
+	}
+	testLogging {
+		events 'passed', 'skipped', 'failed'
+		showStandardStreams = true
+	}
 }
 
 // 로컬 실행에서만 `-Ppyroscope=true`로 켜는 프로파일러입니다.

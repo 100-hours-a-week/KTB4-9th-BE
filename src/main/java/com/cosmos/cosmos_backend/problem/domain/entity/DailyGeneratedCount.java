@@ -37,15 +37,21 @@ public class DailyGeneratedCount {
     @Column(name = "generation_count", nullable = false)
     private Integer generationCount;
 
-    // 그날 처음 사용할 때 횟수 1로 생성
-    public DailyGeneratedCount(Long userId, LocalDate usageDate) {
+    // 오늘 마지막으로 생성한 문제 (이 칼럼을 추가하기 전에 만들어진 행은 NULL)
+    @Column(name = "last_problem_id")
+    private Long lastProblemId;
+
+    // 그날 처음 사용할 때 횟수 1로 생성하고 받은 문제를 기록
+    public DailyGeneratedCount(Long userId, LocalDate usageDate, Long problemId) {
         this.userId = userId;
         this.usageDate = usageDate;
         this.generationCount = 1;
+        this.lastProblemId = problemId;
     }
 
-    // 사용 횟수를 1 늘림
-    public void increase() {
+    // 사용 횟수를 1 늘리고 받은 문제로 기록을 바꿈
+    public void increase(Long problemId) {
         this.generationCount += 1;
+        this.lastProblemId = problemId;
     }
 }

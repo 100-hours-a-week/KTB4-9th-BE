@@ -3,5 +3,9 @@ package com.cosmos.cosmos_backend.dailyBattle.repository;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
+
 public interface BattleSubmissionRepository extends JpaRepository<BattleSubmission,Long> {
+
+    List<BattleSubmission> findByParticipation_participationId(Long participationId);
 }
