@@ -48,6 +48,11 @@ evaluation:
   mq:
     enabled: ${EVALUATION_MQ_ENABLED:false}
     request-ttl: ${EVALUATION_MQ_REQUEST_TTL:5m}
+    publish-lease: ${EVALUATION_MQ_PUBLISH_LEASE:10s}
+    pending-fail-after: ${EVALUATION_MQ_PENDING_FAIL_AFTER:2m}
+    relay-interval: ${EVALUATION_MQ_RELAY_INTERVAL:1s}
+    relay-batch-size: ${EVALUATION_MQ_RELAY_BATCH_SIZE:50}
+    confirm-timeout: ${EVALUATION_MQ_CONFIRM_TIMEOUT:5s}
 
 judge0:
   connect-timeout: ${JUDGE0_CONNECT_TIMEOUT:3s}

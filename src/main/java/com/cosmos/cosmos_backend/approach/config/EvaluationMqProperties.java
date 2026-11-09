@@ -16,6 +16,16 @@ public record EvaluationMqProperties(
         // 만료되거나 거절된 요청이 가는 큐
         @DefaultValue("evaluation.request.dlq") String requestDlq,
         // 요청이 이 시간 안에 처리되지 않으면 만료되어 DLQ로 이동
-        @DefaultValue("5m") Duration requestTtl
+        @DefaultValue("5m") Duration requestTtl,
+        // 선점한 작업을 이 시간 동안 다른 릴레이가 가져가지 않음 (발행 실패 시 다시 시도하기까지의 간격)
+        @DefaultValue("10s") Duration publishLease,
+        // 접수 후 이 시간이 지나도 PENDING이면 FAILED로 처리
+        @DefaultValue("2m") Duration pendingFailAfter,
+        // 릴레이가 발행 대기 작업을 확인하는 주기
+        @DefaultValue("1s") Duration relayInterval,
+        // 릴레이가 한 번에 선점해서 발행하는 최대 작업 수
+        @DefaultValue("50") int relayBatchSize,
+        // 발행 확인(Confirm)을 기다리는 최대 시간
+        @DefaultValue("5s") Duration confirmTimeout
 ) {
 }

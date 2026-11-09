@@ -122,6 +122,31 @@ public class SolutionEvaluationTask {
         this.updatedAt = now;
     }
 
+    /** 발행 확인을 받아 PROCESSING이 됨 (MQ 경로). PENDING 또는 RETRY_WAIT에서만 가능. */
+    public void markPublished(LocalDateTime now) {
+        // 1. 발행 대기 중인 작업만 가능
+        if (!isWaitingForPublish()) {
+            throw illegalTransition(EvaluationTaskStatus.PROCESSING);
+        }
+        // 2. 처리 중으로 바꾸고 발행 확인 시각을 기록 (MQ 경로의 시도 횟수는 1로 고정)
+        this.status = EvaluationTaskStatus.PROCESSING;
+        this.workerAttemptCount = 1;
+        this.startedAt = now;
+        this.nextRetryAt = null;
+        this.updatedAt = now;
+    }
+
+    /** 릴레이가 발행하려고 작업을 맡음. 이 시각 전에는 다른 릴레이가 가져가지 않음. */
+    public void reservePublish(LocalDateTime until, LocalDateTime now) {
+        // 1. 발행 대기 중인 작업만 예약할 수 있음
+        if (!isWaitingForPublish()) {
+            throw illegalTransition(EvaluationTaskStatus.PROCESSING);
+        }
+        // 2. 예약 시각을 기록
+        this.nextRetryAt = until;
+        this.updatedAt = now;
+    }
+
     /** 일시 오류로 재시도 대기에 들어감. PROCESSING에서만 가능. 활성 상태는 유지됨. */
     public void scheduleRetry(LocalDateTime nextRetryAt, String errorCode, String errorMessage, LocalDateTime now) {
         // 1. 처리 중인 작업만 재시도 대기로 보낼 수 있음
@@ -136,10 +161,10 @@ public class SolutionEvaluationTask {
         this.updatedAt = now;
     }
 
-    /** AI 평가와 결과 저장이 성공. PROCESSING에서만 가능. 활성 상태가 해제됨. */
+    /** AI 평가와 결과 저장이 성공. 최종 상태가 아니면 가능 (결과가 PROCESSING 표시보다 먼저 올 수 있음). 활성 상태가 해제됨. */
     public void markSucceeded(Long submissionId, LocalDateTime now) {
-        // 1. 처리 중인 작업만 성공 처리할 수 있음
-        if (status != EvaluationTaskStatus.PROCESSING) {
+        // 1. 이미 끝난 작업은 성공 처리할 수 없음
+        if (isFinished()) {
             throw illegalTransition(EvaluationTaskStatus.SUCCEEDED);
         }
         // 2. 성공 상태로 바꾸고 이전 재시도 오류 기록을 지움
@@ -154,10 +179,10 @@ public class SolutionEvaluationTask {
         this.updatedAt = now;
     }
 
-    /** 최종 실패. PROCESSING에서만 가능. 활성 상태가 해제됨. */
+    /** 최종 실패. 최종 상태가 아니면 가능 (발행하지 못한 PENDING도 실패 처리할 수 있음). 활성 상태가 해제됨. */
     public void markFailed(String errorCode, String errorMessage, LocalDateTime now) {
-        // 1. 처리 중인 작업만 실패 처리할 수 있음
-        if (status != EvaluationTaskStatus.PROCESSING) {
+        // 1. 이미 끝난 작업은 실패 처리할 수 없음
+        if (isFinished()) {
             throw illegalTransition(EvaluationTaskStatus.FAILED);
         }
         // 2. 실패 상태로 바꾸고 오류 내용을 기록
@@ -169,6 +194,16 @@ public class SolutionEvaluationTask {
         this.activeSlot = null;
         this.completedAt = now;
         this.updatedAt = now;
+    }
+
+    // 발행을 기다리는 상태인지 (PENDING 또는 RETRY_WAIT)
+    private boolean isWaitingForPublish() {
+        return status == EvaluationTaskStatus.PENDING || status == EvaluationTaskStatus.RETRY_WAIT;
+    }
+
+    // 최종 상태인지 (SUCCEEDED 또는 FAILED)
+    private boolean isFinished() {
+        return status == EvaluationTaskStatus.SUCCEEDED || status == EvaluationTaskStatus.FAILED;
     }
 
     // 허용되지 않는 상태 변경 예외 생성
