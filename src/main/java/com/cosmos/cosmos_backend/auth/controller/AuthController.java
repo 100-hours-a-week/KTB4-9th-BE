@@ -1,10 +1,7 @@
 package com.cosmos.cosmos_backend.auth.controller;
 
 import com.cosmos.cosmos_backend.auth.domain.entity.User;
-import com.cosmos.cosmos_backend.auth.dto.LoginResponseDto;
-import com.cosmos.cosmos_backend.auth.dto.LoginResult;
-import com.cosmos.cosmos_backend.auth.dto.LogoutResult;
-import com.cosmos.cosmos_backend.auth.dto.TokenRefreshResult;
+import com.cosmos.cosmos_backend.auth.dto.*;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.auth.service.AuthService;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
@@ -65,20 +62,29 @@ public class AuthController {
 
     @GetMapping("/me")
     @Operation(summary = "내 정보 조회", description = "accessToken 쿠키로 인증된 사용자의 기본 정보를 조회합니다.")
-    public LoginResponseDto getMe(@Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
+    public CurrentUserResponseDto getMe(@Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
 
         // 1. Spring Security가 검증한 JWT에서 userId(sub) 가져오기
         Long userId = Long.valueOf(jwt.getSubject());
 
         // 2. DB에서 현재 사용자 조회
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+        User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
+                HttpStatus.NOT_FOUND, "user_not_found")
+        );
+
+        boolean withdrawalPending = user.getDeletedAt() != null;
 
         // 3. 프론트에 사용자 정보 반환
-        return new LoginResponseDto(
+        return new CurrentUserResponseDto(
                 user.getId(),
                 user.getUsername(),
-                user.getProfileImageUrl()
+                user.getProfileImageUrl(),
+                withdrawalPending ? "WITHDRAWAL_PENDING" : "ACTIVE",
+                withdrawalPending,
+                user.getDeletedAt(),
+                withdrawalPending
+                        ? user.getDeletedAt().plusDays(30)
+                        : null
         );
     }
 
@@ -158,5 +164,63 @@ public class AuthController {
         }
 
     }
+
+    // 탈퇴 요청
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponse<WithdrawalResponseDto>> withdraw(
+            @AuthenticationPrincipal Jwt userJwt
+    ) {
+        // 사용자 ID 조회
+        Long userId = Long.valueOf(userJwt.getSubject());
+
+        // 탈퇴 신청 처리
+        WithdrawalResult result = authService.withdraw(userId);
+
+        // 인증 쿠키를 만료 + 탈퇴 정보 반환
+        return ResponseEntity
+                .ok()
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        result.accessToken().toString()
+                )
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        result.refreshToken().toString()
+                )
+                .body(
+                        ApiResponse.of(
+                                "account_withdrawal_scheduled",
+                                result.response()
+                        )
+                );
+    }
+
+
+    // 탈퇴 취소 (30일 내)
+    @PostMapping("/withdrawal/cancel")
+    public ResponseEntity<Void> cancelWithdrawal(
+            @AuthenticationPrincipal Jwt userJwt
+    ) {
+        // 사용자 조회
+        Long userId = Long.valueOf(userJwt.getSubject());
+
+        // 탈퇴 취소 및 정상 로그인 토큰 재발급
+        TokenRefreshResult result =
+                authService.cancelWithdrawal(userId);
+
+        // 새 인증 쿠키 반환
+        return ResponseEntity
+                .noContent()
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        result.accessToken().toString()
+                )
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        result.refreshToken().toString()
+                )
+                .build();
+    }
+
 
 }

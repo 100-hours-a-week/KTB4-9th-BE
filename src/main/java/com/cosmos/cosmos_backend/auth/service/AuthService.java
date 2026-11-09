@@ -23,6 +23,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -44,6 +45,8 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
 
     private final UserPointRepository userPointRepository;
+
+    private final Clock clock;
 
     @Value("${cookie.secure}")
     private boolean cookieSecure;
@@ -79,6 +82,26 @@ public class AuthService {
 
         if(userOauthAccount.isPresent()){
             user =  userOauthAccount.get().getUser();
+
+            // 탈퇴 신청 중인 사용자
+            if (user.getDeletedAt() != null) {
+
+                LocalDateTime now = LocalDateTime.now(clock);
+
+                LocalDateTime scheduledDeletionAt =
+                        user.getDeletedAt().plusDays(30);
+
+                // 복구 기간이 이미 끝난 경우
+                if (!now.isBefore(scheduledDeletionAt)) {
+                    throw new BusinessException(
+                            HttpStatus.GONE,
+                            "withdrawal_recovery_period_expired"
+                    );
+                }
+
+                // 30일 이내라면 복구용 로그인 처리
+                return createWithdrawalRecoveryLogin(user);
+            }
 
         } else {
             User newUser = new User(kakaoUser.kakaoAccount().profile().nickname(), kakaoUser.kakaoAccount().profile().profileImageUrl());
@@ -137,6 +160,45 @@ public class AuthService {
         return new LoginResult(responseDto,accessTokenCookie,refreshTokenCookie);
     }
 
+    // 탈퇴 취소 후 로그인
+    private LoginResult createWithdrawalRecoveryLogin(User user) {
+
+        // 1. 복구용 Access Token만 생성
+        String recoveryAccessToken = jwtTokenProvider.createWithdrawalRecoveryToken(user.getId(), user.getUsername());
+
+        // 2. 복구용 Access Token 쿠키
+        ResponseCookie accessTokenCookie = ResponseCookie
+                .from("accessToken", recoveryAccessToken)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(accessTokenExpiration)
+                .build();
+
+        // 3. Refresh Token은 발급하지 않고 기존 쿠키 만료
+        ResponseCookie refreshTokenCookie = ResponseCookie
+                .from("refreshToken", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/api/auth")
+                .maxAge(0)
+                .build();
+
+        LoginResponseDto response = new LoginResponseDto(
+                user.getId(),
+                user.getUsername(),
+                user.getProfileImageUrl()
+        );
+
+        return new LoginResult(
+                response,
+                accessTokenCookie,
+                refreshTokenCookie
+        );
+    }
+
     @Transactional
     public TokenRefreshResult refreshToken(String originRefreshToken) {
 
@@ -159,6 +221,17 @@ public class AuthService {
 
         // 4. 해당 Refresh Token의 사용자 조회
         User user = savedRefreshToken.getUser();
+
+        // 탈퇴한 회원인지 확인
+        if (user.getDeletedAt() != null) {
+
+            refreshTokenRepository.delete(savedRefreshToken);
+
+            throw new BusinessException(
+                    HttpStatus.UNAUTHORIZED,
+                    "withdrawn_user_cannot_refresh_token"
+            );
+        }
 
         // 5. 새로운 Access Token 생성
         String accessToken =
@@ -250,6 +323,146 @@ public class AuthService {
                 .build();
 
         return new LogoutResult(accessTokenCookie, refreshTokenCookie);
+    }
+
+    @Transactional
+    public WithdrawalResult withdraw(Long userId) {
+
+        // 1. 사용자 조회
+        User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(
+                HttpStatus.NOT_FOUND, "user_not_found"));
+
+        // 2. 이미 탈퇴 신청한 사용자라면 기존 날짜 사용
+        LocalDateTime withdrawalRequestedAt;
+
+        if (user.getDeletedAt() != null) {
+
+            withdrawalRequestedAt = user.getDeletedAt();
+
+        } else {
+
+            withdrawalRequestedAt = LocalDateTime.now(clock);
+
+            user.requestWithdrawal(withdrawalRequestedAt);
+        }
+
+        LocalDateTime scheduledDeletionAt = withdrawalRequestedAt.plusDays(30);
+
+        // 3. 사용자의 모든 Refresh Token 삭제
+        refreshTokenRepository.deleteAllByUser_Id(userId);
+
+        // 4. Access Token 쿠키 만료
+        ResponseCookie accessTokenCookie = ResponseCookie
+                .from("accessToken", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(0)
+                .build();
+
+        // 5. Refresh Token 쿠키 만료
+        ResponseCookie refreshTokenCookie = ResponseCookie
+                .from("refreshToken", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/api/auth")
+                .maxAge(0)
+                .build();
+
+        // 6. 응답 데이터 생성
+        WithdrawalResponseDto response =
+                new WithdrawalResponseDto(
+                        withdrawalRequestedAt,
+                        scheduledDeletionAt
+                );
+
+        return new WithdrawalResult(
+                response,
+                accessTokenCookie,
+                refreshTokenCookie
+        );
+    }
+
+    @Transactional
+    public TokenRefreshResult cancelWithdrawal(Long userId) {
+
+        // 1. 사용자 조회
+        User user = userRepository.findById(userId).orElseThrow(
+                () -> new BusinessException(
+                        HttpStatus.NOT_FOUND,
+                        "user_not_found"
+                )
+        );
+
+        // 2. 탈퇴 신청 여부 확인
+        if (user.getDeletedAt() == null) {
+            throw new BusinessException(
+                    HttpStatus.BAD_REQUEST,
+                    "withdrawal_not_requested"
+            );
+        }
+
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        LocalDateTime scheduledDeletionAt =
+                user.getDeletedAt().plusDays(30);
+
+        // 3. 복구 가능 기간인지 확인
+        if (!now.isBefore(scheduledDeletionAt)) {
+            throw new BusinessException(
+                    HttpStatus.GONE,
+                    "withdrawal_recovery_period_expired"
+            );
+        }
+
+        // 4. 탈퇴 취소
+        user.cancelWithdrawal();
+
+        // 5. 기존 Refresh Token 정리
+        refreshTokenRepository.deleteAllByUser_Id(userId);
+
+        // 6. 정상 Access Token 생성
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getUsername());
+
+        // 7. 정상 Refresh Token 생성
+        String originRefreshToken = refreshTokenProvider.createRefreshToken();
+
+        String refreshTokenHash = refreshTokenProvider.hashRefreshToken(originRefreshToken);
+
+        RefreshToken refreshToken = new RefreshToken(
+                user,
+                refreshTokenHash,
+                refreshTokenProvider.getExpiresAt()
+        );
+
+        refreshTokenRepository.save(refreshToken);
+
+        // 8. Access Token 쿠키 생성
+        ResponseCookie accessTokenCookie = ResponseCookie
+                .from("accessToken", accessToken)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(accessTokenExpiration)
+                .build();
+
+        // 9. Refresh Token 쿠키 생성
+        ResponseCookie refreshTokenCookie = ResponseCookie
+                .from("refreshToken", originRefreshToken)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/api/auth")
+                .maxAge(refreshTokenExpiration)
+                .build();
+
+        return new TokenRefreshResult(
+                accessTokenCookie,
+                refreshTokenCookie
+        );
     }
 
 }
