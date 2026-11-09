@@ -45,6 +45,9 @@ evaluation:
     retry-delay: ${EVALUATION_WORKER_RETRY_DELAY:15s}
     stuck-after: ${EVALUATION_WORKER_STUCK_AFTER:2m}
     recovery-interval: ${EVALUATION_WORKER_RECOVERY_INTERVAL:30s}
+  mq:
+    enabled: ${EVALUATION_MQ_ENABLED:false}
+    request-ttl: ${EVALUATION_MQ_REQUEST_TTL:5m}
 
 judge0:
   connect-timeout: ${JUDGE0_CONNECT_TIMEOUT:3s}
