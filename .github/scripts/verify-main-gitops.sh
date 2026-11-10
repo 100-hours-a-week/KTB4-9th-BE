@@ -13,6 +13,9 @@ fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 [[ "$(grep -Fc 'branches: [prod]' "${prod_workflow}")" -eq 2 ]] || fail "prod workflow must target prod"
 ! grep -Fq 'branches: [main]' "${prod_workflow}" || fail "prod workflow must not target main"
 [[ "$(grep -Fc 'branches: [main]' "${main_workflow}")" -eq 2 ]] || fail "main workflow must keep main triggers"
+[[ "$(grep -Fc -- '--provenance=false' "${prod_workflow}")" -eq 2 ]] || fail "prod PR and publish builds must disable default attestations"
+[[ "$(grep -Fc -- '--provenance=false' "${main_workflow}")" -eq 1 ]] || fail "main build must disable default attestations"
+grep -Fq 'FROM eclipse-temurin:25-jre-noble' "${repo_root}/dockerfile" || fail "runtime image must use the patched Noble base"
 
 test_root="$(mktemp -d)"
 trap 'rm -rf "${test_root}"' EXIT
