@@ -3,6 +3,7 @@ package com.cosmos.cosmos_backend.dailyBattle.scheduler;
 import com.cosmos.cosmos_backend.dailyBattle.service.OutboxStatusChangeService;
 import com.cosmos.cosmos_backend.dailyBattle.service.OutboxPublishService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -12,6 +13,12 @@ import java.util.concurrent.ScheduledFuture;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+        prefix = "app.worker",
+        name = "enabled",
+        havingValue = "false",
+        matchIfMissing = true
+)
 public class OutboxPublisherScheduler {
 
     private final OutboxStatusChangeService outboxPreemptService;
