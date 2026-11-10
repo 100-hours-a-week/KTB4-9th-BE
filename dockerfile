@@ -18,7 +18,7 @@ RUN java -Djarmode=tools -jar build/libs/*-SNAPSHOT.jar extract --layers --launc
 
 
 # 2단계: 레이어별 복사 및 실행
-FROM eclipse-temurin:25-jre-alpine
+FROM eclipse-temurin:25-jre-noble
 WORKDIR /app
 
 # 변경이 드문 의존성부터 순서대로 레이어 복사 (도커 캐싱 극대화)
