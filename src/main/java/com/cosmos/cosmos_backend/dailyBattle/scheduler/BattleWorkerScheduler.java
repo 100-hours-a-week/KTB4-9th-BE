@@ -9,6 +9,7 @@ import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import com.cosmos.cosmos_backend.dailyBattle.worker.BattleGradingWorker;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
@@ -48,6 +49,8 @@ public class BattleWorkerScheduler {
     private List<ScheduledFuture<?>> workerTasks = new ArrayList<>();
 
     private ScheduledFuture<?> recheckTask;
+
+    private final BattleTimeoutScheduler battleTimeoutScheduler;
 
     // 설정된 배틀 시작 시각에 채점 워커 시작
     @Scheduled(cron = "#{@battleSchedule.openCron()}", zone = "Asia/Seoul")
@@ -127,7 +130,6 @@ public class BattleWorkerScheduler {
             return;
         }
 
-
         // 1. 남아 있는 채점 작업 확인 (제출 상태, 채점 중 상태 있는지 확인)
         Boolean existRemainedGrading = battleParticipationRepository.existsByDailyBattleIdAndParticipationStatusIn(
                 todayBattleId,
@@ -174,19 +176,6 @@ public class BattleWorkerScheduler {
     }
 
 
-    // 설정된 제출 마감 시각에 미제출 참여자 타임아웃 처리
-    @Scheduled(cron = "#{@battleSchedule.submissionDeadlineCron()}", zone = "Asia/Seoul")
-    public void timeoutBattle() {
-
-        LocalDate today = LocalDate.now(clock);
-
-        Long battleId = dailyBattleRepository.findIdByBattleDate(today)
-                .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND, "today_battle_not_exist"
-                ));
-
-        dailyBattleService.timeoutInProgress(battleId);
-    }
 
     //서버 다운시 복구 로직
     @EventListener(ApplicationReadyEvent.class)
@@ -210,11 +199,14 @@ public class BattleWorkerScheduler {
 
         // 4. 제출 마감 시각이 지났다면 타임아웃 복구
         if (!now.isBefore(battleSchedule.submissionDeadline())) {
-            timeoutBattle();
+            battleTimeoutScheduler.timeoutBattle();
         }
 
         // 5. 채점 워커 복구
         startGradingWorker();
+
+        // 부하테스트를 위한 메트릭
+        battleMetrics.recordRecoveryStarted(clock.instant());
 
         // 6. 결과 공개 시각이 지났다면 결과 확정 재시도
         if (!now.isBefore(battleSchedule.resultTime())) {

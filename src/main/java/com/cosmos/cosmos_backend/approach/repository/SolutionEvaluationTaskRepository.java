@@ -40,6 +40,22 @@ public interface SolutionEvaluationTaskRepository extends JpaRepository<Solution
             """, nativeQuery = true)
     Optional<SolutionEvaluationTask> findNextForUpdate(@Param("now") LocalDateTime now);
 
+    // 릴레이의 발행 대상 선점: 예약이 없거나 지난 PENDING, 재시도 시각이 지난 RETRY_WAIT을 오래된 순으로 잠가서 조회 (다른 릴레이가 잠근 행은 건너뜀)
+    @Query(value = """
+            SELECT *
+            FROM solution_evaluation_tasks
+            WHERE (status = 'PENDING' AND (next_retry_at IS NULL OR next_retry_at <= :now))
+               OR (status = 'RETRY_WAIT' AND next_retry_at <= :now)
+            ORDER BY created_at ASC
+            LIMIT :limit
+            FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
+    List<SolutionEvaluationTask> findPublishTargetsForUpdate(@Param("now") LocalDateTime now, @Param("limit") int limit);
+
+    // 기준 시각 이전에 접수했는데 아직 PENDING인 작업의 id 조회
+    @Query("select t.id from SolutionEvaluationTask t where t.status = com.cosmos.cosmos_backend.approach.domain.EvaluationTaskStatus.PENDING and t.createdAt < :threshold")
+    List<Long> findExpiredPendingIds(@Param("threshold") LocalDateTime threshold);
+
     // 작업을 잠그고 조회 (결과 저장·실패 처리·복구가 같은 작업을 동시에 바꾸지 않도록, 트랜잭션 안에서만 호출 가능)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<SolutionEvaluationTask> findForUpdateById(Long id);

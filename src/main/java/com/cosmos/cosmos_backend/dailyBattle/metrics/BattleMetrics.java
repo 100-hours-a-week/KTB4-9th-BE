@@ -35,6 +35,8 @@ public class BattleMetrics {
     private final AtomicLong maxQueueDepth = new AtomicLong();
     private final AtomicInteger activeWorkers = new AtomicInteger();
     private final AtomicLong resultPublishedTimestamp = new AtomicLong();
+    private final AtomicLong recoveryStartedTimestamp = new AtomicLong();
+    private final AtomicLong leaseReclaimedTimestamp = new AtomicLong();
     private final AtomicLong pendingAtFirstFinalize = new AtomicLong();
     private final AtomicBoolean firstFinalizeRecorded = new AtomicBoolean();
     private final Counter finalizeAttempts;
@@ -66,6 +68,12 @@ public class BattleMetrics {
         Gauge.builder("battle.result.published.timestamp", resultPublishedTimestamp, AtomicLong::get)
                 .description("결과가 공개된 Unix timestamp(초)")
                 .register(registry);
+        Gauge.builder("battle.recovery.started.timestamp", recoveryStartedTimestamp, AtomicLong::get)
+                .description("서버 재시작 복구 로직이 워커를 복구한 Unix timestamp(초)")
+                .register(registry);
+        Gauge.builder("battle.lease.reclaimed.timestamp", leaseReclaimedTimestamp, AtomicLong::get)
+                .description("만료된 채점 작업을 마지막으로 재선점한 Unix timestamp(초)")
+                .register(registry);
         Gauge.builder("battle.result.pending.at.first.finalize", pendingAtFirstFinalize, AtomicLong::get)
                 .description("결과 공개 예정 시각 첫 확인에서 남아 있던 SUBMITTED+GRADING 작업 수")
                 .register(registry);
@@ -76,6 +84,83 @@ public class BattleMetrics {
             queueWait.record(nonNegative(Duration.between(submittedAt, claimedAt)));
         }
         taskCounter("claimed").increment();
+    }
+
+    public void recordPoll(Duration duration, String outcome) {
+        Counter.builder("battle.grading.polls")
+                .tag("outcome", outcome)
+                .description("채점 워커의 DB 작업 선점 폴링 횟수")
+                .register(registry)
+                .increment();
+        recordDbOperation(duration, "claim", outcome);
+    }
+
+    public void recordClaimQuery(Duration duration, String outcome) {
+        Timer.builder("battle.grading.claim.query")
+                .tag("outcome", outcome)
+                .description("SELECT FOR UPDATE SKIP LOCKED 선점 SQL 저장소 호출 시간")
+                .publishPercentileHistogram()
+                .register(registry)
+                .record(nonNegative(duration));
+    }
+
+    public void recordSubmissionDbPhase(Duration duration, String phase, String outcome) {
+        Timer.builder("battle.submission.db.phase")
+                .tag("phase", phase)
+                .tag("outcome", outcome)
+                .description("배틀 제출 API의 조회, 조건부 UPDATE, 답안 INSERT, 커밋 구간별 시간")
+                .publishPercentileHistogram()
+                .register(registry)
+                .record(nonNegative(duration));
+    }
+
+    public void recordSubmissionConnection(Duration duration, String phase, String outcome) {
+        Timer.builder("battle.submission.connection")
+                .tag("phase", phase)
+                .tag("outcome", outcome)
+                .description("배틀 제출 요청의 DB 커넥션 획득 대기 또는 점유 시간")
+                .publishPercentileHistogram()
+                .register(registry)
+                .record(nonNegative(duration));
+    }
+
+    public void recordSubmissionTransaction(Duration duration, String outcome) {
+        Timer.builder("battle.submission.transaction")
+                .tag("outcome", outcome)
+                .description("배틀 제출 서비스 프록시 호출부터 트랜잭션 커밋 완료까지의 시간")
+                .publishPercentileHistogram()
+                .register(registry)
+                .record(nonNegative(duration));
+    }
+
+    public void recordDbOperation(Duration duration, String operation, String outcome) {
+        Timer.builder("battle.grading.db.operation")
+                .tag("operation", operation)
+                .tag("outcome", outcome)
+                .description("채점 작업의 DB 선점 또는 결과 저장 트랜잭션 시간")
+                .publishPercentileHistogram()
+                .register(registry)
+                .record(nonNegative(duration));
+    }
+
+    public void recordGradingResultDbPhase(Duration duration, String phase, String outcome) {
+        Timer.builder("battle.grading.result.db.phase")
+                .tag("phase", phase)
+                .tag("outcome", outcome)
+                .description("채점 결과 저장의 참여 행 락, 답안 조회, UPDATE flush, 커밋 구간별 시간")
+                .publishPercentileHistogram()
+                .register(registry)
+                .record(nonNegative(duration));
+    }
+
+    public void recordGradingResultConnection(Duration duration, String phase, String outcome) {
+        Timer.builder("battle.grading.result.connection")
+                .tag("phase", phase)
+                .tag("outcome", outcome)
+                .description("채점 결과 저장 트랜잭션의 DB 커넥션 획득 대기 또는 점유 시간")
+                .publishPercentileHistogram()
+                .register(registry)
+                .record(nonNegative(duration));
     }
 
     public void recordProcessing(Duration duration, String outcome) {
@@ -96,6 +181,15 @@ public class BattleMetrics {
 
     public void recordRetry() {
         taskCounter("retry").increment();
+    }
+
+    public void recordLeaseReclaim(Instant reclaimedAt) {
+        leaseReclaimedTimestamp.set(reclaimedAt.getEpochSecond());
+        taskCounter("reclaimed").increment();
+    }
+
+    public void recordRecoveryStarted(Instant startedAt) {
+        recoveryStartedTimestamp.set(startedAt.getEpochSecond());
     }
 
     public void recordFailure() {
@@ -119,6 +213,8 @@ public class BattleMetrics {
     public void resetBattleRun() {
         maxQueueDepth.set(0);
         resultPublishedTimestamp.set(0);
+        recoveryStartedTimestamp.set(0);
+        leaseReclaimedTimestamp.set(0);
         pendingAtFirstFinalize.set(0);
         firstFinalizeRecorded.set(false);
     }

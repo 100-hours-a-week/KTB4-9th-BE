@@ -125,14 +125,90 @@ class SolutionEvaluationTaskTest {
     }
 
     @Test
-    void transitions_throw_whenTaskIsStillPending() {
+    void scheduleRetry_throws_whenTaskIsStillPending() {
         // Given
         SolutionEvaluationTask task = newTask();
 
         // When & Then
         assertThatThrownBy(() -> task.scheduleRetry(T2, "code", "msg", T1)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> task.markSucceeded(1L, T1)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> task.markFailed("code", "msg", T1)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void markSucceeded_works_whenTaskIsStillPending() {
+        // Given
+        SolutionEvaluationTask task = newTask();
+
+        // When
+        task.markSucceeded(501L, T2);
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.SUCCEEDED);
+        assertThat(task.getSubmissionId()).isEqualTo(501L);
+        assertThat(task.getActiveSlot()).isNull();
+    }
+
+    @Test
+    void markFailed_works_whenTaskIsStillPending() {
+        // Given
+        SolutionEvaluationTask task = newTask();
+
+        // When
+        task.markFailed("AI_SERVER_UNAVAILABLE", "publish_failed", T2);
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.FAILED);
+        assertThat(task.getActiveSlot()).isNull();
+        assertThat(task.getErrorMessage()).isEqualTo("publish_failed");
+    }
+
+    @Test
+    void reservePublish_setsReservation_andKeepsPending() {
+        // Given
+        SolutionEvaluationTask task = newTask();
+
+        // When
+        task.reservePublish(T2, T1);
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.PENDING);
+        assertThat(task.getNextRetryAt()).isEqualTo(T2);
+    }
+
+    @Test
+    void reservePublish_throws_whenAlreadyProcessing() {
+        // Given
+        SolutionEvaluationTask task = processingTask();
+
+        // When & Then
+        assertThatThrownBy(() -> task.reservePublish(T2, T2)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void markPublished_movesToProcessing_fixesAttemptAtOne_andClearsReservation() {
+        // Given
+        SolutionEvaluationTask task = newTask();
+        task.reservePublish(T2, T1);
+
+        // When
+        task.markPublished(T2);
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.PROCESSING);
+        assertThat(task.getWorkerAttemptCount()).isEqualTo(1);
+        assertThat(task.getStartedAt()).isEqualTo(T2);
+        assertThat(task.getNextRetryAt()).isNull();
+    }
+
+    @Test
+    void markPublished_throws_whenAlreadyProcessingOrFinished() {
+        // Given
+        SolutionEvaluationTask processing = processingTask();
+        SolutionEvaluationTask succeeded = processingTask();
+        succeeded.markSucceeded(1L, T2);
+
+        // When & Then
+        assertThatThrownBy(() -> processing.markPublished(T2)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> succeeded.markPublished(T2)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
