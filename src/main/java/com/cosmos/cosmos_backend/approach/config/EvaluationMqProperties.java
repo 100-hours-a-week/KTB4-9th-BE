@@ -26,6 +26,12 @@ public record EvaluationMqProperties(
         // 릴레이가 한 번에 선점해서 발행하는 최대 작업 수
         @DefaultValue("50") int relayBatchSize,
         // 발행 확인(Confirm)을 기다리는 최대 시간
-        @DefaultValue("5s") Duration confirmTimeout
+        @DefaultValue("5s") Duration confirmTimeout,
+        // 결과 소비자가 동시에 돌릴 스레드 수 (서버 1대 기준)
+        @DefaultValue("2") int resultConcurrency,
+        // 결과 소비자가 ACK 전에 미리 받아 두는 최대 메시지 수
+        @DefaultValue("10") int resultPrefetch,
+        // 결과 반영이 실패했을 때 시도하는 최대 횟수 (처음 포함)
+        @DefaultValue("3") int resultMaxAttempts
 ) {
 }

@@ -54,7 +54,7 @@ class SolutionEvaluationRelayServiceTest {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-10-19T03:30:00Z"), ZoneId.of("Asia/Seoul"));
         EvaluationMqProperties properties = new EvaluationMqProperties(
                 true, "evaluation.request", "evaluation.result", "evaluation.request.dlq", Duration.ofMinutes(5),
-                Duration.ofSeconds(10), Duration.ofMinutes(2), Duration.ofSeconds(1), 50, Duration.ofSeconds(5));
+                Duration.ofSeconds(10), Duration.ofMinutes(2), Duration.ofSeconds(1), 50, Duration.ofSeconds(5), 2, 10, 3);
         service = new SolutionEvaluationRelayService(taskRepository, problemRepository, notificationService, properties, fixedClock);
     }
 

@@ -40,7 +40,7 @@ class EvaluationRequestPublisherTest {
     void setUp() {
         EvaluationMqProperties properties = new EvaluationMqProperties(
                 true, "evaluation.request", "evaluation.result", "evaluation.request.dlq", Duration.ofMinutes(5),
-                Duration.ofSeconds(10), Duration.ofMinutes(2), Duration.ofSeconds(1), 50, Duration.ofMillis(100));
+                Duration.ofSeconds(10), Duration.ofMinutes(2), Duration.ofSeconds(1), 50, Duration.ofMillis(100), 2, 10, 3);
         publisher = new EvaluationRequestPublisher(rabbitTemplate, JsonMapper.builder().build(), properties);
     }
 

@@ -20,6 +20,7 @@ import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepositor
 import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepository;
 import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationExecutionService.ClaimedTask;
 import com.cosmos.cosmos_backend.approach.service.SolutionEvaluationExecutionService.EvaluationInput;
+import com.cosmos.cosmos_backend.approach.worker.EvaluationResultMessage;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.Difficulty;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
@@ -502,6 +503,189 @@ class SolutionEvaluationExecutionServiceTest {
 
         // Then
         assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.SUCCEEDED);
+        verifyNoInteractions(notificationService);
+    }
+
+    private EvaluationResultMessage successMessage(Integer score, String feedback) {
+        return new EvaluationResultMessage(5L, "SUCCESS", score, feedback,
+                List.of(new EvaluationResultMessage.Keyword("해시맵", true)), null, null);
+    }
+
+    private EvaluationResultMessage failureMessage(String errorCode, String message) {
+        return new EvaluationResultMessage(5L, "FAILURE", null, null, null, errorCode, message);
+    }
+
+    // 결과 반영에 필요한 공통 stub (문제, 제출 없음, 키워드)
+    private void stubSuccessFlow(SolutionEvaluationTask task) {
+        when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+        when(keywordRepository.findByProblemIdOrderById(1L)).thenReturn(List.of(new Keyword(1L, "해시맵")));
+        when(approachSubmissionRepository.findByUserIdAndProblemId(10L, 1L)).thenReturn(Optional.empty());
+        when(approachSubmissionRepository.save(any())).thenAnswer(invocation -> {
+            ApproachSubmission saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 501L);
+            return saved;
+        });
+    }
+
+    @Test
+    void applyResult_succeedsTask_whenResultArrivesForProcessingTask() {
+        // Given
+        SolutionEvaluationTask task = processingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
+        stubSuccessFlow(task);
+
+        // When
+        service.applyResult(successMessage(85, "좋은 접근이에요"));
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.SUCCEEDED);
+        assertThat(task.getSubmissionId()).isEqualTo(501L);
+        verify(notificationService).createEvaluationNotification(10L, 1L, 5L, NotificationType.NL_EVALUATION_DONE, "제목");
+    }
+
+    @Test
+    void applyResult_succeedsTask_whenResultArrivesBeforePublishIsRecorded() {
+        // Given
+        SolutionEvaluationTask task = pendingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
+        stubSuccessFlow(task);
+
+        // When
+        service.applyResult(successMessage(85, "좋은 접근이에요"));
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.SUCCEEDED);
+    }
+
+    @Test
+    void applyResult_ignoresMessage_whenTaskAlreadyFinished() {
+        // Given
+        SolutionEvaluationTask task = processingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
+        task.markFailed("AI_SERVER_UNAVAILABLE", "실패", NOW);
+        when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+
+        // When
+        service.applyResult(successMessage(85, "좋은 접근이에요"));
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.FAILED);
+        verifyNoInteractions(approachSubmissionRepository, notificationService);
+    }
+
+    @Test
+    void applyResult_failsTask_whenScoreIsOutOfRange() {
+        // Given
+        SolutionEvaluationTask task = processingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
+        when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+
+        // When
+        service.applyResult(successMessage(101, "피드백"));
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.FAILED);
+        assertThat(task.getErrorCode()).isEqualTo("AI_SERVER_UNAVAILABLE");
+        verify(approachSubmissionRepository, never()).save(any());
+    }
+
+    @Test
+    void applyResult_failsTask_whenFeedbackIsBlank() {
+        // Given
+        SolutionEvaluationTask task = processingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
+        when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+
+        // When
+        service.applyResult(successMessage(80, " "));
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.FAILED);
+        assertThat(task.getErrorCode()).isEqualTo("AI_SERVER_UNAVAILABLE");
+    }
+
+    @Test
+    void applyResult_failsTaskWithKnownCode_andNotifies_whenFailureResultArrives() {
+        // Given
+        SolutionEvaluationTask task = processingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
+        when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+
+        // When
+        service.applyResult(failureMessage("AI_SERVER_TIMEOUT", "시간 초과"));
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.FAILED);
+        assertThat(task.getErrorCode()).isEqualTo("AI_SERVER_TIMEOUT");
+        verify(notificationService).createEvaluationNotification(10L, 1L, 5L, NotificationType.NL_EVALUATION_FAILED, "제목");
+    }
+
+    @Test
+    void applyResult_mapsUnknownErrorCodeToUnavailable_andKeepsOriginalInMessage() {
+        // Given
+        SolutionEvaluationTask task = processingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
+        when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+
+        // When
+        service.applyResult(failureMessage("GEMINI_QUOTA", "한도"));
+
+        // Then
+        assertThat(task.getErrorCode()).isEqualTo("AI_SERVER_UNAVAILABLE");
+        assertThat(task.getErrorMessage()).isEqualTo("GEMINI_QUOTA: 한도");
+    }
+
+    @Test
+    void applyResult_treatsNonSuccessStatusAsFailure_whenErrorCodeIsMissing() {
+        // Given
+        SolutionEvaluationTask task = processingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
+        when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+
+        // When
+        service.applyResult(new EvaluationResultMessage(5L, "WHATEVER", null, null, null, null, null));
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.FAILED);
+        assertThat(task.getErrorCode()).isEqualTo("AI_SERVER_UNAVAILABLE");
+    }
+
+    @Test
+    void recordInternalError_failsTask_withInternalError() {
+        // Given
+        SolutionEvaluationTask task = processingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
+        when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+        when(problemRepository.findById(1L)).thenReturn(Optional.of(problem("ARRAY")));
+
+        // When
+        service.recordInternalError(5L, "IllegalStateException");
+
+        // Then
+        assertThat(task.getStatus()).isEqualTo(EvaluationTaskStatus.FAILED);
+        assertThat(task.getErrorCode()).isEqualTo("INTERNAL_ERROR");
+        verify(notificationService).createEvaluationNotification(10L, 1L, 5L, NotificationType.NL_EVALUATION_FAILED, "제목");
+    }
+
+    @Test
+    void recordInternalError_doesNothing_whenTaskAlreadyFinished() {
+        // Given
+        SolutionEvaluationTask task = processingTask(Category.ARRAY);
+        ReflectionTestUtils.setField(task, "id", 5L);
+        task.markFailed("AI_SERVER_UNAVAILABLE", "실패", NOW);
+        when(taskRepository.findForUpdateById(5L)).thenReturn(Optional.of(task));
+
+        // When
+        service.recordInternalError(5L, "IllegalStateException");
+
+        // Then
+        assertThat(task.getErrorCode()).isEqualTo("AI_SERVER_UNAVAILABLE");
         verifyNoInteractions(notificationService);
     }
 }

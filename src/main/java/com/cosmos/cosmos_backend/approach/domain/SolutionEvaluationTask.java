@@ -202,7 +202,7 @@ public class SolutionEvaluationTask {
     }
 
     // 최종 상태인지 (SUCCEEDED 또는 FAILED)
-    private boolean isFinished() {
+    public boolean isFinished() {
         return status == EvaluationTaskStatus.SUCCEEDED || status == EvaluationTaskStatus.FAILED;
     }
 

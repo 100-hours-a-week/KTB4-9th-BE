@@ -16,7 +16,7 @@ class EvaluationSwitchGuardTest {
     private EvaluationMqProperties mq(boolean enabled) {
         return new EvaluationMqProperties(
                 enabled, "evaluation.request", "evaluation.result", "evaluation.request.dlq", Duration.ofMinutes(5),
-                Duration.ofSeconds(10), Duration.ofMinutes(2), Duration.ofSeconds(1), 50, Duration.ofSeconds(5));
+                Duration.ofSeconds(10), Duration.ofMinutes(2), Duration.ofSeconds(1), 50, Duration.ofSeconds(5), 2, 10, 3);
     }
 
     @Test

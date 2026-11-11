@@ -10,6 +10,7 @@ import com.cosmos.cosmos_backend.approach.domain.KeywordResult;
 import com.cosmos.cosmos_backend.approach.domain.SolutionEvaluationTask;
 import com.cosmos.cosmos_backend.approach.repository.ApproachSubmissionRepository;
 import com.cosmos.cosmos_backend.approach.repository.SolutionEvaluationTaskRepository;
+import com.cosmos.cosmos_backend.approach.worker.EvaluationResultMessage;
 import com.cosmos.cosmos_backend.common.Category;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.notification.domain.NotificationType;
@@ -92,7 +93,47 @@ public class SolutionEvaluationExecutionService {
         if (!isCurrentAttempt(task, attempt)) {
             throw new IllegalStateException("stale evaluation result: taskId=" + taskId + ", attempt=" + attempt);
         }
+        applySuccess(taskId, task, keywords, result);
+    }
 
+    /** MQ로 받은 결과 1건을 반영. 이미 끝난 작업이면 무시. 모두 한 트랜잭션. */
+    @Transactional
+    public void applyResult(EvaluationResultMessage message) {
+        // 1. 작업을 잠그고, 이미 끝난 작업(성공·실패)이면 중복 메시지라 무시
+        SolutionEvaluationTask task = lockTask(message.taskId());
+        if (task.isFinished()) {
+            return;
+        }
+
+        // 2. 실패 결과면 오류 코드를 정리해서 실패 처리
+        if (!message.isSuccess()) {
+            failTask(task, toFailureCode(message.errorCode()), failureMessage(message));
+            return;
+        }
+
+        // 3. 성공 결과인데 점수나 피드백이 올바르지 않으면 AI 응답 이상으로 실패 처리
+        if (!isValidSuccess(message)) {
+            failTask(task, EvaluationFailureCode.AI_SERVER_UNAVAILABLE, "invalid_ai_result");
+            return;
+        }
+
+        // 4. 우리 키워드 목록을 다시 읽어 와서 결과를 반영 (제출 저장, 보상, 완료, 알림)
+        List<Keyword> keywords = keywordRepository.findByProblemIdOrderById(task.getProblemId());
+        applySuccess(message.taskId(), task, keywords, toResult(message));
+    }
+
+    /** 반영을 여러 번 시도해도 안 될 때 최종 실패(INTERNAL_ERROR)로 기록. 이미 끝났으면 무시. */
+    @Transactional
+    public void recordInternalError(Long taskId, String reason) {
+        SolutionEvaluationTask task = lockTask(taskId);
+        if (task.isFinished()) {
+            return;
+        }
+        failTask(task, EvaluationFailureCode.INTERNAL_ERROR, reason);
+    }
+
+    // 성공 결과를 반영: 제출 저장, 첫 정답 보상, 작업 SUCCEEDED, 완료 알림 (호출하는 쪽의 트랜잭션 안에서 실행)
+    private void applySuccess(Long taskId, SolutionEvaluationTask task, List<Keyword> keywords, AiEvaluationResult result) {
         // 1. 문제를 조회
         Problem problem = findProblem(task.getProblemId());
         Long userId = task.getUserId();
@@ -187,6 +228,48 @@ public class SolutionEvaluationExecutionService {
             task.markFailed(EvaluationFailureCode.WORKER_TIMEOUT.name(), "worker_timeout", now);
             notifyFailed(task);
         }
+    }
+
+    // 작업을 FAILED로 바꾸고 실패 알림을 만듦
+    private void failTask(SolutionEvaluationTask task, EvaluationFailureCode code, String message) {
+        task.markFailed(code.name(), truncate(message), now());
+        notifyFailed(task);
+    }
+
+    // 점수가 0~100이고 피드백이 비어 있지 않은 성공 결과인지 확인
+    private boolean isValidSuccess(EvaluationResultMessage message) {
+        return message.score() != null && message.score() >= 0 && message.score() <= 100
+                && message.llmFeedback() != null && !message.llmFeedback().isBlank();
+    }
+
+    // 메시지를 검증된 결과로 변환 (키워드가 없으면 빈 목록)
+    private AiEvaluationResult toResult(EvaluationResultMessage message) {
+        List<AiEvaluationResult.KeywordJudgement> keywords = message.keywords() == null ? List.of()
+                : message.keywords().stream()
+                        .filter(k -> k != null && k.keyword() != null)
+                        .map(k -> new AiEvaluationResult.KeywordJudgement(k.keyword(), Boolean.TRUE.equals(k.isIncluded())))
+                        .toList();
+        return new AiEvaluationResult(message.score(), message.llmFeedback(), keywords);
+    }
+
+    // 알려진 오류 코드면 그대로, 모르는 코드면 AI_SERVER_UNAVAILABLE
+    private EvaluationFailureCode toFailureCode(String errorCode) {
+        try {
+            return EvaluationFailureCode.valueOf(errorCode);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return EvaluationFailureCode.AI_SERVER_UNAVAILABLE;
+        }
+    }
+
+    // 모르는 코드였다면 원래 코드를 메시지에 남김
+    private String failureMessage(EvaluationResultMessage message) {
+        String text = message.message() != null ? message.message() : "ai_evaluation_failed";
+        return message.errorCode() == null ? text : message.errorCode() + ": " + text;
+    }
+
+    // error_message 컬럼(255자)에 맞게 자름
+    private String truncate(String text) {
+        return text != null && text.length() > 255 ? text.substring(0, 255) : text;
     }
 
     // 최종 실패 알림을 만듦 (문제 제목을 조회해 문구에 넣음)

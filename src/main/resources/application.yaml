@@ -53,6 +53,9 @@ evaluation:
     relay-interval: ${EVALUATION_MQ_RELAY_INTERVAL:1s}
     relay-batch-size: ${EVALUATION_MQ_RELAY_BATCH_SIZE:50}
     confirm-timeout: ${EVALUATION_MQ_CONFIRM_TIMEOUT:5s}
+    result-concurrency: ${EVALUATION_MQ_RESULT_CONCURRENCY:2}
+    result-prefetch: ${EVALUATION_MQ_RESULT_PREFETCH:10}
+    result-max-attempts: ${EVALUATION_MQ_RESULT_MAX_ATTEMPTS:3}
 
 judge0:
   connect-timeout: ${JUDGE0_CONNECT_TIMEOUT:3s}
