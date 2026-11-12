@@ -85,7 +85,7 @@ public interface BattleParticipationRepository extends JpaRepository<BattleParti
         """)
     List<BattleStatusCountProjection> countTasksByStatus(@Param("battleId") Long battleId);
 
-    // 채점 저장을 위한 락
+    // consumer 작업 선점, 채점 저장을 위한 락
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
     SELECT bp
