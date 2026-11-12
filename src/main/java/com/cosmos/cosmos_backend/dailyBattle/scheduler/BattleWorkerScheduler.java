@@ -24,6 +24,11 @@ import java.util.concurrent.ScheduledFuture;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+        prefix = "app.legacy-db-worker",
+        name = "enabled",
+        havingValue = "true"
+)
 public class BattleWorkerScheduler {
 
     private final BattleResultService battleResultService;
