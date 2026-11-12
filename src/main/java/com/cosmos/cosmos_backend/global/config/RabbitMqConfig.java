@@ -47,6 +47,8 @@ public class RabbitMqConfig {
     public Queue gradingQueue() {
         return QueueBuilder
                 .durable(GRADING_QUEUE)
+                .deadLetterExchange(GRADING_RETRY_EXCHANGE)
+                .deadLetterRoutingKey(GRADING_RETRY_ROUTING_KEY)
                 .quorum()
                 .build();
     }
@@ -72,7 +74,7 @@ public class RabbitMqConfig {
                 .build();
     }
 
-    // 재시도 큐 (TTL 2초)
+    // 재시도 큐 (TTL 3초)
     @Bean
     public Queue battleGradingRetryQueue() {
         return QueueBuilder
@@ -114,7 +116,7 @@ public class RabbitMqConfig {
                 .build();
     }
 
-    // 최종 싪패 큐, 익체 바인딩
+    // 최종 실패 큐, 익체 바인딩
     @Bean
     public Binding gradingFailureBinding(
             Queue gradingFailureQueue,
@@ -126,7 +128,5 @@ public class RabbitMqConfig {
                 .with(GRADING_FAILURE_ROUTING_KEY);
 
     }
-
-
 
 }

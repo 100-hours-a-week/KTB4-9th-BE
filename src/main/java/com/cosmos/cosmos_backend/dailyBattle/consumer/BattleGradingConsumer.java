@@ -21,6 +21,8 @@ import org.springframework.transaction.CannotCreateTransactionException;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -46,20 +48,44 @@ public class BattleGradingConsumer {
     public void battleGradingMessageReceive(
             BattleAnswerPayload battleAnswerPayload,
             Channel channel,
-            @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag
+            @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag,
+            // 재전달 횟수
+            @Header(name = "x-delivery-count", required = false) Long deliveryCount,
+            // 재시도 큐 횟수
+            @Header(name = "x-death", required = false) List<Map<String, Object>> retryCount
     ) throws IOException {
+
+        long redeliveryCount = deliveryCount == null ? 0 : deliveryCount;
+
+        // 연결 끊김 재전달 3회 이상 → 실패큐 발행
+        if (redeliveryCount >= 3) {
+            gradingFailureMessagePublish(battleAnswerPayload);
+
+            channel.basicAck(deliveryTag, false);
+
+            return;
+        }
+
+        // 재시도 횟수 검사 (3회 도달시 실패 큐로)
+        long totalRetryCount = getRetryCount(retryCount);
+
+        if (totalRetryCount >= 3) {
+            gradingFailureMessagePublish(battleAnswerPayload);
+
+            channel.basicAck(deliveryTag, false);
+
+            return;
+        }
 
         // 채점 작업 선점
         GradingConsumerPreemptResult preemptResult;
 
-        // DB 오류는 재시도
+        // DB 오류는 nack → 재시도 큐로
         try {
             preemptResult  = gradingPreemptService.preemptGradingTask(battleAnswerPayload.participationId());
         } catch (TransientDataAccessException | CannotCreateTransactionException exception){
 
-            gradingRetryMessagePublish(battleAnswerPayload);
-
-            channel.basicAck(deliveryTag, false);
+            channel.basicNack(deliveryTag, false, false);
 
             return;
         }
@@ -83,10 +109,8 @@ public class BattleGradingConsumer {
                 );
             } catch (Exception exception) {
 
-                // 채점 실패시 Retry 발행 → confirm 확인 → 원본 ACK
-                gradingRetryMessagePublish(battleAnswerPayload);
-
-                channel.basicAck(deliveryTag, false);
+                // 채점 실패시 NACK → 재시도
+                channel.basicNack(deliveryTag, false, false);
 
                 return;
             }
@@ -108,9 +132,7 @@ public class BattleGradingConsumer {
         // 다른 워커가 선점 중 + 임대 유효
         if(preemptStatus == GradingPreemptStatus.LEASE_ACTIVE){
 
-            gradingRetryMessagePublish(battleAnswerPayload);
-
-            channel.basicAck(deliveryTag, false);
+            channel.basicNack(deliveryTag, false, false);
 
             return;
         }
@@ -123,28 +145,6 @@ public class BattleGradingConsumer {
             channel.basicAck(deliveryTag, false);
 
             return;
-        }
-    }
-
-
-    // 재시도 큐로 발행 메소드
-    private void gradingRetryMessagePublish(BattleAnswerPayload battleAnswerPayload) {
-
-        CorrelationData retryPublishingConfirm = new CorrelationData(UUID.randomUUID().toString());
-
-        rabbitTemplate.convertAndSend(
-                RabbitMqConfig.GRADING_RETRY_EXCHANGE,
-                RabbitMqConfig.GRADING_RETRY_ROUTING_KEY,
-                battleAnswerPayload,
-                retryPublishingConfirm
-        );
-
-        CorrelationData.Confirm retryConfirm = retryPublishingConfirm.getFuture().orTimeout(3, TimeUnit.SECONDS).join();
-
-        if (!retryConfirm.ack() || retryPublishingConfirm.getReturned() != null){
-            throw new IllegalStateException(
-                    "Battle_grading_retry_message_publish_failed"
-            );
         }
     }
 
@@ -167,5 +167,35 @@ public class BattleGradingConsumer {
                     "Battle_grading_failure_message_publish_failed"
             );
         }
+
+
+    }
+
+    // 재시도 횟수 확인 메소드
+    private long getRetryCount(List<Map<String, Object>> retryCount) {
+
+        if (retryCount == null) {
+            return 0;
+        }
+
+        long totalRetryCount = 0;
+
+        for (Map<String, Object> death : retryCount) {
+
+            boolean retryQueue = RabbitMqConfig.GRADING_RETRY_QUEUE.equals(death.get("queue"));
+
+            boolean ttlExpired = "expired".equals(death.get("reason"));
+
+            if (retryQueue && ttlExpired) {
+
+                Object count = death.get("count");
+
+                if (count instanceof Number number) {
+                    totalRetryCount += number.longValue();
+                }
+            }
+        }
+
+        return totalRetryCount;
     }
 }
