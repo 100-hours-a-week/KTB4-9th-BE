@@ -2,6 +2,8 @@ package com.cosmos.cosmos_backend.dailyBattle.service;
 
 
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.dailyBattle.domain.GradingPreempt;
+import com.cosmos.cosmos_backend.dailyBattle.domain.GradingResult;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.*;
 import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
