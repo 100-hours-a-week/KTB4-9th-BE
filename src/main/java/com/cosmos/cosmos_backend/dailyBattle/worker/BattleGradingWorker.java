@@ -1,6 +1,6 @@
 package com.cosmos.cosmos_backend.dailyBattle.worker;
 
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.GradingPreempt;
+import com.cosmos.cosmos_backend.dailyBattle.domain.GradingPreempt;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleGradingService;
 import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import lombok.RequiredArgsConstructor;
