@@ -19,9 +19,9 @@ public class TimeConfig {
 
     @Bean
     public BattleSchedule battleSchedule(
-            @Value("${battle.schedule.open-time:14:30:00}") LocalTime openTime,
-            @Value("${battle.schedule.submission-deadline:14:39:59}") LocalTime submissionDeadline,
-            @Value("${battle.schedule.result-time:14:40:00}") LocalTime resultTime
+            @Value("${battle.schedule.open-time:12:50:00}") LocalTime openTime,
+            @Value("${battle.schedule.submission-deadline:12:59:59}") LocalTime submissionDeadline,
+            @Value("${battle.schedule.result-time:13:00:00}") LocalTime resultTime
     ) {
         return new BattleSchedule(openTime, submissionDeadline, resultTime);
     }
