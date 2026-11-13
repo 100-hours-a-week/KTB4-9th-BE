@@ -21,6 +21,14 @@ spring:
     publisher-returns: true
     template:
       mandatory: true
+    listener:
+      simple:
+        # 동시에 메시지를 처리할 Consumer 개수
+        concurrency: ${RABBITMQ_CONSUMER_CONCURRENCY:1}
+        max-concurrency: ${RABBITMQ_CONSUMER_CONCURRENCY:1}
+        # Worker가 ACK하기 전에 미리 받아둘 메시지를 1개로 제한
+        prefetch: ${RABBITMQ_CONSUMER_PREFETCH:1}
+
   # HTTP 요청 받을지
   main:
     web-application-type: ${SPRING_MAIN_WEB_APPLICATION_TYPE:servlet}
