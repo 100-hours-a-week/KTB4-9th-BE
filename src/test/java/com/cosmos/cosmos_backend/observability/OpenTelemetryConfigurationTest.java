@@ -18,6 +18,8 @@ class OpenTelemetryConfigurationTest {
         String image = Files.readString(Path.of("dockerfile"));
 
         assertThat(build).contains("io.opentelemetry.javaagent:opentelemetry-javaagent:2.33.1");
+        assertThat(build).contains("e43a270df53c6f423e0ab157be9c27ccc01d5dc3232e162fe54777573db2f149");
+        assertThat(build).contains("verifyOtelJavaAgent");
         assertThat(image).contains("/opt/opentelemetry-javaagent.jar");
         assertThat(image).contains("-javaagent:/opt/opentelemetry-javaagent.jar");
         assertThat(image).contains("OTEL_TRACES_EXPORTER=none");
