@@ -7,6 +7,7 @@ import com.cosmos.cosmos_backend.dailyBattle.dto.response.*;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleWorkerScheduler;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
+import com.cosmos.cosmos_backend.dailyBattle.service.BattleSubmissionService;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,6 +34,8 @@ public class DailyBattleController {
     private final DailyBattleService  dailyBattleService;
 
     private final BattleResultService battleResultService;
+
+    private final BattleSubmissionService battleSubmissionService;
 
     // 배틀 문제 저장
     @PostMapping("/problem")
@@ -100,14 +103,18 @@ public class DailyBattleController {
 
         Long userId = Long.valueOf(userInfo.getSubject());
 
-        BattleSubmissionResponseDto battleSubmissionResponse = dailyBattleService.battleSubmission(battleSubmissionRequest, battleId, userId, submittedAt);
+        BattleSubmissionResponseDto battleSubmissionResponse = battleSubmissionService.submitBattleAnswers(
+                battleSubmissionRequest,
+                battleId,
+                userId,
+                submittedAt
+        );
 
         // 202 반환
         return ResponseEntity.accepted().body(ApiResponse.of(
                 "battle_submission_resumed",
-                battleSubmissionResponse).data()
-
-        );
+                battleSubmissionResponse
+        ).data());
     }
 
     // 배틀 중도 포기
