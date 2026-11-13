@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -33,13 +34,20 @@ public class GradingPreemptService {
     @Transactional
     public GradingConsumerPreemptResult preemptGradingTask(Long participationId) {
 
-        BattleParticipation preemptParticipation = battleParticipationRepository.findByIdForUpdate(participationId)
-                .orElseThrow(() -> new BusinessException(
-                        HttpStatus.NOT_FOUND,
-                        "Participation_Not_Found"
-                ));
+        Optional<BattleParticipation> preemptValidParticipation = battleParticipationRepository.findByIdForUpdate(participationId);
+
+        // 참여행 없다면 유효하지 않은 상태로 전달
+        if(preemptValidParticipation.isEmpty()){
+            return new GradingConsumerPreemptResult(
+                    participationId,
+                    null,
+                    GradingPreemptStatus.INVALID_STATUS
+            );
+        }
 
         // 참여 상태 확인
+        BattleParticipation preemptParticipation = preemptValidParticipation.get();
+
         ParticipationStatus participationStatus = preemptParticipation.getParticipationStatus();
 
         // 현재 시각

@@ -3,19 +3,17 @@ package com.cosmos.cosmos_backend.dailyBattle.service;
 import com.cosmos.cosmos_backend.auth.domain.entity.User;
 import com.cosmos.cosmos_backend.auth.repository.UserRepository;
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
+import com.cosmos.cosmos_backend.dailyBattle.domain.BattleAnswerPayload;
+import com.cosmos.cosmos_backend.dailyBattle.domain.BattleEventType;
+import com.cosmos.cosmos_backend.dailyBattle.domain.BattleSubmissionInfo;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
+import com.cosmos.cosmos_backend.dailyBattle.domain.entity.*;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.AiBattleCreateRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.request.DailyBattleSubmissionRequestDto;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.*;
-import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
-import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
-import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
-import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
+import com.cosmos.cosmos_backend.dailyBattle.repository.*;
 import com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleSchedule;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,13 +34,20 @@ public class DailyBattleService {
 
     private final BattleParticipationRepository battleParticipationRepository;
 
-    private final BattleSubmissionRepository battleSubmissionRepository;
+    private final BattleSubmissionBulkRepository battleSubmissionBulkRepository;
 
     private final Clock clock;
 
     private final BattleSchedule battleSchedule;
 
+    private final OutboxEventRepository outboxEventRepository;
+
     @Transactional
+    @CacheEvict(
+            cacheManager = "battleSubmissionCacheManager",
+            cacheNames = "battleSubmissionInfo",
+            allEntries = true
+    )
     public Long createDailyBattle(AiBattleCreateRequestDto request){
 
         LocalDate date = LocalDate.now(clock).plusDays(1);
@@ -225,19 +230,18 @@ public class DailyBattleService {
             DailyBattleSubmissionRequestDto battleSubmissionRequest,
             Long battleId,
             Long userId,
-            Instant submittedAt){
+            Instant submittedAt,
+            BattleSubmissionInfo submissionInfo
+    ){
 
-        // 0. 배틀 존재 확인
-        DailyBattle battleInfo = battleValidCheck(battleId);
-
-        // 1.  배틀 날짜, 시간 확인
-        battleDateCheck(submittedAt, battleInfo.getBattleDate());
+        // 0. 캐시된 배틀 날짜로 제출 가능 날짜와 시간 확인
+        battleDateCheck(submittedAt, submissionInfo.battleDate());
         battleTimeCheck(submittedAt);
 
-        // 2. 배틀 참여 정보 확인
+        // 1. 배틀 참여 정보 확인
         BattleParticipation participationInfo = battleParticipationCheck(battleId, userId);
 
-        // 3. 참여 정보가 없으면 404
+        // 2. 참여 정보가 없으면 404
         if (participationInfo == null){
             throw new BusinessException(HttpStatus.NOT_FOUND, "Battle_participation_information_not_found");
         }
@@ -245,8 +249,8 @@ public class DailyBattleService {
         // 요청 접수 시간 반환용
         LocalDateTime submittedTime = submittedAt.atZone(ZoneId.of("Asia/Seoul")).toLocalDateTime();
 
-        // 4. 제출 상태로 변경
-        Instant deadline = battleInfo.getBattleDate()
+        // 3. 제출 상태로 변경
+        Instant deadline = submissionInfo.battleDate()
                 .atTime(battleSchedule.submissionDeadline())
                 .atZone(ZoneId.of("Asia/Seoul"))
                 .toInstant();
@@ -259,27 +263,23 @@ public class DailyBattleService {
                 ParticipationStatus.SUBMITTED,
                 submittedAt,
                 deadline
-                );
+        );
 
-        // 5. 상태 변경 실패 시 중복 제출 예외
+        // 4. 상태 변경 실패 시 중복 제출 예외
         // 현재 상태가 IN_PROGRESS 또는 TIME_OVER가 아니거나, 요청 접수 시각이 마감 이후이면 UPDATE 결과 0 반환
         if (updatedCountCheck == 0) {
             throw new BusinessException(HttpStatus.CONFLICT, "Battle_already_participated"
             );
         }
 
-        // 조건부 업데이트 clearAutomatically 실행 이후 답안 연관관계에 사용할 관리 상태 참조를 다시 가져옴
-        BattleParticipation participationReference = battleParticipationRepository.getReferenceById(
-                participationInfo.getParticipationId()
-        );
-
-        // 6. 제출 답안 3개 저장
+        // 5. 제출 답안 3개 저장
         List<DailyBattleSubmissionRequestDto.Answer> userAnswers = battleSubmissionRequest.userAnswers();
 
-        List<BattleCase> battleCaseList = battleCaseRepository.findByDailyBattle_BattleIdOrderByDisplayOrderAsc(battleId);
+        // 다중 행 INSERT용 리스트
+        List<BattleSubmissionBulkRepository.SubmissionRow> submissionRows = new ArrayList<>();
 
-        // 행 저장용 리스트
-        List<BattleSubmission> submissions = new ArrayList<>();
+        // 아웃 박스 저장용 리스트
+        List<BattleAnswerPayload.UserAnswer> outboxUserAnswers = new ArrayList<>();
 
         // 요청 정답의 케이스 순서 중복 검증
         Set<Integer> caseNums = new HashSet<>();
@@ -293,39 +293,56 @@ public class DailyBattleService {
 
         for (DailyBattleSubmissionRequestDto.Answer answer : userAnswers) {
 
-            // 6-1. caseNum에 해당하는 BattleCase 찾기
-            BattleCase battleCase = null;
+            // 5-1. 캐시에서 caseNum에 해당하는 BattleCase ID 찾기
+            Long battleCaseId = submissionInfo.caseIdByCaseNum().get(answer.caseNum());
 
-            for (BattleCase bc : battleCaseList) {
-                if (bc.getDisplayOrder().equals(answer.caseNum())) {
-                    battleCase = bc;
-                    break;
-                }
-            }
-
-            // 일치하는 BattleCase가 없으면 예외
-            if (battleCase == null) {
+            if (battleCaseId == null) {
                 throw new BusinessException(
                         HttpStatus.BAD_REQUEST,
                         "Battle_case_not_found"
                 );
             }
 
-            // 6-2. BattleSubmission 엔티티 생성
-            BattleSubmission submission = new BattleSubmission(
-                    participationReference,
-                    battleCase,
+            // 5-2. 다중 행 INSERT에 사용할 답안 데이터 생성
+            BattleSubmissionBulkRepository.SubmissionRow submissionRow =
+                    new BattleSubmissionBulkRepository.SubmissionRow(
+                            battleCaseId,
+                            answer.userAnswer()
+                    );
+
+            BattleAnswerPayload.UserAnswer userAnswer = new BattleAnswerPayload.UserAnswer(
+                    answer.caseNum(),
                     answer.userAnswer()
             );
 
-            // 6-3. 저장 리스트에 추가
-            submissions.add(submission);
+            // 5-3. 저장 리스트에 추가
+            submissionRows.add(submissionRow);
+
+            outboxUserAnswers.add(userAnswer);
         }
 
-        // 6-4. 답안 3개 저장
-        battleSubmissionRepository.saveAll(submissions);
+        // 5-4. 답안 3개를 하나의 INSERT 문으로 저장
+        battleSubmissionBulkRepository.insertAll(
+                participationInfo.getParticipationId(),
+                submissionRows
+        );
 
-        // 7. 응답 dto 만들기
+        // 아웃 박스 테이블 저장
+        BattleAnswerPayload battleAnswerPayload = new BattleAnswerPayload(
+                participationInfo.getParticipationId(),
+                battleId,
+                outboxUserAnswers
+        );
+
+        OutboxEvent outboxEvent = new OutboxEvent(
+                participationInfo.getParticipationId(),
+                BattleEventType.GRADING_REQUEST,
+                battleAnswerPayload
+        );
+
+        outboxEventRepository.save(outboxEvent);
+
+        // 6. 응답 dto 만들기
         BattleSubmissionResponseDto battleSubmissionResponse = new BattleSubmissionResponseDto(
                 battleId,
                 userId,
@@ -335,6 +352,7 @@ public class DailyBattleService {
 
         return battleSubmissionResponse;
     }
+
 
     // 기존 참여 확인 메소드 → 해당 배틀에 대한 유저의 제출 여부 확인
     @Transactional(readOnly = true)

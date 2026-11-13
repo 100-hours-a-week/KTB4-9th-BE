@@ -6,7 +6,6 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.GradingPreempt;
 import com.cosmos.cosmos_backend.dailyBattle.domain.GradingResult;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.*;
-import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
@@ -16,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -33,10 +31,6 @@ public class BattleGradingService {
 
     private final BattleResultSaveService battleResultSaveService;
 
-    // 부하테스트를 위한 메트릭
-    private final BattleMetrics battleMetrics;
-
-    // 부하테스트를 위한 메트릭
     private final Clock clock;
 
 
@@ -60,7 +54,6 @@ public class BattleGradingService {
             // 3. 재선점 한도에 도달했다면 최종 실패 처리
             if (preemptedParticipation.getLeaseRetryCount() >= 3) {
                 preemptedParticipation.markGradingFailed();
-                battleMetrics.recordFailure();
                 return Optional.empty();
             }
 
@@ -75,9 +68,6 @@ public class BattleGradingService {
 
         preemptedParticipation.markGrading(leaseExpiresAt, leaseToken);
 
-        // 부하테스트를 위한 메트릭
-        battleMetrics.recordClaim(preemptedParticipation.getSubmittedAt(), clock.instant());
-
         // 6. 참여 작업 정보 반환
         GradingPreempt preemptTask = new GradingPreempt(
                 submissionTask.get().getParticipationId(),
@@ -89,12 +79,7 @@ public class BattleGradingService {
     }
 
     // 채점 메소드
-    public void battleGrade(
-            Long participationId,
-            UUID leaseToken,
-            // 부하테스트를 위한 메트릭
-            Instant processingStartedAt
-    ) {
+    public void battleGrade(Long participationId, UUID leaseToken) {
 
         // 유저 제출 정보 가져오기
         List<BattleSubmission> userSubmissions = battleSubmissionRepository.findByParticipation_participationId(participationId);
@@ -144,26 +129,11 @@ public class BattleGradingService {
                 HttpStatus.NOT_FOUND, "Battle_Participation_not_found"
         ));
 
-        boolean resultSaveSuccess = battleResultSaveService.saveGradedResult(battleParticipation.getParticipationId(), leaseToken, gradingResults);
-
-
-        // 부하테스트를 위한 메트릭
-        Instant completedAt = clock.instant();
-        if (!resultSaveSuccess) {
-            // 재선점 등으로 토큰이 변경되어 결과 저장이 거부된 경우
-            battleMetrics.recordProcessing(
-                    Duration.between(processingStartedAt, completedAt),
-                    "stale"
-            );
-            return;
-        }
-
-        // 결과 저장 성공 매트릭
-        battleMetrics.recordProcessing(
-                Duration.between(processingStartedAt, completedAt),
-                "success"
+        battleResultSaveService.saveGradedResult(
+                battleParticipation.getParticipationId(),
+                leaseToken,
+                gradingResults
         );
-        battleMetrics.recordCompleted(battleParticipation.getSubmittedAt(), completedAt);
     }
 
     // 채점 재시도 횟수 증가
@@ -182,9 +152,6 @@ public class BattleGradingService {
 
         // 재시도 횟수 증가
         battleParticipation.increaseRetryCount();
-        // 부하테스트를 위한 메트릭
-        battleMetrics.recordRetry();
-
         // 재시도 가능 여부 확인
         if (battleParticipation.getRetryCount() < 3) {
             // 제출 처리로 되돌리기 (다시 worker가 선점하도록)
@@ -192,8 +159,6 @@ public class BattleGradingService {
         } else {
             // 재시도 횟수 초과 시 채점 실패 처리
             battleParticipation.markGradingFailed();
-            // 부하테스트를 위한 메트릭
-            battleMetrics.recordFailure();
         }
     }
 
@@ -205,7 +170,5 @@ public class BattleGradingService {
         );
 
         battleParticipation.markGradingFailed();
-        // 부하테스트를 위한 메트릭
-        battleMetrics.recordFailure();
     }
 }

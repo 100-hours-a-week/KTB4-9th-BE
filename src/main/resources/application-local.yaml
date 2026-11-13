@@ -5,7 +5,7 @@ spring:
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      maximum-pool-size: 20
+      maximum-pool-size: 10
   task:
     scheduling:
       pool:
@@ -17,6 +17,13 @@ spring:
     username: ${RABBITMQ_DEFAULT_USER:guest}
     password: ${RABBITMQ_DEFAULT_PASS:guest}
     virtual-host: ${RABBITMQ_DEFAULT_VHOST:/}
+    listener:
+      simple:
+        # 동시에 메시지를 처리할 Consumer 개수
+        concurrency: ${RABBITMQ_CONSUMER_CONCURRENCY:1}
+        max-concurrency: ${RABBITMQ_CONSUMER_CONCURRENCY:1}
+        # Worker가 ACK하기 전에 미리 받아둘 메시지를 1개로 제한
+        prefetch: ${RABBITMQ_CONSUMER_PREFETCH:1}
 
   jpa:
     hibernate:
@@ -51,30 +58,3 @@ ai:
 
 judge0:
   base-url: ${JUDGE0_BASE_URL:http://localhost:2358}
-
-# 로컬 부하테스트에서 Tomcat HTTP 작업 스레드 풀 메트릭 노출
-# 스레드 수나 풀 크기는 변경하지 않고 Actuator/Micrometer 계측만 활성화
-server:
-  tomcat:
-    mbeanregistry:
-      enabled: true
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,metrics,prometheus
-  metrics:
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-        hikaricp.connections.acquire: true
-        hikaricp.connections.usage: true
-        jdbc.query: true
-
-jdbc:
-  datasource-proxy:
-    enabled: true
-  includes:
-    - CONNECTION
-    - QUERY

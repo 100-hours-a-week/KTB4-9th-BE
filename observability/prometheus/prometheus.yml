@@ -8,10 +8,25 @@ global:
 # Prometheus 수집 대상
 scrape_configs:
   # COSMOS Spring 백엔드 지표
-  - job_name: cosmos-backend
+  - job_name: prometheus.scrape.spring
     # Actuator Prometheus 엔드포인트 경로
     metrics_path: /actuator/prometheus
     static_configs:
       # 호스트 백엔드 주소·포트
       - targets:
           - host.docker.internal:8080
+        labels:
+          application: cosmos-backend
+          version: v1
+
+  # 로컬 MySQL·백엔드 컨테이너 자원 지표
+  - job_name: cadvisor
+    static_configs:
+      - targets:
+          - cadvisor:8080
+
+  # Docker API 기반 MySQL 컨테이너 CPU 지표
+  - job_name: docker-metrics
+    static_configs:
+      - targets:
+          - docker-metrics:9273
