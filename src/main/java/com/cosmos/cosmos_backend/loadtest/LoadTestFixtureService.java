@@ -12,21 +12,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-@Profile("dev")
+@Profile({"dev", "local"})
 @RequiredArgsConstructor
 public class LoadTestFixtureService {
 
-    private static final int BATTLE_USER_COUNT = 100;
+    private static final int MAX_BATTLE_USER_COUNT = 1_000;
     private static final String USERNAME_PREFIX = "loadtest-b0-";
 
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
 
     @Transactional
-    public List<LoadTestUserCredential> prepareBattleUsers() {
-        List<LoadTestUserCredential> credentials = new ArrayList<>(BATTLE_USER_COUNT);
+    public List<LoadTestUserCredential> prepareBattleUsers(int userCount) {
+        if (userCount < 1 || userCount > MAX_BATTLE_USER_COUNT) {
+            throw new IllegalArgumentException("userCount must be between 1 and 1000");
+        }
 
-        for (int sequence = 1; sequence <= BATTLE_USER_COUNT; sequence++) {
+        List<LoadTestUserCredential> credentials = new ArrayList<>(userCount);
+
+        for (int sequence = 1; sequence <= userCount; sequence++) {
             String username = USERNAME_PREFIX + String.format("%03d", sequence);
             User user = userRepository.findFirstByUsername(username)
                     .orElseGet(() -> userRepository.save(new User(username, null)));

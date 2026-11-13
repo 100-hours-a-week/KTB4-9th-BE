@@ -18,7 +18,6 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
-import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
@@ -29,8 +28,6 @@ import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import com.cosmos.cosmos_backend.dailyBattle.worker.BattleGradingWorker;
 import com.cosmos.cosmos_backend.global.config.JpaConfig;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -81,7 +78,6 @@ import org.testcontainers.mysql.MySQLContainer;
         BattleResultSaveService.class,
         BattleResultService.class,
         DailyBattleService.class,
-        BattleMetrics.class,
         JpaConfig.class,
         BattleWorkerRecoveryIntegrationTest.TestSupportConfig.class
 })
@@ -106,9 +102,6 @@ class BattleWorkerRecoveryIntegrationTest {
 
     @Autowired
     private DailyBattleService dailyBattleService;
-
-    @Autowired
-    private BattleMetrics battleMetrics;
 
     @Autowired
     private BattleSchedule battleSchedule;
@@ -146,6 +139,9 @@ class BattleWorkerRecoveryIntegrationTest {
     @MockitoBean
     private TaskScheduler taskScheduler;
 
+    @MockitoBean
+    private BattleTimeoutScheduler battleTimeoutScheduler;
+
     private ScheduledFuture<?> firstWorkerTask;
     private ScheduledFuture<?> secondWorkerTask;
     private ScheduledFuture<?> recheckTask;
@@ -179,8 +175,8 @@ class BattleWorkerRecoveryIntegrationTest {
                 clock,
                 taskScheduler,
                 battleGradingWorker,
-                battleMetrics,
-                battleSchedule
+                battleSchedule,
+                battleTimeoutScheduler
         );
     }
 
@@ -415,8 +411,8 @@ class BattleWorkerRecoveryIntegrationTest {
                 clock,
                 realTaskScheduler,
                 countingWorker,
-                battleMetrics,
-                battleSchedule
+                battleSchedule,
+                battleTimeoutScheduler
         );
 
         try {
@@ -539,10 +535,6 @@ class BattleWorkerRecoveryIntegrationTest {
             return new BattleSchedule(OPEN_TIME, SUBMISSION_DEADLINE, RESULT_TIME);
         }
 
-        @Bean
-        MeterRegistry meterRegistry() {
-            return new SimpleMeterRegistry();
-        }
     }
 
     static class MutableClock extends Clock {

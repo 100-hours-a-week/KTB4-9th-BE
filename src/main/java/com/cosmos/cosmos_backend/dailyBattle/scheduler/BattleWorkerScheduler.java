@@ -2,7 +2,6 @@ package com.cosmos.cosmos_backend.dailyBattle.scheduler;
 
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
-import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
@@ -45,10 +44,6 @@ public class BattleWorkerScheduler {
 
     private final BattleGradingWorker battleGradingWorker;
 
-    // 부하테스트를 위한 메트릭
-    private final BattleMetrics battleMetrics;
-
-    // 부하테스트를 위한 메트릭
     private final BattleSchedule battleSchedule;
 
     private List<ScheduledFuture<?>> workerTasks = new ArrayList<>();
@@ -75,11 +70,6 @@ public class BattleWorkerScheduler {
                         HttpStatus.NOT_FOUND, "today_battle_not_exist"
                 ));
 
-        // 새 배틀의 첫 워커를 시작할 때만 메트릭 초기화
-        if (workerTasks.isEmpty()) {
-            battleMetrics.resetBattleRun();
-        }
-
         //필요한 워커 수 계산 (최대 2개)
         int neededWorkers = 2 - workerTasks.size();
 
@@ -94,8 +84,6 @@ public class BattleWorkerScheduler {
             workerTasks.add(task);
         }
 
-        // 부하테스트를 위한 메트릭
-        battleMetrics.setActiveWorkers(workerTasks.size());
     }
 
     // worker 종료
@@ -106,16 +94,11 @@ public class BattleWorkerScheduler {
         }
 
         workerTasks.clear();
-        // 부하테스트를 위한 메트릭
-        battleMetrics.setActiveWorkers(0);
     }
 
     // 설정된 결과 공개 시각에 실행할 결과 확정 메소드
     @Scheduled(cron = "#{@battleSchedule.resultCron()}", zone = "Asia/Seoul")
     public synchronized void finalizeBattle() {
-
-        // 부하테스트를 위한 메트릭
-        battleMetrics.recordFinalizeAttempt();
 
         LocalDate today = LocalDate.now(clock);
 
@@ -158,18 +141,7 @@ public class BattleWorkerScheduler {
         // 3. 모든 채점 완료 → 결과 공개 상태 저장
         LocalDateTime publishedAt = LocalDateTime.now(clock);
 
-        int resultPublishedSuccess = battleResultService.battleResultPublished(todayBattleId, publishedAt);
-
-        if(resultPublishedSuccess == 1){
-            // 부하테스트를 위한 메트릭
-            battleMetrics.recordResultPublished(
-                    today.atTime(battleSchedule.resultTime())
-                            .atZone(ZoneId.of("Asia/Seoul"))
-                            .toInstant(),
-                    publishedAt.atZone(ZoneId.of("Asia/Seoul")).toInstant()
-            );
-
-        }
+        battleResultService.battleResultPublished(todayBattleId, publishedAt);
 
         // 4. 남은 채점 없으면 worker들 종료
         stopGradingWorker();
@@ -209,9 +181,6 @@ public class BattleWorkerScheduler {
 
         // 5. 채점 워커 복구
         startGradingWorker();
-
-        // 부하테스트를 위한 메트릭
-        battleMetrics.recordRecoveryStarted(clock.instant());
 
         // 6. 결과 공개 시각이 지났다면 결과 확정 재시도
         if (!now.isBefore(battleSchedule.resultTime())) {

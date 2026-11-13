@@ -21,7 +21,7 @@ class LoadTestFixtureControllerTest {
         LoadTestFixtureController controller = new LoadTestFixtureController(
                 fixtureService, false, "expected-secret");
 
-        assertThatThrownBy(() -> controller.prepareBattleUsers("expected-secret"))
+        assertThatThrownBy(() -> controller.prepareBattleUsers("expected-secret", 100))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -31,7 +31,7 @@ class LoadTestFixtureControllerTest {
         LoadTestFixtureController controller = new LoadTestFixtureController(
                 fixtureService, true, "expected-secret");
 
-        assertThatThrownBy(() -> controller.prepareBattleUsers("wrong-secret"))
+        assertThatThrownBy(() -> controller.prepareBattleUsers("wrong-secret", 100))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -42,13 +42,23 @@ class LoadTestFixtureControllerTest {
                 fixtureService, true, "expected-secret");
         List<LoadTestUserCredential> credentials = List.of(
                 new LoadTestUserCredential(1L, "access-token"));
-        when(fixtureService.prepareBattleUsers()).thenReturn(credentials);
+        when(fixtureService.prepareBattleUsers(300)).thenReturn(credentials);
 
         ResponseEntity<List<LoadTestUserCredential>> response =
-                controller.prepareBattleUsers("expected-secret");
+                controller.prepareBattleUsers("expected-secret", 300);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(credentials);
-        verify(fixtureService).prepareBattleUsers();
+        verify(fixtureService).prepareBattleUsers(300);
+    }
+
+    @Test
+    void userCountOverLimitIsRejected() {
+        LoadTestFixtureController controller = new LoadTestFixtureController(
+                fixtureService, true, "expected-secret");
+
+        assertThatThrownBy(() -> controller.prepareBattleUsers("expected-secret", 1_001))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        exception -> assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
 }

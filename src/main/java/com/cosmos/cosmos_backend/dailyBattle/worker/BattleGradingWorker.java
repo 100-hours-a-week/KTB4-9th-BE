@@ -2,12 +2,8 @@ package com.cosmos.cosmos_backend.dailyBattle.worker;
 
 import com.cosmos.cosmos_backend.dailyBattle.domain.GradingPreempt;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleGradingService;
-import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,12 +12,6 @@ import java.util.UUID;
 public class BattleGradingWorker {
 
     private final BattleGradingService battleGradingService;
-
-    // 부하테스트를 위한 메트릭
-    private final BattleMetrics battleMetrics;
-
-    // 부하테스트를 위한 메트릭
-    private final Clock clock;
 
     // 작업 선점, 채점 작업을 진행하는 워커
     public void gradingBattleSubmissions(Long battleId) {
@@ -40,21 +30,11 @@ public class BattleGradingWorker {
         Long participationId = preemptParticipation.participationId();
         UUID leaseToken = preemptParticipation.leaseToken();
 
-        // 부하테스트를 위한 메트릭
-        Instant processingStartedAt = clock.instant();
-
         // 선점한 작업으로 채점 진행
         try {
-            battleGradingService.battleGrade(participationId, leaseToken, processingStartedAt);
+            battleGradingService.battleGrade(participationId, leaseToken);
 
         } catch (Exception e) {
-
-            // 부하테스트를 위한 메트릭
-            battleMetrics.recordProcessing(
-                    Duration.between(processingStartedAt, clock.instant()),
-                    "error"
-            );
-
             // 3. 채점 실패 상태 저장 (트랜잭션 3)
             battleGradingService.checkGradingFailed(participationId, leaseToken);
         }

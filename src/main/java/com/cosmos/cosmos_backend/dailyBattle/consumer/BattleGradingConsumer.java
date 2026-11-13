@@ -19,8 +19,6 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.transaction.CannotCreateTransactionException;
 
 import java.io.IOException;
-import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,8 +38,6 @@ public class BattleGradingConsumer {
     private final BattleGradingService battleGradingService;
 
     private final RabbitTemplate rabbitTemplate;
-
-    private final Clock clock;
 
     // GRADING_QUEUE(채점큐) 구독 + RabbitMQ 메시지 수신
     @RabbitListener(queues = RabbitMqConfig.GRADING_QUEUE, ackMode = "MANUAL")
@@ -98,14 +94,10 @@ public class BattleGradingConsumer {
         // 선점 성공 → 기존 BattleGradingService를 이용해 채점
         if (preemptStatus == GradingPreemptStatus.PREEMPTED) {
 
-            // 시각 기록
-            Instant processingStartedAt = clock.instant();
-
             try {
                 battleGradingService.battleGrade(
                         preemptResult.participationId(),
-                        preemptResult.leaseToken(),
-                        processingStartedAt
+                        preemptResult.leaseToken()
                 );
             } catch (Exception exception) {
 
