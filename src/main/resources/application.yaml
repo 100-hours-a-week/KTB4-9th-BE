@@ -91,6 +91,13 @@ sentry:
   send-default-pii: false
   traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
 
+# OpenTelemetry Java Agent가 MDC에 주입하는 trace_id/span_id를 JSON 필드로 함께 출력한다.
+# 요청/응답 본문과 인증 헤더는 구조화 로그에 추가하지 않는다.
+logging:
+  structured:
+    format:
+      console: logstash
+
 management:
   endpoints:
     web:

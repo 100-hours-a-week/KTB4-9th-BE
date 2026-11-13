@@ -26,11 +26,17 @@ COPY --from=builder /app/extracted/dependencies/ ./
 COPY --from=builder /app/extracted/spring-boot-loader/ ./
 COPY --from=builder /app/extracted/snapshot-dependencies/ ./
 COPY --from=builder /app/extracted/application/ ./
+COPY --from=builder /app/build/otel/opentelemetry-javaagent.jar /opt/opentelemetry-javaagent.jar
 
 EXPOSE 8080
 
 # v1 EC2는 별도 프로필 주입 없이 dev를 사용하고, v2 ECS는 stage로 덮어쓴다.
 ENV SPRING_PROFILES_ACTIVE=dev
+ENV JAVA_TOOL_OPTIONS="-javaagent:/opt/opentelemetry-javaagent.jar" \
+    OTEL_TRACES_EXPORTER=none \
+    OTEL_METRICS_EXPORTER=none \
+    OTEL_LOGS_EXPORTER=none \
+    OTEL_PROPAGATORS=tracecontext,baggage
 
 # 최신 스프링 부트 런처 실행
 ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]

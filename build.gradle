@@ -19,6 +19,9 @@ repositories {
 
 configurations {
 	pyroscopeAgent
+	otelJavaAgent {
+		transitive = false
+	}
 }
 
 dependencies {
@@ -37,6 +40,7 @@ dependencies {
 	// 에러 및 성능 모니터링
 	implementation 'io.sentry:sentry-spring-boot-4-starter:8.53.0'
 	pyroscopeAgent 'io.pyroscope:agent:2.9.1'
+	otelJavaAgent 'io.opentelemetry.javaagent:opentelemetry-javaagent:2.33.1'
 
 	// JWT 생성/검증 및 Resource Server 인증
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
@@ -65,6 +69,16 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 
+}
+
+tasks.register('copyOtelJavaAgent', Copy) {
+	from configurations.otelJavaAgent
+	into layout.buildDirectory.dir('otel')
+	rename { 'opentelemetry-javaagent.jar' }
+}
+
+tasks.named('bootJar') {
+	finalizedBy tasks.named('copyOtelJavaAgent')
 }
 
 tasks.named('test') {
