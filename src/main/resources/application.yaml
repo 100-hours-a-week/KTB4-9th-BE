@@ -42,9 +42,9 @@ app:
 
 battle:
   schedule:
-    open-time: ${BATTLE_OPEN_TIME:20:20:00}
-    submission-deadline: ${BATTLE_SUBMISSION_DEADLINE:20:29:59}
-    result-time: ${BATTLE_RESULT_TIME:20:300:00}
+    open-time: ${BATTLE_OPEN_TIME:12:00:00}
+    submission-deadline: ${BATTLE_SUBMISSION_DEADLINE:12:09:59}
+    result-time: ${BATTLE_RESULT_TIME:12:10:00}
 
 ai:
   server:
