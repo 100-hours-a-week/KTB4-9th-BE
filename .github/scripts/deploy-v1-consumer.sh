@@ -41,7 +41,17 @@ set_backend_image() {
   local temporary_file
 
   temporary_file="$(mktemp "${DEPLOY_DIR}/.env.tmp.XXXXXX")"
-  awk -F= '$1 != "BACKEND_IMAGE"' "${ENV_FILE}" >"${temporary_file}"
+  awk '
+    {
+      key = $0
+      sub(/^[[:space:]]*/, "", key)
+      sub(/[[:space:]]*[:=].*$/, "", key)
+    }
+    key != "BACKEND_IMAGE" &&
+    key != "BATTLE_OPEN_TIME" &&
+    key != "BATTLE_SUBMISSION_DEADLINE" &&
+    key != "BATTLE_RESULT_TIME"
+  ' "${ENV_FILE}" >"${temporary_file}"
   printf 'BACKEND_IMAGE=%s\n' "${image}" >>"${temporary_file}"
   chmod 600 "${temporary_file}"
   mv "${temporary_file}" "${ENV_FILE}"
