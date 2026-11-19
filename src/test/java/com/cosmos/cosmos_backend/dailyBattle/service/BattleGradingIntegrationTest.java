@@ -11,16 +11,13 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.GradingPreempt;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.GradingResult;
-import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
+import com.cosmos.cosmos_backend.dailyBattle.domain.GradingPreempt;
+import com.cosmos.cosmos_backend.dailyBattle.domain.GradingResult;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.global.config.JpaConfig;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -65,7 +62,6 @@ import org.testcontainers.mysql.MySQLContainer;
 @Import({
         BattleGradingService.class,
         BattleResultSaveService.class,
-        BattleMetrics.class,
         JpaConfig.class,
         BattleGradingIntegrationTest.TestSupportConfig.class
 })
@@ -334,8 +330,7 @@ class BattleGradingIntegrationTest {
         //when: 현재 워커가 실제 채점과 결과 저장을 수행
         battleGradingService.battleGrade(
                 participationId,
-                claim.leaseToken(),
-                Instant.now(clock));
+                claim.leaseToken());
 
         //then: 참여와 개별 답안이 모두 채점 완료 상태로 저장
         BattleParticipation participation = findParticipation();
@@ -367,8 +362,7 @@ class BattleGradingIntegrationTest {
         GradingPreempt claim = battleGradingService.preemptSubmission(battleId).orElseThrow();
         assertThatCode(() -> battleGradingService.battleGrade(
                 participationId,
-                claim.leaseToken(),
-                Instant.now(clock)))
+                claim.leaseToken()))
                 .doesNotThrowAnyException();
 
         //then: LazyInitializationException 없이 채점 결과가 정상 저장
@@ -625,9 +619,5 @@ class BattleGradingIntegrationTest {
             return Clock.system(KOREA_ZONE);
         }
 
-        @Bean
-        MeterRegistry meterRegistry() {
-            return new SimpleMeterRegistry();
-        }
     }
 }

@@ -1,6 +1,7 @@
 package com.cosmos.cosmos_backend.dailyBattle.repository;
 
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
+import com.cosmos.cosmos_backend.dailyBattle.projection.BattleCaseIdProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,4 +18,16 @@ public interface BattleCaseRepository extends JpaRepository<BattleCase, Long> {
     WHERE bc.caseId IN :caseIds
     """)
     List<BattleCase> findAllByCaseIds(@Param("caseIds") List<Long> caseIds);
+
+    // 배틀 id로 케이스 조회
+    @Query("""
+    SELECT bc.caseId AS caseId,
+           bc.displayOrder AS displayOrder
+    FROM BattleCase bc
+    WHERE bc.dailyBattle.battleId = :battleId
+    ORDER BY bc.displayOrder ASC
+    """)
+    List<BattleCaseIdProjection> findCaseIdsByBattleId(
+            @Param("battleId") Long battleId
+    );
 }

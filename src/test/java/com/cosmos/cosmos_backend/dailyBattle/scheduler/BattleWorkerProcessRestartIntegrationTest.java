@@ -10,7 +10,6 @@ import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleCase;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
-import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleCaseRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
@@ -21,8 +20,6 @@ import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import com.cosmos.cosmos_backend.dailyBattle.worker.BattleGradingWorker;
 import com.cosmos.cosmos_backend.global.config.JpaConfig;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -403,7 +400,6 @@ class BattleWorkerProcessRestartIntegrationTest {
             BattleResultSaveService.class,
             BattleResultService.class,
             DailyBattleService.class,
-            BattleMetrics.class,
             JpaConfig.class
     })
     static class RecoveryTestApplication {
@@ -419,11 +415,6 @@ class BattleWorkerProcessRestartIntegrationTest {
         @Bean
         BattleSchedule battleSchedule() {
             return new BattleSchedule(OPEN_TIME, SUBMISSION_DEADLINE, RESULT_TIME);
-        }
-
-        @Bean
-        MeterRegistry meterRegistry() {
-            return new SimpleMeterRegistry();
         }
 
         @Bean(destroyMethod = "destroy")

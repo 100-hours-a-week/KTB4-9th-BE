@@ -7,6 +7,7 @@ import com.cosmos.cosmos_backend.dailyBattle.dto.response.*;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.dailyBattle.scheduler.BattleWorkerScheduler;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
+import com.cosmos.cosmos_backend.dailyBattle.service.BattleSubmissionService;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,6 +34,8 @@ public class DailyBattleController {
     private final DailyBattleService  dailyBattleService;
 
     private final BattleResultService battleResultService;
+
+    private final BattleSubmissionService battleSubmissionService;
 
     // 배틀 문제 저장
     @PostMapping("/problem")
@@ -100,20 +103,41 @@ public class DailyBattleController {
 
         Long userId = Long.valueOf(userInfo.getSubject());
 
-        BattleSubmissionResponseDto battleSubmissionResponse = dailyBattleService.battleSubmission(battleSubmissionRequest, battleId, userId, submittedAt);
+        BattleSubmissionResponseDto battleSubmissionResponse = battleSubmissionService.submitBattleAnswers(
+                battleSubmissionRequest,
+                battleId,
+                userId,
+                submittedAt
+        );
 
         // 202 반환
         return ResponseEntity.accepted().body(ApiResponse.of(
                 "battle_submission_resumed",
-                battleSubmissionResponse).data()
-
-        );
+                battleSubmissionResponse
+        ).data());
     }
 
     // 배틀 중도 포기
     @PatchMapping("/{battle_id}/participations")
+    @Operation(
+            summary = "배틀 중도 포기",
+            description = "로그인한 사용자의 해당 배틀 참여 상태를 IN_PROGRESS에서 DROPPED_OUT으로 변경합니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "배틀 참여 상태를 중도 포기로 변경했습니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "409",
+            description = "배틀에 참여 중인 상태가 아닙니다."
+    )
     public ResponseEntity<ApiResponse<BattleDropOutResponseDto>> dropOutBattle(
+            @Parameter(hidden = true)
             @AuthenticationPrincipal Jwt userInfo,
+            @Parameter(
+                    description = "중도 포기할 배틀 ID",
+                    example = "1"
+            )
             @PathVariable("battle_id") Long battleId
     ) {
         Long userId = Long.parseLong(userInfo.getSubject());

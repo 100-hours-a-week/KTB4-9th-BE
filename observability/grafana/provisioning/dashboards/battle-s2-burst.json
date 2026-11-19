@@ -12,7 +12,7 @@
       }
     ]
   },
-  "description": "COSMOS 데일리 배틀 S2 100명 동시 제출: B0 전체 지표와 burst 처리량, 최대 지연, 큐 소진 시간을 같은 시간축으로 관측",
+  "description": "COSMOS 데일리 배틀 S2 동시 제출: 사용자 수별 burst 처리량, 최대 지연, 큐 소진 시간을 같은 시간축으로 관측",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -37,10 +37,11 @@
       "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
       "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
       "id": 2,
+      "description": "선택한 S2 실행에서 HTTP 202로 정상 수락된 제출 요청의 응답 시간입니다. expected_response=false인 EOF·연결 실패 요청은 실패율 패널에서 별도로 확인합니다.",
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "k6_http_req_duration_p95{testid=~\"$testid\",operation=\"submit\"} * 1000", "legendFormat": "P95", "refId": "A" },
-        { "expr": "k6_http_req_duration_p99{testid=~\"$testid\",operation=\"submit\"} * 1000", "legendFormat": "P99", "refId": "B" }
+        { "expr": "k6_http_req_duration_p95{testid=~\"$testid\",operation=\"submit\",expected_response=\"true\",status=\"202\"} * 1000", "legendFormat": "성공 제출 P95", "refId": "A" },
+        { "expr": "k6_http_req_duration_p99{testid=~\"$testid\",operation=\"submit\",expected_response=\"true\",status=\"202\"} * 1000", "legendFormat": "성공 제출 P99", "refId": "B" }
       ],
       "title": "제출 API P95/P99",
       "type": "timeseries"
@@ -228,10 +229,10 @@
       "fieldConfig": { "defaults": { "max": 200, "min": 0, "unit": "percent" }, "overrides": [] },
       "gridPos": { "h": 7, "w": 8, "x": 8, "y": 26 },
       "id": 31,
-      "description": "cAdvisor가 수집한 cosmos-mysql 컨테이너 CPU 사용률입니다. 100%는 vCPU 1개를 완전히 사용하는 상태이고, 개발 서버가 2 vCPU라면 이론상 최대는 200%입니다.",
+      "description": "Docker Engine 메트릭이 수집한 cosmos-mysql 컨테이너 CPU 사용률입니다. 100%는 vCPU 1개를 완전히 사용하는 상태이고, 로컬 환경이 2 vCPU라면 이론상 최대는 200%입니다.",
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\".*cosmos-mysql.*\"}[$__rate_interval]) or rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service=\"mysql\"}[$__rate_interval])) * 100", "legendFormat": "MySQL CPU (1 vCPU = 100%)", "refId": "A" }
+        { "expr": "docker_container_cpu_usage_percent{container_name=\"cosmos-mysql\"}", "legendFormat": "MySQL CPU (1 vCPU = 100%)", "refId": "A" }
       ],
       "title": "MySQL 컨테이너 CPU",
       "type": "timeseries"
@@ -378,14 +379,14 @@
       },
       "gridPos": { "h": 7, "w": 8, "x": 0, "y": 53 },
       "id": 25,
-      "description": "S2 전용 k6 카운터로 제출 시도 수와 HTTP 202 수락 수를 직접 셉니다. operation 라벨 보존 여부와 무관하므로 다음 실행부터 100명 burst가 비지 않고 표시됩니다.",
+      "description": "S2 전용 k6 카운터로 설정한 동시 사용자 수만큼의 제출 시도와 HTTP 202 수락 수를 직접 셉니다.",
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
         { "expr": "sum(k6_battle_submission_attempts_total{testid=~\"$testid\"})", "legendFormat": "누적 제출 시도", "refId": "A" },
         { "expr": "sum(k6_battle_submission_accepted_total{testid=~\"$testid\"})", "legendFormat": "누적 202 수락", "refId": "B" },
         { "expr": "sum(rate(k6_battle_submission_accepted_total{testid=~\"$testid\"}[1m]))", "legendFormat": "수락 RPS (1분 평균)", "refId": "C" }
       ],
-      "title": "100명 동시 제출 Burst",
+      "title": "동시 제출 Burst",
       "type": "timeseries"
     },
     {
@@ -396,8 +397,8 @@
       "description": "서버가 작업을 선점하고 완료한 속도의 1분 평균입니다. 서버 scrape 간격보다 짧았던 10초 rate 때문에 No data가 발생하던 문제를 방지합니다.",
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "sum(rate(battle_grading_tasks_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"claimed\"}[1m]))", "legendFormat": "선점/초 (1분 평균)", "refId": "A" },
-        { "expr": "sum(rate(battle_grading_tasks_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"completed\"}[1m]))", "legendFormat": "완료/초 (1분 평균)", "refId": "B" }
+        { "expr": "sum(rate(battle_grading_tasks_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"claimed\"}[30s]))", "legendFormat": "선점/초 (30초 평균)", "refId": "A" },
+        { "expr": "sum(rate(battle_grading_tasks_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"completed\"}[30s]))", "legendFormat": "완료/초 (30초 평균)", "refId": "B" }
       ],
       "title": "채점 선점·완료 처리량",
       "type": "timeseries"
@@ -464,11 +465,792 @@
       "id": 30,
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "(k6_battle_submission_lateness_ms_max{testid=~\"$testid\"} - k6_battle_submission_lateness_ms_min{testid=~\"$testid\"}) * 1000", "legendFormat": "100명 실제 제출 분산 폭", "refId": "A" },
+        { "expr": "(k6_battle_submission_lateness_ms_max{testid=~\"$testid\"} - k6_battle_submission_lateness_ms_min{testid=~\"$testid\"}) * 1000", "legendFormat": "전체 사용자 실제 제출 분산 폭", "refId": "A" },
         { "expr": "k6_battle_submission_lateness_ms_max{testid=~\"$testid\"} * 1000", "legendFormat": "가장 늦은 제출", "refId": "B" }
       ],
       "title": "동시 제출 정렬 정확도",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 67
+      },
+      "id": 32,
+      "title": "DB 폴링 QPS",
+      "description": "워커 2개가 100ms 주기로 실행하는 선점 DB 폴링을 결과별로 표시합니다. empty는 조회했지만 선점할 작업이 없었던 폴링입니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(battle_grading_polls_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))",
+          "legendFormat": "{{outcome}}/초",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 67
+      },
+      "id": 33,
+      "title": "DB 선점·결과 저장 시간",
+      "description": "claim은 작업 조회·행 잠금·상태 변경·커밋을 포함한 선점 트랜잭션이고 result_save는 결과 저장 트랜잭션입니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, operation) (rate(battle_grading_db_operation_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{operation}} P95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, operation) (rate(battle_grading_db_operation_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{operation}} P99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 67
+      },
+      "id": 34,
+      "title": "MySQL 행 잠금 대기",
+      "description": "MySQL InnoDB가 직접 보고하는 현재 행 잠금 대기 수와 초당 새 잠금 대기 발생 수입니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "mysql_innodb_row_lock_current_waits",
+          "legendFormat": "현재 대기",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(mysql_innodb_row_lock_waits[$__rate_interval])",
+          "legendFormat": "신규 대기/초",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 74
+      },
+      "id": 35,
+      "title": "MySQL 행 잠금 대기 시간",
+      "description": "InnoDB 행 잠금 대기의 평균·최대 시간과 초당 누적된 잠금 대기 시간입니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "mysql_innodb_row_lock_time_avg",
+          "legendFormat": "평균",
+          "refId": "A"
+        },
+        {
+          "expr": "mysql_innodb_row_lock_time_max",
+          "legendFormat": "최대",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(mysql_innodb_row_lock_time[$__rate_interval])",
+          "legendFormat": "누적 증가 ms/초",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 74
+      },
+      "id": 36,
+      "title": "다른 API 응답 시간 변화",
+      "description": "테스트 시작부터 11분 동안 GET /daily-problems를 고정 1 RPS로 호출해 배틀 부하가 다른 API에 미치는 영향을 비교합니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "k6_http_req_duration_p95{testid=~\"$testid\",operation=\"control_api\"} * 1000",
+          "legendFormat": "클라이언트 P95",
+          "refId": "A"
+        },
+        {
+          "expr": "k6_http_req_duration_p99{testid=~\"$testid\",operation=\"control_api\"} * 1000",
+          "legendFormat": "클라이언트 P99",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",uri=\"/daily-problems\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "서버 P95",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 74
+      },
+      "id": 37,
+      "title": "큐 적체 증감 속도",
+      "description": "양수이면 해당 상태 작업이 쌓이고 있고 음수이면 소진되고 있다는 뜻입니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "deriv(battle_queue_depth{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",status=\"SUBMITTED\"}[1m])",
+          "legendFormat": "SUBMITTED 증감/초",
+          "refId": "A"
+        },
+        {
+          "expr": "deriv(battle_queue_depth{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",status=\"GRADING\"}[1m])",
+          "legendFormat": "GRADING 증감/초",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 81
+      },
+      "id": 38,
+      "title": "HikariCP 고갈 신호",
+      "description": "pending은 DB 커넥션을 기다리는 스레드 수이고, timeout은 1분 동안 커넥션을 얻지 못해 타임아웃된 횟수입니다. pending이 증가한 상태에서 timeout이 발생하면 커넥션 풀 고갈로 판단할 수 있습니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "hikaricp_connections_pending{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}",
+          "legendFormat": "커넥션 대기 스레드",
+          "refId": "A"
+        },
+        {
+          "expr": "increase(hikaricp_connections_timeout_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[1m])",
+          "legendFormat": "Hikari 타임아웃/분",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 81
+      },
+      "id": 39,
+      "title": "DB 커넥션 점유 시간",
+      "description": "커넥션을 획득한 뒤 풀에 반환할 때까지의 시간입니다. 채점 트랜잭션이나 제출 INSERT가 커넥션을 오래 쥐고 있는지 확인합니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(hikaricp_connections_usage_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "점유 P95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(hikaricp_connections_usage_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "점유 P99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "max": 100,
+          "min": 0,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 81
+      },
+      "id": 40,
+      "title": "일반 API 실패·5xx 비율",
+      "description": "고정 1 RPS로 호출하는 GET /daily-problems의 클라이언트 실패율과 서버 5xx 비율입니다. 커넥션 풀 고갈이 배틀과 무관한 API까지 전파되는지 확인합니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(k6_http_reqs_total{testid=~\"$testid\",operation=\"control_api\",expected_response=\"false\"}[$__rate_interval])) / clamp_min(sum(rate(k6_http_reqs_total{testid=~\"$testid\",operation=\"control_api\"}[$__rate_interval])), 0.000001) * 100) or vector(0)",
+          "legendFormat": "일반 API 클라이언트 실패율",
+          "refId": "A"
+        },
+        {
+          "expr": "(sum(rate(http_server_requests_seconds_count{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",uri=\"/daily-problems\",status=~\"5..\"}[$__rate_interval])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",uri=\"/daily-problems\"}[$__rate_interval])), 0.000001) * 100) or vector(0)",
+          "legendFormat": "일반 API 서버 5xx 비율",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 88
+      },
+      "id": 41,
+      "title": "선점 SQL 실행 시간",
+      "description": "findSubmittedForUpdate의 SELECT ... FOR UPDATE SKIP LOCKED 저장소 호출 시간입니다. 선점 트랜잭션 전체가 아니라 SQL 조회·락 획득·결과 매핑 구간을 측정하며 found, empty, error 결과별로 구분합니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, outcome) (rate(battle_grading_claim_query_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{outcome}} P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, outcome) (rate(battle_grading_claim_query_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{outcome}} P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, outcome) (rate(battle_grading_claim_query_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{outcome}} P99",
+          "refId": "C"
+        },
+        {
+          "expr": "max by (outcome) (battle_grading_claim_query_seconds_max{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}) * 1000",
+          "legendFormat": "{{outcome}} MAX",
+          "refId": "D"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 95
+      },
+      "id": 42,
+      "title": "제출 API DB 구간별 실행 시간",
+      "description": "캐시 적용 후 lookup은 사용자 참여 정보 조회 시간입니다. 배틀 기본 정보와 케이스 ID 조회는 캐시 miss일 때만 트랜잭션 시작 전에 실행되며, 아래 캐시 및 SQL 패널에서 확인합니다. conditional_update는 참여 상태 조건부 UPDATE, submission_insert는 답안 3건 saveAll 호출, commit은 트랜잭션 flush와 DB commit 완료까지의 시간입니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, phase, outcome) (rate(battle_submission_db_phase_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{phase}} · {{outcome}} P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, phase, outcome) (rate(battle_submission_db_phase_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{phase}} · {{outcome}} P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, phase, outcome) (rate(battle_submission_db_phase_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{phase}} · {{outcome}} P99",
+          "refId": "C"
+        },
+        {
+          "expr": "max by (phase, outcome) (battle_submission_db_phase_seconds_max{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\"}) * 1000",
+          "legendFormat": "{{phase}} · {{outcome}} MAX",
+          "refId": "D"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 103 },
+      "id": 43,
+      "title": "성공 제출 요청별 커넥션 획득 대기",
+      "description": "HTTP 202로 수락된 각 제출 요청이 DataSource.getConnection()을 호출한 뒤 실제 커넥션을 받을 때까지 기다린 시간입니다. 커넥션 점유 시간과 겹치지 않습니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "k6_battle_submission_connection_acquire_ms_p95{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"} * 1000",
+          "legendFormat": "요청별 P95",
+          "refId": "A"
+        },
+        {
+          "expr": "k6_battle_submission_connection_acquire_ms_p99{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"} * 1000",
+          "legendFormat": "요청별 P99",
+          "refId": "B"
+        },
+        {
+          "expr": "k6_battle_submission_connection_acquire_ms_max{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"} * 1000",
+          "legendFormat": "요청별 MAX",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 103 },
+      "id": 44,
+      "title": "성공 제출 요청별 커넥션 점유",
+      "description": "HTTP 202로 수락된 각 제출 요청이 커넥션을 획득한 직후부터 close()로 풀에 반환할 때까지 점유한 시간입니다. 획득 대기 시간은 포함하지 않습니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "k6_battle_submission_connection_hold_ms_p95{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"} * 1000",
+          "legendFormat": "요청별 P95",
+          "refId": "A"
+        },
+        {
+          "expr": "k6_battle_submission_connection_hold_ms_p99{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"} * 1000",
+          "legendFormat": "요청별 P99",
+          "refId": "B"
+        },
+        {
+          "expr": "k6_battle_submission_connection_hold_ms_max{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"} * 1000",
+          "legendFormat": "요청별 MAX",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 103 },
+      "id": 45,
+      "title": "성공 제출 트랜잭션 전체 시간",
+      "description": "컨트롤러가 @Transactional 서비스 프록시를 호출하기 직전부터 서비스 실행과 commit을 마치고 반환될 때까지의 시간입니다. 커넥션 획득 대기와 점유를 모두 포함하는 상위 구간이므로 둘과 합산하지 않습니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "k6_battle_submission_transaction_ms_p95{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"} * 1000",
+          "legendFormat": "요청별 P95",
+          "refId": "A"
+        },
+        {
+          "expr": "k6_battle_submission_transaction_ms_p99{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"} * 1000",
+          "legendFormat": "요청별 P99",
+          "refId": "B"
+        },
+        {
+          "expr": "k6_battle_submission_transaction_ms_max{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"} * 1000",
+          "legendFormat": "요청별 MAX",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 111 },
+      "id": 46,
+      "title": "채점 결과 저장 DB 구간별 시간",
+      "description": "채점 결과 저장 트랜잭션을 참여 행 잠금(participation_lock), 제출 3건 조회(submission_lookup), Dirty Checking UPDATE 실행(result_flush), 커밋(transaction_commit)으로 분리한 P95/P99입니다. 기존 result_save 전체 시간과 대조해 어느 DB 구간이 지연을 만드는지 확인합니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, phase) (rate(battle_grading_result_db_phase_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"success\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{phase}} P95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, phase) (rate(battle_grading_result_db_phase_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"success\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{phase}} P99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 111 },
+      "id": 47,
+      "title": "채점 결과 저장 커넥션 획득·점유",
+      "description": "채점 결과 저장 트랜잭션이 Hikari 커넥션을 기다린 시간(acquire)과 획득 후 반환할 때까지 점유한 시간(hold)을 분리한 P95/P99입니다. 제출 API의 커넥션 지표와 섞이지 않습니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, phase) (rate(battle_grading_result_connection_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"success\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{phase}} P95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, phase) (rate(battle_grading_result_connection_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"success\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{phase}} P99",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 119 },
+      "id": 48,
+      "title": "제출 정보 캐시 Hit·Miss",
+      "description": "battleSubmissionInfo 로컬 Caffeine 캐시 조회 결과입니다. 최초 요청 또는 TTL 만료 후 첫 요청은 miss이고, 이후 같은 battleId 요청은 hit입니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(cache_gets_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",cache=\"battleSubmissionInfo\",cache_manager=\"battleSubmission\"}[$__rate_interval]))",
+          "legendFormat": "{{result}} / sec",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "min": 0, "max": 100, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 119 },
+      "id": 49,
+      "title": "제출 정보 캐시 적중률",
+      "description": "선택 구간의 hit 비율입니다. 캐시를 비운 직후 첫 요청 1건을 제외하면 동일한 오늘 배틀 조회는 대부분 hit가 되어야 합니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(cache_gets_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",cache=\"battleSubmissionInfo\",cache_manager=\"battleSubmission\",result=\"hit\"}[$__rate_interval])) / clamp_min(sum(rate(cache_gets_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",cache=\"battleSubmissionInfo\",cache_manager=\"battleSubmission\"}[$__rate_interval])), 0.000001)",
+          "legendFormat": "hit ratio",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 119 },
+      "id": 50,
+      "title": "제출 API SQL 종류별 실행량",
+      "description": "제출 HTTP 요청 안에서 실제 실행된 SQL 문장을 SELECT·INSERT·UPDATE·DELETE로 분류한 초당 실행량입니다. 캐시 miss에서만 발생하는 배틀·케이스 SELECT도 포함됩니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "sum by (type) (rate(battle_submission_sql_statements_total{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"success\"}[$__rate_interval]))",
+          "legendFormat": "{{type}} / sec",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 127 },
+      "id": 51,
+      "title": "성공 제출 1건당 SQL 개수",
+      "description": "각 HTTP 202 응답의 X-Cosmos-Submission-Sql-Count를 k6가 수집한 값입니다. 선택한 testid 기준으로 캐시 적용 전·후 쿼리 수를 직접 비교할 수 있습니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "k6_battle_submission_sql_count_avg{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"}",
+          "legendFormat": "평균",
+          "refId": "A"
+        },
+        {
+          "expr": "k6_battle_submission_sql_count_p95{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"}",
+          "legendFormat": "P95",
+          "refId": "B"
+        },
+        {
+          "expr": "k6_battle_submission_sql_count_max{testid=~\"$testid\",operation=\"submit\",outcome=\"accepted\"}",
+          "legendFormat": "MAX",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "min": 0, "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 127 },
+      "id": 52,
+      "title": "제출 API SQL 실행 시간",
+      "description": "제출 요청에서 실행된 JDBC SQL의 유형별 P95/P99 실행 시간입니다. 캐시가 제거한 SELECT와 남아 있는 INSERT·UPDATE 비용을 구분해서 확인합니다.",
+      "type": "timeseries",
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, type) (rate(battle_submission_sql_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"success\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{type}} P95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, type) (rate(battle_submission_sql_seconds_bucket{job=\"prometheus.scrape.spring\",application=\"cosmos-backend\",version=\"v1\",outcome=\"success\"}[$__rate_interval]))) * 1000",
+          "legendFormat": "{{type}} P99",
+          "refId": "B"
+        }
+      ]
     }
   ],
   "refresh": "2s",
@@ -486,26 +1268,31 @@
         "type": "datasource"
       },
       {
-        "current": {},
+        "current": {
+          "selected": true,
+          "text": "All S2 runs",
+          "value": "$__all"
+        },
         "datasource": { "type": "prometheus", "uid": "$datasource" },
         "definition": "label_values(k6_http_reqs_total, testid)",
-        "includeAll": false,
+        "includeAll": true,
         "label": "k6 테스트 실행 ID",
         "name": "testid",
         "options": [],
         "query": { "query": "label_values(k6_http_reqs_total, testid)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
         "refresh": 2,
-        "regex": "/^s2-[0-9]{8}-[0-9]{6}$/",
+        "regex": "/^s2-(?:(?:100|200|300|500|700|1000)-)?[0-9]{8}-[0-9]{6}$/",
         "sort": 2,
-        "type": "query"
+        "type": "query",
+        "allValue": "s2-(?:(?:100|200|300|500|700|1000)-)?[0-9]{8}-[0-9]{6}"
       }
     ]
   },
   "time": { "from": "now-30m", "to": "now" },
   "timepicker": {},
   "timezone": "Asia/Seoul",
-  "title": "COSMOS 데일리 배틀 S2 - 100명 동시 제출",
+  "title": "COSMOS 데일리 배틀 S2 - 사용자 수별 동시 제출",
   "uid": "cosmos-battle-s2",
-  "version": 3,
+  "version": 11,
   "weekStart": "monday"
 }

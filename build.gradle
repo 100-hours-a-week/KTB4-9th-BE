@@ -19,6 +19,9 @@ repositories {
 
 configurations {
 	pyroscopeAgent
+	otelJavaAgent {
+		transitive = false
+	}
 }
 
 dependencies {
@@ -34,12 +37,10 @@ dependencies {
 
 	// 평가 완료 이벤트 서버 간 전달
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-	// Local-profile JDBC query timing observations (disabled outside local profile).
-	implementation 'net.ttddyy.observation:datasource-micrometer-spring-boot:2.3.0'
-
 	// 에러 및 성능 모니터링
 	implementation 'io.sentry:sentry-spring-boot-4-starter:8.53.0'
 	pyroscopeAgent 'io.pyroscope:agent:2.9.1'
+	otelJavaAgent 'io.opentelemetry.javaagent:opentelemetry-javaagent:2.33.1'
 
 	// JWT 생성/검증 및 Resource Server 인증
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
@@ -68,6 +69,30 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 
+}
+
+tasks.register('copyOtelJavaAgent', Copy) {
+	dependsOn tasks.named('verifyOtelJavaAgent')
+	from configurations.otelJavaAgent
+	into layout.buildDirectory.dir('otel')
+	rename { 'opentelemetry-javaagent.jar' }
+}
+
+def otelJavaAgentSha256 = 'e43a270df53c6f423e0ab157be9c27ccc01d5dc3232e162fe54777573db2f149'
+tasks.register('verifyOtelJavaAgent') {
+	inputs.files(configurations.otelJavaAgent)
+	doLast {
+		def agent = configurations.otelJavaAgent.singleFile
+		def digest = java.security.MessageDigest.getInstance('SHA-256')
+			.digest(agent.bytes).encodeHex().toString()
+		if (digest != otelJavaAgentSha256) {
+			throw new GradleException("OpenTelemetry Java agent checksum mismatch: ${digest}")
+		}
+	}
+}
+
+tasks.named('bootJar') {
+	finalizedBy tasks.named('copyOtelJavaAgent')
 }
 
 tasks.named('test') {

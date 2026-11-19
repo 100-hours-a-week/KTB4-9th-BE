@@ -2,7 +2,6 @@ package com.cosmos.cosmos_backend.dailyBattle.scheduler;
 
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
-import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.dailyBattle.service.BattleResultService;
@@ -43,15 +42,9 @@ public class BattleResultScheduler {
 
     private ScheduledFuture<?> recheckTask;
 
-    // 부하테스트를 위한 메트릭
-    private final BattleMetrics battleMetrics;
-
     // 설정된 결과 공개 시각에 실행할 결과 확정 메소드
     @Scheduled(cron = "#{@battleSchedule.resultCron()}", zone = "Asia/Seoul")
     public synchronized void finalizeBattle() {
-
-        // 부하테스트를 위한 메트릭
-        battleMetrics.recordFinalizeAttempt();
 
         LocalDate today = LocalDate.now(clock);
 
@@ -93,18 +86,7 @@ public class BattleResultScheduler {
         // 3. 모든 채점 완료 → 결과 공개 상태 저장
         LocalDateTime publishedAt = LocalDateTime.now(clock);
 
-        int resultPublishedSuccess = battleResultService.battleResultPublished(todayBattleId, publishedAt);
-
-        if(resultPublishedSuccess == 1){
-            // 부하테스트를 위한 메트릭
-            battleMetrics.recordResultPublished(
-                    today.atTime(battleSchedule.resultTime())
-                            .atZone(ZoneId.of("Asia/Seoul"))
-                            .toInstant(),
-                    publishedAt.atZone(ZoneId.of("Asia/Seoul")).toInstant()
-            );
-
-        }
+        battleResultService.battleResultPublished(todayBattleId, publishedAt);
 
         if(recheckTask != null){
             recheckTask.cancel(false);

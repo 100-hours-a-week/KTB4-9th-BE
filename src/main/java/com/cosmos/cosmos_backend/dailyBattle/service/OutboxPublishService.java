@@ -2,16 +2,13 @@ package com.cosmos.cosmos_backend.dailyBattle.service;
 
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.OutboxEvent;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.OutboxEventPreemptResponseDto;
+import com.cosmos.cosmos_backend.global.config.RabbitMqConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -50,8 +47,8 @@ public class OutboxPublishService {
             // 발행 과정 예외 처리
             try {
                 rabbitTemplate.convertAndSend(
-                        "battle.grading.exchange",
-                        "battle.grading.request",
+                        RabbitMqConfig.GRADING_EXCHANGE,
+                        RabbitMqConfig.GRADING_ROUTING_KEY,
                         event.getBattleAnswerPayload(),
                         publishConfirmData
                 );

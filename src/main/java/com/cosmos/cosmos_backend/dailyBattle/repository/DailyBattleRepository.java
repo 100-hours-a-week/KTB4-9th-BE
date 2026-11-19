@@ -1,6 +1,7 @@
 package com.cosmos.cosmos_backend.dailyBattle.repository;
 
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.DailyBattle;
+import com.cosmos.cosmos_backend.dailyBattle.projection.BattleBasicInfoProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -35,5 +36,16 @@ public interface DailyBattleRepository extends JpaRepository<DailyBattle, Long> 
           AND d.resultPublishedAt IS NULL
     """)
     int publishResultIfNotPublished(Long battleId, LocalDateTime publishedAt);
+
+    // 배틀 기본 정보 조회
+    @Query("""
+    SELECT d.battleId AS battleId,
+           d.battleDate AS battleDate
+    FROM DailyBattle d
+    WHERE d.battleId = :battleId
+    """)
+    Optional<BattleBasicInfoProjection> findBasicInfoByBattleId(
+            @Param("battleId") Long battleId
+    );
 
 }

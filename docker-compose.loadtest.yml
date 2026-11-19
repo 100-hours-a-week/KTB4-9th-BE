@@ -12,7 +12,27 @@ services:
       retries: 12
       start_period: 30s
 
+  rabbitmq:
+    container_name: cosmos-rabbitmq-loadtest
+    image: rabbitmq:4.1-management-alpine
+    ports:
+      # 기존 로컬 RabbitMQ와 충돌하지 않도록 관리 화면만 15673으로 노출
+      - "15673:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-cosmos}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-cosmos-local}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-/}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
   backend-loadtest:
+    container_name: cosmos-backend-loadtest
     image: eclipse-temurin:25-jdk-alpine
     working_dir: /workspace
     command: ["./gradlew", "-Ppyroscope=true", "bootRun", "--no-daemon"]
@@ -29,16 +49,94 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cosmos
       SPRING_DATASOURCE_USERNAME: cosmos
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in your shell}
+      APP_WORKER_ENABLED: "false"
+      # 배틀 채점 부하테스트와 무관한 자연어 풀이 DB 폴링 Worker 비활성화
+      EVALUATION_WORKER_ENABLED: "false"
+      SPRING_MAIN_WEB_APPLICATION_TYPE: servlet
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-cosmos}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-cosmos-local}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-/}
+      MANAGEMENT_HEALTH_RABBIT_ENABLED: "true"
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in your shell}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your shell}
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:?Set KAKAO_CLIENT_ID in your shell}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:?Set KAKAO_CLIENT_SECRET in your shell}
       KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:?Set KAKAO_REDIRECT_URI in your shell}
-      AI_BASE_URL: http://host.docker.internal:8000
-      PYROSCOPE_SERVER_ADDRESS: http://host.docker.internal:4040
+      AI_SERVER_BASE_URL: ${AI_SERVER_BASE_URL:-http://host.docker.internal:8000}
+      JUDGE0_BASE_URL: ${JUDGE0_BASE_URL:-http://host.docker.internal:2358}
+      PYROSCOPE_SERVER_ADDRESS: http://pyroscope:4040
+
+      # 로컬 부하테스트 사용자 100명 준비 엔드포인트
+      LOADTEST_FIXTURES_ENABLED: "true"
+      LOADTEST_FIXTURES_SECRET: ${LOADTEST_FIXTURES_SECRET:?Set LOADTEST_FIXTURES_SECRET in your shell}
+
+      # 로컬에서 배틀 시간을 반복 조정할 수 있도록 호스트 환경변수를 전달
+      BATTLE_OPEN_TIME: ${BATTLE_OPEN_TIME:-12:50:00}
+      BATTLE_SUBMISSION_DEADLINE: ${BATTLE_SUBMISSION_DEADLINE:-12:59:59}
+      BATTLE_RESULT_TIME: ${BATTLE_RESULT_TIME:-13:00:00}
+      # S2 제출 단독 비교 실험에서만 false로 전달합니다.
+      BATTLE_GRADING_WORKER_ENABLED: ${BATTLE_GRADING_WORKER_ENABLED:-true}
     depends_on:
       mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    # 컨테이너 프로세스가 시작된 시점이 아니라 Spring이 요청을 받을 수 있는 시점을 확인합니다.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+      start_period: 20s
+
+  grading-worker-loadtest:
+    container_name: cosmos-grading-worker-loadtest
+    image: eclipse-temurin:25-jdk-alpine
+    working_dir: /workspace
+    # API와 저장소의 .gradle 프로젝트 캐시 잠금을 공유하지 않도록 별도 경로 사용
+    command: ["./gradlew", "bootRun", "--no-daemon", "--project-cache-dir", "/tmp/worker-gradle-project-cache"]
+    cpus: 2.0
+    mem_limit: 4g
+    volumes:
+      - .:/workspace
+      # 실행 중인 API Gradle 프로세스와 캐시 잠금이 충돌하지 않도록 Worker 전용 캐시 사용
+      - grading-worker-gradle-cache:/root/.gradle
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_JPA_OPEN_IN_VIEW: "false"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/cosmos
+      SPRING_DATASOURCE_USERNAME: cosmos
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in your shell}
+      APP_WORKER_ENABLED: "true"
+      # 이 프로세스에서는 RabbitMQ 배틀 채점 Consumer만 실행
+      EVALUATION_WORKER_ENABLED: "false"
+      SPRING_MAIN_WEB_APPLICATION_TYPE: none
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-cosmos}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-cosmos-local}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-/}
+      RABBITMQ_CONSUMER_PREFETCH: ${RABBITMQ_CONSUMER_PREFETCH:-1}
+      RABBITMQ_CONSUMER_CONCURRENCY: ${RABBITMQ_CONSUMER_CONCURRENCY:-1}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in your shell}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your shell}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:?Set KAKAO_CLIENT_ID in your shell}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:?Set KAKAO_CLIENT_SECRET in your shell}
+      KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:?Set KAKAO_REDIRECT_URI in your shell}
+      AI_SERVER_BASE_URL: ${AI_SERVER_BASE_URL:-http://host.docker.internal:8000}
+      JUDGE0_BASE_URL: ${JUDGE0_BASE_URL:-http://host.docker.internal:2358}
+      BATTLE_OPEN_TIME: ${BATTLE_OPEN_TIME:-12:50:00}
+      BATTLE_SUBMISSION_DEADLINE: ${BATTLE_SUBMISSION_DEADLINE:-12:59:59}
+      BATTLE_RESULT_TIME: ${BATTLE_RESULT_TIME:-13:00:00}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
 volumes:
   gradle-cache:
+  grading-worker-gradle-cache:
+  rabbitmq-data:

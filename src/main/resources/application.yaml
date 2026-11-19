@@ -21,6 +21,14 @@ spring:
     publisher-returns: true
     template:
       mandatory: true
+    listener:
+      simple:
+        # 동시에 메시지를 처리할 Consumer 개수
+        concurrency: ${RABBITMQ_CONSUMER_CONCURRENCY:1}
+        max-concurrency: ${RABBITMQ_CONSUMER_CONCURRENCY:1}
+        # Worker가 ACK하기 전에 미리 받아둘 메시지를 1개로 제한
+        prefetch: ${RABBITMQ_CONSUMER_PREFETCH:1}
+
   # HTTP 요청 받을지
   main:
     web-application-type: ${SPRING_MAIN_WEB_APPLICATION_TYPE:servlet}
@@ -83,6 +91,13 @@ sentry:
   send-default-pii: false
   traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
 
+# OpenTelemetry Java Agent가 MDC에 주입하는 trace_id/span_id를 JSON 필드로 함께 출력한다.
+# 요청/응답 본문과 인증 헤더는 구조화 로그에 추가하지 않는다.
+logging:
+  structured:
+    format:
+      console: logstash
+
 management:
   endpoints:
     web:
@@ -111,6 +126,14 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+
 kakao:
   client-id: ${KAKAO_CLIENT_ID}
   client-secret: ${KAKAO_CLIENT_SECRET}
@@ -135,19 +158,6 @@ judge0:
 server:
   servlet:
     context-path: /api
-  # 부하테스트를 위한 메트릭
-  tomcat:
-    mbeanregistry:
-      enabled: true
-
-# 부하테스트를 위한 메트릭
-management:
-  metrics:
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-        hikaricp.connections.acquire: true
-        jvm.gc.pause: true
 
 frontend:
   base-url: ${FRONTEND_BASE_URL}

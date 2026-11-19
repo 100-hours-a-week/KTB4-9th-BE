@@ -1,0 +1,19 @@
+local.file_match "mysql_slow_query" {
+  path_targets = [
+    {
+      "__path__" = "/var/log/mysql/*.log",
+      "job"      = "mysql-slow-query",
+    },
+  ]
+}
+
+loki.source.file "mysql_slow_query" {
+  targets    = local.file_match.mysql_slow_query.targets
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

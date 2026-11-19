@@ -103,6 +103,9 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
     private DailyBattleService dailyBattleService;
 
     @Autowired
+    private BattleSubmissionService battleSubmissionService;
+
+    @Autowired
     private DataSource dataSource;
 
     @Autowired
@@ -169,7 +172,7 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
         Future<BattleSubmissionResponseDto> submission = executor.submit(() -> {
             await(timeoutReadCompleted, "timeout transaction did not finish its IN_PROGRESS query");
 
-            BattleSubmissionResponseDto response = dailyBattleService.battleSubmission(
+            BattleSubmissionResponseDto response = battleSubmissionService.submitBattleAnswers(
                     submissionRequest(fixture.battleId()),
                     fixture.battleId(),
                     fixture.userId(),
@@ -204,7 +207,7 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
         Future<BattleSubmissionResponseDto> submission = executor.submit(() -> {
             // battleSubmission() 내부에서 참여자 조회까지 수행한 뒤
             // updateStatusIfMatch() 직전 테스트 게이트에서 일시 정지
-            BattleSubmissionResponseDto response = dailyBattleService.battleSubmission(
+            BattleSubmissionResponseDto response = battleSubmissionService.submitBattleAnswers(
                     submissionRequest(fixture.battleId()),
                     fixture.battleId(),
                     fixture.userId(),
@@ -258,7 +261,7 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
             await(timeoutCommitted, "timeout transaction did not commit");
 
             // 전달하는 submittedAt은 마감 전이지만 실제 제출 트랜잭션은 지금 시작된다.
-            return dailyBattleService.battleSubmission(
+            return battleSubmissionService.submitBattleAnswers(
                     submissionRequest(fixture.battleId()),
                     fixture.battleId(),
                     fixture.userId(),
@@ -378,7 +381,7 @@ class DailyBattleSubmissionTimeoutConcurrencyIntegrationTest {
                             timelineRecorder.recordSubmissionStarted(participant.participationId());
 
                             // 모든 사용자는 마감 전 동일한 submittedAt으로 제출 시도
-                            return dailyBattleService.battleSubmission(
+                            return battleSubmissionService.submitBattleAnswers(
                                     submissionRequest(fixture.battleId()),
                                     fixture.battleId(),
                                     participant.userId(),

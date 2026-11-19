@@ -18,7 +18,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
     @Query(value = """
         SELECT *
         FROM outbox_events
-        WHERE battle_event_type = 'GRADING_REQUESTED'
+        WHERE battle_event_type = 'GRADING_REQUEST'
         AND ( 
             battle_submission_event_status = 'PENDING'
            OR (

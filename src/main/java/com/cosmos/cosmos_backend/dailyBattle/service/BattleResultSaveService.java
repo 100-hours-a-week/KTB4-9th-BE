@@ -5,14 +5,13 @@ import com.cosmos.cosmos_backend.common.exception.BusinessException;
 import com.cosmos.cosmos_backend.dailyBattle.domain.ParticipationStatus;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleParticipation;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.BattleSubmission;
-import com.cosmos.cosmos_backend.dailyBattle.domain.entity.GradingResult;
+import com.cosmos.cosmos_backend.dailyBattle.domain.GradingResult;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleParticipationRepository;
 import com.cosmos.cosmos_backend.dailyBattle.repository.BattleSubmissionRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-
 import java.util.*;
 
 @Service
@@ -70,5 +69,4 @@ public class BattleResultSaveService {
 
         return true;
     }
-
 }

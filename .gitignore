@@ -18,6 +18,7 @@
 # 부하 테스트용 사용자 인증 정보
 /loadtest/data/*
 !/loadtest/data/battle-users.example.json
+/loadtest/results/
 
 # 기타
 *.log

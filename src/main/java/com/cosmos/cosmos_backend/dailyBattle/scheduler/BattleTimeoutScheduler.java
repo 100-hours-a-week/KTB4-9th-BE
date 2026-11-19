@@ -1,7 +1,6 @@
 package com.cosmos.cosmos_backend.dailyBattle.scheduler;
 
 import com.cosmos.cosmos_backend.common.exception.BusinessException;
-import com.cosmos.cosmos_backend.dailyBattle.metrics.BattleMetrics;
 import com.cosmos.cosmos_backend.dailyBattle.repository.DailyBattleRepository;
 import com.cosmos.cosmos_backend.dailyBattle.service.DailyBattleService;
 import lombok.RequiredArgsConstructor;
@@ -34,9 +33,6 @@ public class BattleTimeoutScheduler {
     private final BattleSchedule battleSchedule;
 
     private final Clock clock;
-
-    // 부하테스트를 위한 메트릭
-    private final BattleMetrics battleMetrics;
 
     // 설정된 제출 마감 시각에 미제출 참여자 타임아웃 처리
     @Scheduled(cron = "#{@battleSchedule.submissionDeadlineCron()}", zone = "Asia/Seoul")
