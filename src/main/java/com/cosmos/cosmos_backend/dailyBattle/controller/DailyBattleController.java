@@ -119,8 +119,25 @@ public class DailyBattleController {
 
     // 배틀 중도 포기
     @PatchMapping("/{battle_id}/participations")
+    @Operation(
+            summary = "배틀 중도 포기",
+            description = "로그인한 사용자의 해당 배틀 참여 상태를 IN_PROGRESS에서 DROPPED_OUT으로 변경합니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "배틀 참여 상태를 중도 포기로 변경했습니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "409",
+            description = "배틀에 참여 중인 상태가 아닙니다."
+    )
     public ResponseEntity<ApiResponse<BattleDropOutResponseDto>> dropOutBattle(
+            @Parameter(hidden = true)
             @AuthenticationPrincipal Jwt userInfo,
+            @Parameter(
+                    description = "중도 포기할 배틀 ID",
+                    example = "1"
+            )
             @PathVariable("battle_id") Long battleId
     ) {
         Long userId = Long.parseLong(userInfo.getSubject());

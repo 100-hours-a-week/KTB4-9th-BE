@@ -75,7 +75,7 @@ public class OutboxPublisherScheduler {
             return;
         }
 
-        // 결과 공개 전까지는 publisher 복구
+        // 결과 공개 전까지는 publisher 복
         outboxPublisher();
 
     }
