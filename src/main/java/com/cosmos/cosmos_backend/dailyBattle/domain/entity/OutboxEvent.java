@@ -18,7 +18,19 @@ import java.util.UUID;
 
 @Entity
 @Getter
-@Table(name = "outbox_events")
+@Table(
+        name = "outbox_events",
+        indexes = {
+                @Index(
+                        name = "idx_outbox_pending",
+                        columnList = "battle_event_type, battle_submission_event_status, created_at, outbox_event_id"
+                ),
+                @Index(
+                        name = "idx_outbox_expired_publishing",
+                        columnList = "battle_event_type, battle_submission_event_status, publisher_lease_expires_at, created_at, outbox_event_id"
+                )
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 public class OutboxEvent {

@@ -22,6 +22,8 @@ public class OutboxStatusChangeService {
     // TODO : 몇 초 기준으로 할지 부하테스트 해보고 바꾸기
     private static final long PUBLISHER_LEASE_SECONDS = 5;
 
+    private static final int PUBLISH_BATCH_SIZE = 100;
+
     private final OutboxEventRepository outboxEventRepository;
 
     private final Clock clock;
@@ -30,8 +32,22 @@ public class OutboxStatusChangeService {
     @Transactional
     public OutboxEventPreemptResponseDto preemptOutboxEvent() {
 
-        // 가져온 선점 작업 (500ms 배치 폴링)
-        List<OutboxEvent> outboxEvents = outboxEventRepository.findPublishableForUpdate();
+        // 임대가 만료된 PUBLISHING 이벤트 먼저 조회
+        List<OutboxEvent> expiredPublishingEvents =
+                outboxEventRepository.findExpiredPublishingForUpdate(PUBLISH_BATCH_SIZE);
+
+        // 최대 배치 크기에서 남은 개수 계산
+        int pendingLimit = PUBLISH_BATCH_SIZE - expiredPublishingEvents.size();
+
+        // 남은 개수만큼 PENDING 이벤트 조회
+        List<OutboxEvent> pendingEvents = pendingLimit > 0
+                ? outboxEventRepository.findPendingForUpdate(pendingLimit)
+                : List.of();
+
+        // 실제 선점할 이벤트를 하나의 목록으로 합치기
+        List<OutboxEvent> outboxEvents = new ArrayList<>(PUBLISH_BATCH_SIZE);
+        outboxEvents.addAll(expiredPublishingEvents);
+        outboxEvents.addAll(pendingEvents);
 
         // 선점할 작업 담을 리스트
         List<OutboxEvent> publishEvents = new ArrayList<>();
