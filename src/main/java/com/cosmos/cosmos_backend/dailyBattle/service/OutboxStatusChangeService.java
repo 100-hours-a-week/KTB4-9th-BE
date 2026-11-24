@@ -49,27 +49,53 @@ public class OutboxStatusChangeService {
         outboxEvents.addAll(expiredPublishingEvents);
         outboxEvents.addAll(pendingEvents);
 
-        // 선점할 작업 담을 리스트
+        // 실제 발행할 이벤트와 상태 변경할 id를 담을 리스트
         List<OutboxEvent> publishEvents = new ArrayList<>();
+        List<Long> publishingEventIds = new ArrayList<>();
+        List<Long> publishFailedEventIds = new ArrayList<>();
 
-        // publishing 상태 변경
+        // Publisher 임대 정보 생성
         Instant leaseExpiresAt = clock.instant().plusSeconds(PUBLISHER_LEASE_SECONDS);
 
         UUID leaseToken = UUID.randomUUID();
 
         for (OutboxEvent outboxEvent : outboxEvents) {
-            // 재선점 횟수 3회 초과시 발행 실패 처리
+            // 재선점 횟수 3회 초과시 발행 실패 id로 분류
             if (outboxEvent.getPublishedAttemptCount() >= 3){
-                outboxEvent.changeStatusFailed();
+                publishFailedEventIds.add(outboxEvent.getOutboxEventId());
                 continue;
             }
 
-            // 실제 발행할 이벤트 선점
-            outboxEvent.changedPublishingStatus(leaseToken, leaseExpiresAt);
-            outboxEvent.increasePublishedAttemptCount();
-
+            // 실제 발행할 이벤트와 id 분류
             publishEvents.add(outboxEvent);
+            publishingEventIds.add(outboxEvent.getOutboxEventId());
 
+        }
+
+        // 재선점 횟수를 초과한 이벤트 한 번에 실패 처리
+        if (!publishFailedEventIds.isEmpty()) {
+            int failedCount = outboxEventRepository.markAsPublishFailed(
+                    publishFailedEventIds,
+                    BattleSubmissionEventStatus.PUBLISH_FAILED
+            );
+
+            if (failedCount != publishFailedEventIds.size()) {
+                throw new IllegalStateException("Outbox_publish_failed_bulk_update_mismatch");
+            }
+        }
+
+        // 실제 발행할 이벤트 한 번에 선점 처리
+        if (!publishingEventIds.isEmpty()) {
+            int publishingCount = outboxEventRepository.markAsPublishing(
+                    publishingEventIds,
+                    BattleSubmissionEventStatus.PUBLISHING,
+                    leaseToken,
+                    leaseExpiresAt
+            );
+
+            if (publishingCount != publishingEventIds.size()) {
+                throw new IllegalStateException("Outbox_publishing_bulk_update_mismatch");
+            }
         }
 
         OutboxEventPreemptResponseDto outboxEventPreemptResponse = new OutboxEventPreemptResponseDto(
