@@ -1,6 +1,7 @@
 package com.cosmos.cosmos_backend.dailyBattle.service;
 
 import com.cosmos.cosmos_backend.dailyBattle.domain.BattleSubmissionEventStatus;
+import com.cosmos.cosmos_backend.dailyBattle.domain.OutboxSentConfirm;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.OutboxEvent;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.OutboxEventPreemptResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.repository.OutboxEventRepository;
@@ -13,7 +14,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +24,8 @@ public class OutboxStatusChangeService {
 
     // TODO : 몇 초 기준으로 할지 부하테스트 해보고 바꾸기
     private static final long PUBLISHER_LEASE_SECONDS = 5;
+
+    private static final int PUBLISH_BATCH_SIZE = 100;
 
     private final OutboxEventRepository outboxEventRepository;
 
@@ -30,30 +35,70 @@ public class OutboxStatusChangeService {
     @Transactional
     public OutboxEventPreemptResponseDto preemptOutboxEvent() {
 
-        // 가져온 선점 작업 (500ms 배치 폴링)
-        List<OutboxEvent> outboxEvents = outboxEventRepository.findPublishableForUpdate();
+        // 임대가 만료된 PUBLISHING 이벤트 먼저 조회
+        List<OutboxEvent> expiredPublishingEvents =
+                outboxEventRepository.findExpiredPublishingForUpdate(PUBLISH_BATCH_SIZE);
 
-        // 선점할 작업 담을 리스트
+        // 최대 배치 크기에서 남은 개수 계산
+        int pendingLimit = PUBLISH_BATCH_SIZE - expiredPublishingEvents.size();
+
+        // 남은 개수만큼 PENDING 이벤트 조회
+        List<OutboxEvent> pendingEvents = pendingLimit > 0
+                ? outboxEventRepository.findPendingForUpdate(pendingLimit)
+                : List.of();
+
+        // 실제 선점할 이벤트를 하나의 목록으로 합치기
+        List<OutboxEvent> outboxEvents = new ArrayList<>(PUBLISH_BATCH_SIZE);
+        outboxEvents.addAll(expiredPublishingEvents);
+        outboxEvents.addAll(pendingEvents);
+
+        // 실제 발행할 이벤트와 상태 변경할 id를 담을 리스트
         List<OutboxEvent> publishEvents = new ArrayList<>();
+        List<Long> publishingEventIds = new ArrayList<>();
+        List<Long> publishFailedEventIds = new ArrayList<>();
 
-        // publishing 상태 변경
+        // Publisher 임대 정보 생성
         Instant leaseExpiresAt = clock.instant().plusSeconds(PUBLISHER_LEASE_SECONDS);
 
         UUID leaseToken = UUID.randomUUID();
 
         for (OutboxEvent outboxEvent : outboxEvents) {
-            // 재선점 횟수 3회 초과시 발행 실패 처리
+            // 재선점 횟수 3회 초과시 발행 실패 id로 분류
             if (outboxEvent.getPublishedAttemptCount() >= 3){
-                outboxEvent.changeStatusFailed();
+                publishFailedEventIds.add(outboxEvent.getOutboxEventId());
                 continue;
             }
 
-            // 실제 발행할 이벤트 선점
-            outboxEvent.changedPublishingStatus(leaseToken, leaseExpiresAt);
-            outboxEvent.increasePublishedAttemptCount();
-
+            // 실제 발행할 이벤트와 id 분류
             publishEvents.add(outboxEvent);
+            publishingEventIds.add(outboxEvent.getOutboxEventId());
 
+        }
+
+        // 재선점 횟수를 초과한 이벤트 한 번에 실패 처리
+        if (!publishFailedEventIds.isEmpty()) {
+            int failedCount = outboxEventRepository.markAsPublishFailed(
+                    publishFailedEventIds,
+                    BattleSubmissionEventStatus.PUBLISH_FAILED
+            );
+
+            if (failedCount != publishFailedEventIds.size()) {
+                throw new IllegalStateException("Outbox_publish_failed_bulk_update_mismatch");
+            }
+        }
+
+        // 실제 발행할 이벤트 한 번에 선점 처리
+        if (!publishingEventIds.isEmpty()) {
+            int publishingCount = outboxEventRepository.markAsPublishing(
+                    publishingEventIds,
+                    BattleSubmissionEventStatus.PUBLISHING,
+                    leaseToken,
+                    leaseExpiresAt
+            );
+
+            if (publishingCount != publishingEventIds.size()) {
+                throw new IllegalStateException("Outbox_publishing_bulk_update_mismatch");
+            }
         }
 
         OutboxEventPreemptResponseDto outboxEventPreemptResponse = new OutboxEventPreemptResponseDto(
@@ -66,19 +111,30 @@ public class OutboxStatusChangeService {
     }
 
 
-    // 메세지 발행 상태로 변경하는 메소드
+    // Confirm 성공한 이벤트를 leaseToken별로 모아 SENT 상태로 변경
     @Transactional
-    public void changeOutboxSent(Long outboxEventId, UUID leaseToken) {
+    public int changeOutboxSentBulk(List<OutboxSentConfirm> confirmedEvents) {
 
         LocalDateTime now = LocalDateTime.now(clock);
 
-        outboxEventRepository.markAsSent(
-                outboxEventId,
-                leaseToken,
-                BattleSubmissionEventStatus.SENT,
-                BattleSubmissionEventStatus.PUBLISHING,
-                now
-        );
+        Map<UUID, List<Long>> eventIdsByLeaseToken = confirmedEvents.stream()
+                .collect(Collectors.groupingBy(
+                        OutboxSentConfirm::leaseToken,
+                        Collectors.mapping(OutboxSentConfirm::outboxEventId, Collectors.toList())
+                ));
 
+        int updatedCount = 0;
+
+        for (Map.Entry<UUID, List<Long>> entry : eventIdsByLeaseToken.entrySet()) {
+            updatedCount += outboxEventRepository.markAsSentBulk(
+                    entry.getValue(),
+                    entry.getKey(),
+                    BattleSubmissionEventStatus.SENT,
+                    BattleSubmissionEventStatus.PUBLISHING,
+                    now
+            );
+        }
+
+        return updatedCount;
     }
 }

@@ -28,7 +28,7 @@ import java.time.Instant;
 @RestController
 @RequestMapping("/daily-battles")
 @RequiredArgsConstructor
-@Tag(name = "데일리 배틀", description = "데일리 배틀 문제 생성 및 참여 API")
+@Tag(name = "데일리 배틀", description = "데일리 배틀 문제 생성, 참여, 답안 제출, 결과 조회 API")
 public class DailyBattleController {
 
     private final DailyBattleService  dailyBattleService;
@@ -55,7 +55,9 @@ public class DailyBattleController {
 
     // 현재 기준 오늘 배틀 정보 조회
     @GetMapping("/current")
+    @Operation(summary = "현재 배틀 정보 조회", description = "서버 시각과 오늘 배틀 ID, 전날 배틀 ID를 조회합니다.")
     public ResponseEntity<ApiResponse<CurrentDailyBattleResponseDto>> getCurrentDailyBattle(
+            @Parameter(hidden = true)
             @AuthenticationPrincipal Jwt userInfo
     ){
 
@@ -94,10 +96,17 @@ public class DailyBattleController {
 
     // 배틀 제출
     @PostMapping("/{battle_id}/submissions")
+    @Operation(summary = "배틀 답안 제출", description = "로그인한 사용자의 테스트 케이스별 답안을 접수하고 202를 반환합니다. 채점은 비동기로 진행되며 결과 조회 API에서 확인합니다.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "202", description = "배틀 답안을 접수했습니다.")
     public ResponseEntity<BattleSubmissionResponseDto> battleSubmission(
             @Valid @RequestBody DailyBattleSubmissionRequestDto battleSubmissionRequest,
+            @Parameter(description = "답안을 제출할 배틀 ID", required = true, example = "1")
             @PathVariable("battle_id") @Positive Long battleId,
+
+            @Parameter(hidden = true)
             @AuthenticationPrincipal Jwt userInfo,
+
+            @Parameter(hidden = true)
             @RequestAttribute("battleReceivedAt") Instant submittedAt
             ){
 
@@ -155,8 +164,14 @@ public class DailyBattleController {
 
     // 배틀 결과 조회
     @GetMapping("/{battle_id}/results")
+    @Operation(summary = "배틀 결과 조회", description = "공개된 배틀의 내 결과와 상위 5명 순위를 조회합니다. 결과 공개 전에는 202를 반환하며, 참여하지 않은 사용자의 내 결과는 null입니다.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "공개된 배틀 결과를 조회했습니다.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "202", description = "배틀 결과가 아직 공개되지 않았습니다.")
     public ResponseEntity<ApiResponse<BattleResultResponseDto>> battleResult(
+            @Parameter(hidden = true)
             @AuthenticationPrincipal Jwt userInfo,
+
+            @Parameter(description = "결과를 조회할 배틀 ID", required = true, example = "1")
             @Positive @NotNull @PathVariable("battle_id") Long battleId
     ) {
 
