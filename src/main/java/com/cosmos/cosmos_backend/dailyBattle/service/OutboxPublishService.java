@@ -14,14 +14,16 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class OutboxPublishService {
 
-    private final OutboxStatusChangeService outboxStatusChangService;
+    private final OutboxStatusChangeService outboxStatusChangeService;
+
+    private final OutboxSentConfirmBuffer outboxSentConfirmBuffer;
 
     private final RabbitTemplate rabbitTemplate;
 
     // 이벤트 발행 메소드
     public void eventPublish(){
         // 배치로 선점하고 + 발행 중 상태로 변경 (트랜잭션 1)
-        OutboxEventPreemptResponseDto outboxEvents = outboxStatusChangService.preemptOutboxEvent();
+        OutboxEventPreemptResponseDto outboxEvents = outboxStatusChangeService.preemptOutboxEvent();
 
         // RabbitMQ로 발행
         for (OutboxEvent event : outboxEvents.outboxEventList()) {
@@ -37,7 +39,11 @@ public class OutboxPublishService {
 
                 // ack 수신 확인 & 라우팅 성공 확인하면 발행 완료 처리
                 if (confirm.ack() && publishConfirmData.getReturned() == null) {
-                    outboxStatusChangService.changeOutboxSent(event.getOutboxEventId(), outboxEvents.leaseToken());
+                    // Confirm 성공 결과를 Buffer에 모아 SENT 상태를 일괄 처리
+                    outboxSentConfirmBuffer.add(
+                            event.getOutboxEventId(),
+                            outboxEvents.leaseToken()
+                    );
                 } else {
                     // NACK 수신
                     // Outbox 재시도 대상으로 유지

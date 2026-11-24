@@ -71,21 +71,21 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
     );
 
 
-    // 이벤트 발행 완료 상태로 변경
+    // Confirm 성공한 이벤트를 한 번에 발행 완료 상태로 변경
     @Modifying
     @Query("""
     UPDATE OutboxEvent o
     SET o.battleSubmissionEventStatus = :sent,
         o.publishedAt = :publishedAt
-    WHERE o.outboxEventId = :eventId
+    WHERE o.outboxEventId IN :eventIds
       AND o.publisherLeaseToken = :leaseToken
       AND o.battleSubmissionEventStatus = :publishing
     """)
-    int markAsSent(
-            Long eventId,
-            UUID leaseToken,
-            BattleSubmissionEventStatus sent,
-            BattleSubmissionEventStatus publishing,
-            LocalDateTime publishedAt
+    int markAsSentBulk(
+            @Param("eventIds") List<Long> eventIds,
+            @Param("leaseToken") UUID leaseToken,
+            @Param("sent") BattleSubmissionEventStatus sent,
+            @Param("publishing") BattleSubmissionEventStatus publishing,
+            @Param("publishedAt") LocalDateTime publishedAt
     );
 }

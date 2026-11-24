@@ -1,6 +1,7 @@
 package com.cosmos.cosmos_backend.dailyBattle.service;
 
 import com.cosmos.cosmos_backend.dailyBattle.domain.BattleSubmissionEventStatus;
+import com.cosmos.cosmos_backend.dailyBattle.domain.OutboxSentConfirm;
 import com.cosmos.cosmos_backend.dailyBattle.domain.entity.OutboxEvent;
 import com.cosmos.cosmos_backend.dailyBattle.dto.response.OutboxEventPreemptResponseDto;
 import com.cosmos.cosmos_backend.dailyBattle.repository.OutboxEventRepository;
@@ -13,7 +14,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -108,19 +111,30 @@ public class OutboxStatusChangeService {
     }
 
 
-    // 메세지 발행 상태로 변경하는 메소드
+    // Confirm 성공한 이벤트를 leaseToken별로 모아 SENT 상태로 변경
     @Transactional
-    public void changeOutboxSent(Long outboxEventId, UUID leaseToken) {
+    public int changeOutboxSentBulk(List<OutboxSentConfirm> confirmedEvents) {
 
         LocalDateTime now = LocalDateTime.now(clock);
 
-        outboxEventRepository.markAsSent(
-                outboxEventId,
-                leaseToken,
-                BattleSubmissionEventStatus.SENT,
-                BattleSubmissionEventStatus.PUBLISHING,
-                now
-        );
+        Map<UUID, List<Long>> eventIdsByLeaseToken = confirmedEvents.stream()
+                .collect(Collectors.groupingBy(
+                        OutboxSentConfirm::leaseToken,
+                        Collectors.mapping(OutboxSentConfirm::outboxEventId, Collectors.toList())
+                ));
 
+        int updatedCount = 0;
+
+        for (Map.Entry<UUID, List<Long>> entry : eventIdsByLeaseToken.entrySet()) {
+            updatedCount += outboxEventRepository.markAsSentBulk(
+                    entry.getValue(),
+                    entry.getKey(),
+                    BattleSubmissionEventStatus.SENT,
+                    BattleSubmissionEventStatus.PUBLISHING,
+                    now
+            );
+        }
+
+        return updatedCount;
     }
 }
